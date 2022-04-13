@@ -17,7 +17,7 @@ Please note that it is not suggested to use embedded Milvus in a production envi
 
 A configurable file will be created on initial start located at `/tmp/milvus/configs/embedded-milvus.yaml`
 
-## Data and Log Persistency
+## Data and Log Persistence
 
 All data and logs are persistent and will be stored under `/tmp/milvus/` by default. If you want them somewhere else, you can update the embedded Milvus configuration file.
 
@@ -146,7 +146,9 @@ $
 $ make embedded-milvus
 ```
 
-Upon success, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files under it. 
+2. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See step 4 for a complete directory structure). 
+
+3. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put these files in (See step 4 for a complete directory structure).
 
 ```shell
 embd-milvus/
@@ -161,17 +163,28 @@ embd-milvus/
 │   │   └── embd-milvus.so
 │   ├── configs
 │   │   └── embedded-milvus.yaml
+│   ├── lib
+│   │   ├── libfaiss.a
+│   │   ├── libknowhere.dylib               # (or .so)
+│   │   ├── libmilvus_common.dylib          # (or .so)
+│   │   ├── libmilvus_index.dylib           # (or .so)
+│   │   ├── libmilvus_indexbuilder.dylib    # (or .so)
+│   │   └── libmilvus_segcore.dylib         # (or .so)
 │   └── milvus.py
 └── setup.py
 ```
 
-2. Build the wheel:
+4. Build the wheel:
 
 ```shell
 $ python3 setup.py bdist_wheel
 ```
 
-3. Test it locally
+5. Double check that the wheels has the right files included:
+$ unzip -l dist/milvus-{version}-{python}-{abi}-{platform}.whl
+
+
+6. Test it locally
 
 Under the embd-milvus directory, start a virtual environment:
 
@@ -180,7 +193,7 @@ $ python3 -m pip install virtualenv
 $ virtualenv venv
 $ source venv/bin/activate
 # Force install the wheel you just built in the last step.
-(venv) $ pip install --upgrade --force-reinstall ./dist/milvus-2.0.1-{python}-{abi}-{platform}.whl
+(venv) $ pip install --upgrade --force-reinstall ./dist/milvus-{version}-{python}-{abi}-{platform}.whl
 (venv) $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin

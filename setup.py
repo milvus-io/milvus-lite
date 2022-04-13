@@ -29,7 +29,7 @@ setuptools.setup(
     include_package_data=True,
     package_dir={'milvus': 'milvus'},
     package_data={
-        'milvus': ['bin/*.*', 'configs/*.*'],
+        'milvus': ['bin/*.*', 'configs/*.*', 'lib/*.*'],
     },
     install_requires=['importlib_resources>=5.4.0', 'pymilvus==2.0.1'],
     classifiers=[

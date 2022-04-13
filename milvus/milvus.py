@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import os
 from importlib_resources import files
+from distutils.dir_util import copy_tree
 from pymilvus import (
     connections,
     utility,
@@ -24,7 +25,7 @@ if not os.path.exists(CONFIG_PREFIX + CONFIG_NAME):
     print("Creating Milvus config for the first time under:" + CONFIG_PREFIX +
           CONFIG_NAME)
     shutil.copy2(config, CONFIG_PREFIX)
-
+copy_tree(pathlib.Path(__file__).parent / 'lib', "/tmp/milvus/lib/")
 os.environ["LD_PRELOAD"] = str(files('milvus.bin').joinpath('embd-milvus.so'))
 
 library = ctypes.cdll.LoadLibrary(
