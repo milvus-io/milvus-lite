@@ -21,9 +21,11 @@ CONFIG_NAME = 'embedded-milvus.yaml'
 config = str(files('milvus.configs').joinpath(CONFIG_NAME))
 pathlib.Path(CONFIG_PREFIX).mkdir(parents=True, exist_ok=True)
 if not os.path.exists(CONFIG_PREFIX + CONFIG_NAME):
-    print("Creating Milvus config for the first time under" + CONFIG_PREFIX +
+    print("Creating Milvus config for the first time under:" + CONFIG_PREFIX +
           CONFIG_NAME)
     shutil.copy2(config, CONFIG_PREFIX)
+
+os.environ["LD_PRELOAD"] = str(files('milvus.bin').joinpath('embd-milvus.so'))
 
 library = ctypes.cdll.LoadLibrary(
     files('milvus.bin').joinpath('embd-milvus.so'))

@@ -181,11 +181,10 @@ $ virtualenv venv
 $ source venv/bin/activate
 # Force install the wheel you just built in the last step.
 (venv) $ pip install --upgrade --force-reinstall ./dist/milvus-2.0.1-{python}-{abi}-{platform}.whl
-(venv) $ pyton3
+(venv) $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import milvus
 ...
 ```
-

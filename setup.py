@@ -31,7 +31,7 @@ setuptools.setup(
     package_data={
         'milvus': ['bin/*.*', 'configs/*.*'],
     },
-    install_requires=['importlib_resources >= 5.4.0', 'pymilvus == 2.0.1'],
+    install_requires=['importlib_resources>=5.4.0', 'pymilvus==2.0.1'],
     classifiers=[
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
