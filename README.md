@@ -148,7 +148,7 @@ $
 
 1. In Milvus repository, build it with:
 ```shell
-$ make embedded-milvus
+$ make embd-milvus
 ```
 
 2. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See below for a complete directory structure). 
@@ -204,7 +204,7 @@ $ python3 -m pip install virtualenv
 $ virtualenv venv
 $ source venv/bin/activate
 # Force install the wheel you just built in the last step.
-(venv) $ pip install --upgrade --force-reinstall ./dist/milvus-{version}-{python}-{abi}-{platform}.whl
+(venv) $ pip install --upgrade --force-reinstall --no-deps ./dist/milvus-{version}-{python}-{abi}-{platform}.whl
 (venv) $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin

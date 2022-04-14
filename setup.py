@@ -14,8 +14,6 @@ try:
 except ImportError:
     bdist_wheel = None
 
-from milvus import __version__
-
 setuptools.setup(
     name='milvus',
     author='Milvus Team',
