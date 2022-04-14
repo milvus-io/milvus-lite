@@ -59,12 +59,29 @@ $ pip3 install --upgrade milvus
 
 # Running Embedded Milvus
 
-Before you run, install dependencies for Milvus:
+1. Before you run, install dependencies for Milvus:
 ```shell
-wget -O - https://raw.githubusercontent.com/milvus-io/milvus/v2.0.2/scripts/install_deps.sh | bash
+wget -O - https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/install_deps.sh | bash
 ```
 
-You can start by importing milvus:
+2. Preload and set environment variables.
+```shell
+$ python3
+Python 3.9.10 (main, Jan 15 2022, 11:40:53)
+[Clang 13.0.0 (clang-1300.0.29.3)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import milvus
+>>> milvus.preload()
+please run:
+export LD_PRELOAD=${YOUR_LD_PRELOAD_VALUE}
+export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
+>>> exit()
+
+$ export LD_PRELOAD=${${YOUR_LD_PRELOAD_VALUE}}
+$ export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
+```
+
+3. Start milvus:
 
 ```python
 $ python3
@@ -72,6 +89,7 @@ Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import milvus
+>>> milvus.start()
 >>>
 ```
 
@@ -82,7 +100,8 @@ $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
->>> import milvus # embedded Milvus ready to go
+>>> import milvus
+>>> milvus.start()
 >>>
 >>> import random
 >>> from pymilvus import (
@@ -216,4 +235,9 @@ Type "help", "copyright", "credits" or "license" for more information.
 9. If everything's good. Upload it to TestPyPI and PyPI.
 ```shell
 python3 -m twine upload --repository testpypi dist/*
+```
+
+10. Your package will be downloadable and installable now.
+```shell
+$ python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps milvus
 ```
