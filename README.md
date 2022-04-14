@@ -48,7 +48,7 @@ $ pip3 install milvus
 You can install a specific version of embedded Milvus by:
 
 ```shell
-$ pip3 install milvus==2.0.1
+$ pip3 install milvus
 ```
 
 You can upgrade embedded Milvus by:
@@ -58,6 +58,11 @@ $ pip3 install --upgrade milvus
 ```
 
 # Running Embedded Milvus
+
+Before you run, install dependencies for Milvus:
+```shell
+wget -O - https://raw.githubusercontent.com/milvus-io/milvus/v2.0.2/scripts/install_deps.sh | bash
+```
 
 You can start by importing milvus:
 
@@ -146,10 +151,11 @@ $
 $ make embedded-milvus
 ```
 
-2. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See step 4 for a complete directory structure). 
+2. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See below for a complete directory structure). 
 
-3. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put these files in (See step 4 for a complete directory structure).
+3. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put these files in (See below for a complete directory structure).
 
+4. After the steps above, your repository should have the structure like below:
 ```shell
 embd-milvus/
 ├── LICENSE
@@ -174,17 +180,22 @@ embd-milvus/
 └── setup.py
 ```
 
-4. Build the wheel:
+5. Run the following command to update environment variables:
+```shell
+$ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/tmp/milvus/lib"
+$ export LD_PRELOAD="/tmp/milvus/lib/embd-milvus.so"
+```
 
+6. Build the wheel:
 ```shell
 $ python3 setup.py bdist_wheel
 ```
 
-5. Double check that the wheels has the right files included:
+7. Double check that the wheel has the right files included:
 $ unzip -l dist/milvus-{version}-{python}-{abi}-{platform}.whl
 
 
-6. Test it locally
+8. Test it locally
 
 Under the embd-milvus directory, start a virtual environment:
 
@@ -200,4 +211,9 @@ Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import milvus
 ...
+```
+
+9. If everything's good. Upload it to TestPyPI and PyPI.
+```shell
+python3 -m twine upload --repository testpypi dist/*
 ```

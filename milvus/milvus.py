@@ -16,17 +16,19 @@ from pymilvus import (
     Collection,
 )
 
-CONFIG_PREFIX = '/tmp/milvus/configs/'
+CONFIG_PATH = '/tmp/milvus/configs/'
+LOG_PATH = '/tmp/milvus/logs/'
 CONFIG_NAME = 'embedded-milvus.yaml'
 
 config = str(files('milvus.configs').joinpath(CONFIG_NAME))
-pathlib.Path(CONFIG_PREFIX).mkdir(parents=True, exist_ok=True)
-if not os.path.exists(CONFIG_PREFIX + CONFIG_NAME):
-    print("Creating Milvus config for the first time under:" + CONFIG_PREFIX +
+pathlib.Path(CONFIG_PATH).mkdir(parents=True, exist_ok=True)
+pathlib.Path(LOG_PATH).mkdir(parents=True, exist_ok=True)
+if not os.path.exists(CONFIG_PATH + CONFIG_NAME):
+    print("Creating Milvus config for the first time under:" + CONFIG_PATH +
           CONFIG_NAME)
-    shutil.copy2(config, CONFIG_PREFIX)
+    shutil.copy2(config, CONFIG_PATH)
+shutil.copy2(str(files('milvus.bin').joinpath('embd-milvus.so')), '/tmp/milvus/lib/')
 copy_tree(pathlib.Path(__file__).parent / 'lib', "/tmp/milvus/lib/")
-os.environ["LD_PRELOAD"] = str(files('milvus.bin').joinpath('embd-milvus.so'))
 
 library = ctypes.cdll.LoadLibrary(
     files('milvus.bin').joinpath('embd-milvus.so'))
@@ -41,7 +43,7 @@ def is_milvus_alive():
 
 
 def milvus_config_path():
-    return CONFIG_PREFIX + CONFIG_NAME
+    return CONFIG_PATH + CONFIG_NAME
 
 
 thr = threading.Thread(target=run_milvus, args=(), kwargs={})
