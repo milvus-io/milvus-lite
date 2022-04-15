@@ -1,9 +1,9 @@
 # Introduction
 
-The embedded Milvus broughts up a Milvus instance on that starts and exits whenever you wish it to, while keeping all data and logs persistent. You can have it work within two simple steps:
+The embedded Milvus brings up a Milvus instance on that starts and exits whenever you wish it to, while keeping all data and logs persistent. You can have it work within two simple steps:
 
 ```python
-$ pip install milvus
+$ python3 -m pip install milvus
 $ (in python) >>> import milvus
 ```
 
@@ -34,27 +34,27 @@ Embedded Milvus always depends on the most suitable PyMilvus version when releas
 # Requirements
 
 ```shell
-python >= 3.9
+python >= 3.6
 ```
 
 # Installation
 
-You can install embedded Milvus via `pip` or `pip3` for Python 3.6+:
+You can install embedded Milvus via `python3 -m pip` for Python 3.6+:
 
 ```shell
-$ pip3 install milvus
+$ python3 -m pip install milvus
 ```
 
 You can install a specific version of embedded Milvus by:
 
 ```shell
-$ pip3 install milvus==2.0.1.rc2
+$ python3 -m pip install milvus==2.0.1.rc2
 ```
 
 You can upgrade embedded Milvus by:
 
 ```shell
-$ pip3 install --upgrade milvus
+$ python3 -m pip install --upgrade milvus
 ```
 
 # Running Embedded Milvus
@@ -224,7 +224,7 @@ $ python3 -m pip install virtualenv
 $ virtualenv venv
 $ source venv/bin/activate
 # Force install the wheel you just built in the last step.
-(venv) $ pip install --upgrade --force-reinstall --no-deps ./dist/milvus-{version}-{python}-{abi}-{platform}.whl
+(venv) $ python3 -m pip install --upgrade --force-reinstall --no-deps ./dist/milvus-{version}-{python}-{abi}-{platform}.whl
 (venv) $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
