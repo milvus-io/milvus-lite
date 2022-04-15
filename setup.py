@@ -1,7 +1,4 @@
-import pathlib
-import re
 import setuptools
-from datetime import datetime
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -19,7 +16,7 @@ setuptools.setup(
     author='Milvus Team',
     author_email='milvus-team@zilliz.com',
     description='Embedded Version of Milvus',
-    version='2.0.2.rc1',
+    version='2.0.2.rc2',
     cmdclass={'bdist_wheel': bdist_wheel},
     url='https://github.com/milvus-io/embd-milvus',
     license='Apache-2.0',
@@ -29,7 +26,7 @@ setuptools.setup(
     package_data={
         'milvus': ['bin/*.*', 'configs/*.*', 'lib/*.*'],
     },
-    install_requires=['importlib_resources>=5.4.0', 'pymilvus==2.0.1'],
+    install_requires=['importlib_resources', 'pymilvus==2.0.1'],
     classifiers=[
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',

@@ -48,7 +48,7 @@ $ pip3 install milvus
 You can install a specific version of embedded Milvus by:
 
 ```shell
-$ pip3 install milvus
+$ pip3 install milvus==2.0.1.rc2
 ```
 
 You can upgrade embedded Milvus by:
@@ -77,6 +77,7 @@ export LD_PRELOAD=${YOUR_LD_PRELOAD_VALUE}
 export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
 >>> exit()
 
+# if you are using linux systems:
 $ export LD_PRELOAD=${${YOUR_LD_PRELOAD_VALUE}}
 $ export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
 ```
@@ -234,10 +235,12 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 9. If everything's good. Upload it to TestPyPI and PyPI.
 ```shell
-python3 -m twine upload --repository testpypi dist/*
+$ python3 -m twine upload --repository testpypi dist/*
+$ python3 -m twine upload dist/*
 ```
 
 10. Your package will be downloadable and installable now.
 ```shell
 $ python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps milvus
+$ python3 -m pip install --no-deps milvus
 ```
