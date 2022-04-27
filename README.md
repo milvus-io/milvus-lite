@@ -15,11 +15,11 @@ Please note that it is not suggested to use embedded Milvus in a production envi
 
 ## Configuration
 
-A configurable file will be created on initial start located at `/tmp/milvus/configs/embedded-milvus.yaml`
+A configurable file will be created on initial start located at `/tmp/e-milvus/configs/embedded-milvus.yaml`
 
 ## Data and Log Persistence
 
-All data and logs are persistent and will be stored under `/tmp/milvus/` by default. If you want them somewhere else, you can update the embedded Milvus configuration file.
+All data and logs are persistent and will be stored under `/tmp/e-milvus/` by default. If you want them somewhere else, you can update the embedded Milvus configuration file.
 
 ## Working with PyMilvus
 
@@ -34,21 +34,28 @@ Embedded Milvus always depends on the most suitable PyMilvus version when releas
 # Requirements
 
 ```shell
+supported OS: Ubuntu 18.04, Mac x86_64, Mac M1
 python >= 3.6
 ```
 
 # Installation
 
-You can install embedded Milvus via `python3 -m pip` for Python 3.6+:
+You can install embedded Milvus via `pip` for Python 3.6+:
 
 ```shell
 $ python3 -m pip install milvus
 ```
 
-You can install a specific version of embedded Milvus by:
+Or if you already have required version of PyMilvus installed:
 
 ```shell
-$ python3 -m pip install milvus==2.0.1.rc2
+$ python3 -m pip install --no-deps milvus
+```
+
+You can also install a specific version of embedded Milvus by:
+
+```shell
+$ python3 -m pip install milvus==2.0.2rc4
 ```
 
 You can upgrade embedded Milvus by:
@@ -59,42 +66,40 @@ $ python3 -m pip install --upgrade milvus
 
 # Running Embedded Milvus
 
-1. Before you run, install dependencies for Milvus:
-```shell
-wget -O - https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/install_deps.sh | bash
-```
-
-2. Preload and set environment variables.
+1. If you are running for the first time. Import and then run `milvus.before()` for setup instructions.
 ```shell
 $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import milvus
->>> milvus.preload()
-please run:
-export LD_PRELOAD=${YOUR_LD_PRELOAD_VALUE}
-export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
->>> exit()
-
-# if you are using linux systems:
-$ export LD_PRELOAD=${${YOUR_LD_PRELOAD_VALUE}}
-$ export LD_LIBRARY_PATH=${YOUR_LD_LIBRARY_PATH_VALUE}
-```
-
-3. Start milvus:
-
-```python
-$ python3
-Python 3.9.10 (main, Jan 15 2022, 11:40:53)
-[Clang 13.0.0 (clang-1300.0.29.3)] on darwin
-Type "help", "copyright", "credits" or "license" for more information.
->>> import milvus
->>> milvus.start()
+--- if you are running Milvus for the first time, type milvus.before() for pre-run instructions ---
+--- otherwise, type milvus.start() ---
+>>>
+>>> milvus.before()
+please do the following if you haven not already done so:
+1. install required dependencies: bash /tmp/e-milvus/lib/install_deps.sh
+2. export LD_PRELOAD=/SOME_PATH/embd-milvus.so
+3. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/tmp/e-milvus/lib/
 >>>
 ```
 
-Milvus is now ready and you can start interacting with it. For a full example, you can look at [Hello Milvus](https://milvus.io/docs/v2.0.0/example_code.md).
+2. If you have not yet installed the required dependency, do so as instructed in 1.
+```bash
+# exit() python interactive mode first
+# Note that this must be done AFTER `import milvus`
+$ bash /tmp/e-milvus/lib/install_deps.sh
+```
+
+3. If you have not yet set the environment variable, do so as instructed in 1.
+```bash
+# exit() python interactive mode first
+# Note that this must be done AFTER `import milvus`
+$ export LD_PRELOAD=/SOME_PATH/embd-milvus.so
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/tmp/e-milvus/lib/
+```
+
+4. Start Milvus:
 
 ```python
 $ python3
@@ -102,7 +107,37 @@ Python 3.9.10 (main, Jan 15 2022, 11:40:53)
 [Clang 13.0.0 (clang-1300.0.29.3)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import milvus
+--- if you are running Milvus for the first time, type milvus.before() for pre-run instructions ---
+--- otherwise, type milvus.start() ---
+>>>
 >>> milvus.start()
+---Milvus Proxy successfully initialized and ready to serve!---
+>>>
+```
+
+Milvus is now ready. There are two ways to interact with embedded Milvus, we have included a Hello Milvus test script that you can try out.
+
+(1) You can also connect to embedded Milvus from Milvus SDK. Take PyMilvus SDK for example:
+
+```shell
+$ python3 /tmp/e-milvus/examples/hello_milvus.py
+```
+    
+For a full example, look at [Hello Milvus](https://milvus.io/docs/v2.0.x/example_code.md).
+
+(2) Within in the same python interactive mode terminal, type and run your command directly:
+```python
+$ python3
+Python 3.9.10 (main, Jan 15 2022, 11:40:53)
+[Clang 13.0.0 (clang-1300.0.29.3)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import milvus
+--- if you are running Milvus for the first time, type milvus.before() for pre-run instructions ---
+--- otherwise, type milvus.start() ---
+>>>
+>>> milvus.start()
+---Milvus Proxy successfully initialized and ready to serve!---
+>>>
 >>>
 >>> import random
 >>> from pymilvus import (
@@ -149,20 +184,22 @@ hit: (distance: 0.0, id: 2999)
 hit: (distance: 0.0297045037150383, id: 2000)
 hit: (distance: 0.16927233338356018, id: 560)
 >>> utility.drop_collection("hello_milvus")
+>>>
 ```
 
-You can also start another python script or SDK to work with embedded Milvus while it is not closed. For example, in a new shell window, you could:
 
-```shell
-$ python3 ./examples/hello_milvus
-```
 
-Finally, when you are done, simply do exit().
+4. Finally, when you are done, it is highly recommended that you stop Milvus gracefully and use exit() or Ctrl-D (i.e. EOF) to exit.
 
 ```python
+>>> milvus.stop()
+if you need to clean up the environment variables, run:
+export LD_PRELOAD=
+export LD_LIBRARY_PATH=
+>>>
 >>> exit()
-$ 
 ```
+
 
 # Building the Package
 
@@ -180,42 +217,37 @@ $ make embd-milvus
 embd-milvus/
 ├── LICENSE
 ├── README.md
-├── examples
-│   └── hello_milvus.py
 ├── milvus
 │   ├── __init__.py
 │   ├── bin
 │   │   ├── embd-milvus.h
-│   │   └── embd-milvus.so
+│   │   ├── embd-milvus.so
 │   ├── configs
 │   │   └── embedded-milvus.yaml
+│   ├── examples
+│   │   └── hello_milvus.py
 │   ├── lib
+│   │   ├── install_deps.sh
 │   │   ├── libfaiss.a
-│   │   ├── libknowhere.dylib               # (or .so)
-│   │   ├── libmilvus_common.dylib          # (or .so)
-│   │   ├── libmilvus_index.dylib           # (or .so)
-│   │   ├── libmilvus_indexbuilder.dylib    # (or .so)
-│   │   └── libmilvus_segcore.dylib         # (or .so)
-│   └── milvus.py
+│   │   ├── libknowhere.dylib                    # or .so
+│   │   ├── libmilvus_common.dylib               # or .so
+│   │   ├── libmilvus_index.dylib                # or .so
+│   │   ├── libmilvus_indexbuilder.dylib         # or .so
+│   │   └── libmilvus_segcore.dylib              # or .so
+├── myeasylog.log
 └── setup.py
 ```
 
-5. Run the following command to update environment variables:
-```shell
-$ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/tmp/milvus/lib"
-$ export LD_PRELOAD="/tmp/milvus/lib/embd-milvus.so"
-```
-
-6. Build the wheel:
+5. Build the wheel:
 ```shell
 $ python3 setup.py bdist_wheel
 ```
 
-7. Double check that the wheel has the right files included:
+6. Double check that the wheel has the right files included:
 $ unzip -l dist/milvus-{version}-{python}-{abi}-{platform}.whl
 
 
-8. Test it locally
+7. Test it locally
 
 Under the embd-milvus directory, start a virtual environment:
 
@@ -233,13 +265,13 @@ Type "help", "copyright", "credits" or "license" for more information.
 ...
 ```
 
-9. If everything's good. Upload it to TestPyPI and PyPI.
+8. If everything's good. Upload it to TestPyPI and PyPI.
 ```shell
 $ python3 -m twine upload --repository testpypi dist/*
 $ python3 -m twine upload dist/*
 ```
 
-10. Your package will be downloadable and installable now.
+9. Your package will be downloadable and installable now.
 ```shell
 $ python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps milvus
 $ python3 -m pip install --no-deps milvus

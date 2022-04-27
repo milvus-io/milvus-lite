@@ -90,7 +90,7 @@ index = {
     "params": {"nlist": 128},
 }
 
-#hello_milvus.create_index("embeddings", index)
+hello_milvus.create_index("embeddings", index)
 
 ################################################################################
 # 5. search, query, and hybrid search
@@ -120,6 +120,7 @@ end_time = time.time()
 for hits in result:
     for hit in hits:
         print(f"hit: {hit}, random field: {hit.entity.get('random')}")
+
 print(search_latency_fmt.format(end_time - start_time))
 
 # -----------------------------------------------------------------------------
@@ -144,6 +145,7 @@ end_time = time.time()
 for hits in result:
     for hit in hits:
         print(f"hit: {hit}, random field: {hit.entity.get('random')}")
+
 print(search_latency_fmt.format(end_time - start_time))
 
 ###############################################################################

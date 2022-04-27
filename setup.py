@@ -16,7 +16,7 @@ setuptools.setup(
     author='Milvus Team',
     author_email='milvus-team@zilliz.com',
     description='Embedded Version of Milvus',
-    version='2.0.2.rc2',
+    version='2.0.2.rc3',
     cmdclass={'bdist_wheel': bdist_wheel},
     url='https://github.com/milvus-io/embd-milvus',
     license='Apache-2.0',
@@ -24,7 +24,7 @@ setuptools.setup(
     include_package_data=True,
     package_dir={'milvus': 'milvus'},
     package_data={
-        'milvus': ['bin/*.*', 'configs/*.*', 'lib/*.*'],
+        'milvus': ['bin/*.*', 'configs/*.*', 'lib/*.*', 'examples/*.*'],
     },
     install_requires=['importlib_resources', 'pymilvus==2.0.1'],
     classifiers=[
