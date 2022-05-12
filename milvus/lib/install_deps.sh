@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 function install_linux_deps() {
   if [[ -x "$(command -v apt)" ]]; then
       # for Ubuntu 18.04
