@@ -15,11 +15,11 @@ Please note that it is not suggested to use embedded Milvus in a production envi
 
 ## Configuration
 
-A configurable file will be created on initial start located at `/tmp/e-milvus/configs/embedded-milvus.yaml`
+A configurable file will be created on initial start located at `/var/bin/e-milvus/configs/embedded-milvus.yaml`
 
 ## Data and Log Persistence
 
-All data and logs are persistent and will be stored under `/tmp/e-milvus/` by default. If you want them somewhere else, you can update the embedded Milvus configuration file.
+All data and logs are persistent and will be stored under `/var/bin/e-milvus` by default. If you want them somewhere else, you can update the embedded Milvus configuration file.
 
 ## Working with PyMilvus
 
@@ -78,9 +78,9 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>>
 >>> milvus.before()
 please do the following if you haven not already done so:
-1. install required dependencies: bash /tmp/e-milvus/lib/install_deps.sh
+1. install required dependencies: bash /var/bin/e-milvus/lib/install_deps.sh
 2. export LD_PRELOAD=/SOME_PATH/embd-milvus.so
-3. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/tmp/e-milvus/lib/
+3. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 >>>
 ```
 
@@ -88,7 +88,7 @@ please do the following if you haven not already done so:
 ```bash
 # exit() python interactive mode first
 # Note that this must be done AFTER `import milvus`
-$ bash /tmp/e-milvus/lib/install_deps.sh
+$ bash /var/bin/e-milvus/lib/install_deps.sh
 ```
 
 3. If you have not yet set the environment variable, do so as instructed in 1.
@@ -96,7 +96,7 @@ $ bash /tmp/e-milvus/lib/install_deps.sh
 # exit() python interactive mode first
 # Note that this must be done AFTER `import milvus`
 $ export LD_PRELOAD=/SOME_PATH/embd-milvus.so
-$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/tmp/e-milvus/lib/
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 ```
 
 4. Start Milvus:
@@ -120,7 +120,7 @@ Milvus is now ready. There are two ways to interact with embedded Milvus, we hav
 (1) You can also connect to embedded Milvus from Milvus SDK. Take PyMilvus SDK for example:
 
 ```shell
-$ python3 /tmp/e-milvus/examples/hello_milvus.py
+$ python3 /var/bin/e-milvus/examples/hello_milvus.py
 ```
     
 For a full example, look at [Hello Milvus](https://milvus.io/docs/v2.0.x/example_code.md).

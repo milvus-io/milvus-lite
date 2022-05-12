@@ -9,10 +9,10 @@ import os
 from importlib_resources import files
 from distutils.dir_util import copy_tree
 
-CONFIG_PATH = '/tmp/e-milvus/configs/'
-LIB_PATH = '/tmp/e-milvus/lib/'
-LOG_PATH = '/tmp/e-milvus/logs/'
-EG_PATH = '/tmp/e-milvus/examples/'
+CONFIG_PATH = '/var/bin/e-milvus/configs/'
+LIB_PATH = '/var/bin/e-milvus/lib/'
+LOG_PATH = '/var/bin/e-milvus/logs/'
+EG_PATH = '/var/bin/e-milvus/examples/'
 CONFIG_NAME = 'embedded-milvus.yaml'
 
 try:
