@@ -40,29 +40,34 @@ python >= 3.6
 
 # Installation
 
-You can install embedded Milvus via `pip` for Python 3.6+:
+* You can install embedded Milvus via `pip` for Python 3.6+:
 
-```shell
-$ python3 -m pip install milvus
-```
-
-Or if you already have required version of PyMilvus installed:
-
-```shell
-$ python3 -m pip install --no-deps milvus
-```
-
-You can also install a specific version of embedded Milvus by:
-
-```shell
-$ python3 -m pip install milvus==2.0.2rc4
-```
-
-You can upgrade embedded Milvus by:
-
-```shell
-$ python3 -m pip install --upgrade milvus
-```
+    ```shell
+    $ python3 -m pip install milvus
+    ```
+    
+    Or if you already have required version of PyMilvus installed:
+    
+    ```shell
+    $ python3 -m pip install --no-deps milvus
+    ```
+    
+    You can also install a specific version of embedded Milvus by:
+    
+    ```shell
+    $ python3 -m pip install milvus==2.0.2rc4
+    ```
+    
+    You can upgrade embedded Milvus by:
+    
+    ```shell
+    $ python3 -m pip install --upgrade milvus
+    ```
+* After installation, you need to create the data folder for Milvus under /var/bin/e-mllvus:
+    ```shell
+    $ sudo mkdir -p /var/bin/e-milvus
+    $ sudo chmod 777 -R /var/bin/e-milvus
+    ```
 
 # Running Embedded Milvus
 
