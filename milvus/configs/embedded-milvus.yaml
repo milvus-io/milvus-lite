@@ -36,7 +36,16 @@ etcd:
   data:
     # Embedded Etcd only.
     # please adjust in embedded Milvus: /var/bin/e-milvus/etcdData/
-    dir: /var/bin/e-milvus/etcdData
+    dir:  /var/bin/e-milvus/etcdData/
+  ssl:
+    enabled: false # Whether to support ETCD secure connection mode
+    tlsCert: /path/to/etcd-client.pem # path to your cert file
+    tlsKey: /path/to/etcd-client-key.pem # path to your key file
+    tlsCACert:  /path/to/ca.pem # path to your CACert file
+    # TLS min version
+    # Optional values: 1.0, 1.1, 1.2, 1.3。
+    # We recommend using version 1.2 and above
+    tlsMinVersion: 1.3
 
 # please adjust in embedded Milvus: /var/bin/e-milvus/data/
 localStorage:
@@ -51,6 +60,12 @@ minio:
   useSSL: false # Access to MinIO/S3 with SSL
   bucketName: "a-bucket" # Bucket name in MinIO/S3
   rootPath: files # The root path where the message is stored in MinIO/S3
+  # Whether to use AWS IAM role to access S3 instead of access/secret keys
+  # For more infomation, refer to https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html
+  useIAM: false
+  # Custom endpoint for fetch IAM role credentials.
+  # Leave it empty if you want to use AWS default endpoint
+  iamEndpoint: ""
 
 # Milvus supports three MQ: rocksmq(based on RockDB), Pulsar and Kafka, which should be reserved in config what you use.
 # There is a note about enabling priority if we config multiple mq in this file
@@ -61,11 +76,14 @@ minio:
 pulsar:
   address: localhost # Address of pulsar
   port: 6650 # Port of pulsar
+  webport: 80 # Web port of pulsar, if you connect direcly without proxy, should use 8080
   maxMessageSize: 5242880 # 5 * 1024 * 1024 Bytes, Maximum size of each message in pulsar.
 
 # If you want to enable kafka, needs to comment the pulsar configs
 #kafka:
 #  brokerList: localhost1:9092,localhost2:9092,localhost3:9092
+#  saslUsername: username
+#  saslPassword: password
 
 rocksmq:
   # please adjust in embedded Milvus: /var/bin/e-milvus/rdb_data
@@ -73,53 +91,48 @@ rocksmq:
   rocksmqPageSize: 2147483648 # 2 GB, 2 * 1024 * 1024 * 1024 bytes, The size of each page of messages in rocksmq
   retentionTimeInMinutes: 10080 # 7 days, 7 * 24 * 60 minutes, The retention time of the message in rocksmq.
   retentionSizeInMB: 8192 # 8 GB, 8 * 1024 MB, The retention size of the message in rocksmq.
+  lrucacheratio:  0.06 # rocksdb cache memory ratio
 
 # Related configuration of rootCoord, used to handle data definition language (DDL) and data control language (DCL) requests
 rootCoord:
   address: localhost
   port: 53100
 
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32, Maximum data size received by the server
-    serverMaxSendSize: 2147483647 # math.MaxInt32, Maximum data size sent by the server
-    clientMaxRecvSize: 104857600 # 100 MB, Maximum data size received by the client
-    clientMaxSendSize: 104857600 # 100 MB, Maximum data size sent by the client
-
   dmlChannelNum: 256 # The number of dml channels created at system startup
   maxPartitionNum: 4096 # Maximum number of partitions in a collection
   minSegmentSizeToEnableIndex: 1024 # It's a threshold. When the segment size is less than this value, the segment will not be indexed
 
-  # (in seconds) Duration after which an import task will expire (be killed). Default 3600 seconds (1 hour).
+  # (in seconds) Duration after which an import task will expire (be killed). Default 900 seconds (15 minutes).
   # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
-  importTaskExpiration: 3600
+  importTaskExpiration: 900
   # (in seconds) Milvus will keep the record of import tasks for at least `importTaskRetention` seconds. Default 86400
   # seconds (24 hours).
   # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
   importTaskRetention: 86400
-  # (in seconds) During index building phase of an import task, Milvus will check the building status of a task's
-  # segments' indices every `importIndexCheckInterval` seconds. Default 300 seconds (5 minutes).
+  # (in seconds) Check an import task's segment loading state in queryNodes every `importSegmentStateCheckInterval`
+  # seconds. Default 10 seconds.
   # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
-  importIndexCheckInterval: 300
-  # (in seconds) Maximum time to wait before pushing flushed segments online (make them searchable) during importing.
-  # Default 1200 seconds (20 minutes).
+  importSegmentStateCheckInterval: 10
+  # (in seconds) Maximum time to wait for segments in a single import task to be loaded in queryNodes.
+  # Default 60 seconds (1 minute).
   # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
-  importIndexWaitLimit: 1200
+  importSegmentStateWaitLimit: 60
+  # (in seconds) Check the building status of a task's segments' indices every `importIndexCheckInterval` seconds.
+  # Default 10 seconds.
+  # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
+  importIndexCheckInterval: 10
+  # (in seconds) Maximum time to wait for indices to be built on a single import task's segments.
+  # Default 600 seconds (10 minutes).
+  # Note: If default value is to be changed, change also the default in: internal/util/paramtable/component_param.go
+  importIndexWaitLimit: 600
 
 # Related configuration of proxy, used to validate client requests and reduce the returned results.
 proxy:
   port: 19530
-
+  internalPort: 19529
   http:
     enabled: true # Whether to enable the http server
-    port: 8080 # Whether to enable the http server
-    readTimeout: 30000 # 30000 ms http read timeout
-    writeTimeout: 30000 # 30000 ms http write timeout
-
-  grpc:
-    serverMaxRecvSize: 536870912 # 512 MB, 512 * 1024 * 1024 Bytes
-    serverMaxSendSize: 536870912 # 512 MB, 512 * 1024 * 1024 Bytes
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
+    debug_mode: false # Whether to enable http server debug mode
 
   timeTickInterval: 200 # ms, the interval that proxy synchronize the time tick
   msgStream:
@@ -130,8 +143,6 @@ proxy:
   maxDimension: 32768 # Maximum dimension of a vector
   maxShardNum: 256 # Maximum number of shards in a collection
   maxTaskNum: 1024 # max task number of proxy task queue
-  bufFlagExpireTime: 3600 # second, the time to expire bufFlag from cache in collectResultLoop
-  bufFlagCleanupInterval: 600 # second, the interval to clean bufFlag cache in collectResultLoop
   # please adjust in embedded Milvus: false
   ginLogging: false # Whether to produce gin logs.
 
@@ -146,23 +157,11 @@ queryCoord:
   balanceIntervalSeconds: 60
   memoryUsageMaxDifferencePercentage: 30
 
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
-
 # Related configuration of queryNode, used to run hybrid search between vector and scalar data.
 queryNode:
   cacheSize: 32 # GB, default 32 GB, `cacheSize` is the memory used for caching data for faster query. The `cacheSize` must be less than system memory size.
-  gracefulTime: 0 # Minimum time before the newly inserted data can be searched (in ms)
   port: 21123
-
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
+  loadMemoryUsageFactor: 3 # The multiply factor of calculating the memory usage while loading segments
 
   stats:
     publishInterval: 1000 # Interval for querynode to report node information (milliseconds)
@@ -170,60 +169,56 @@ queryNode:
     flowGraph:
       maxQueueLength: 1024 # Maximum length of task queue in flowgraph
       maxParallelism: 1024 # Maximum number of tasks executed in parallel in the flowgraph
-  msgStream:
-    search:
-      recvBufSize: 512 # msgPack channel buffer size
-      pulsarBufSize: 512 # pulsar channel buffer size
-    searchResult:
-      recvBufSize: 64 # msgPack channel buffer size
-  # Segcore will divide a segment into multiple chunks.
+  # Segcore will divide a segment into multiple chunks to enbale small index
   segcore:
-    chunkRows: 32768 # The number of vectors in a chunk.
-
+    chunkRows: 1024 # The number of vectors in a chunk.
+    # Note: we have disabled segment small index since @2022.05.12. So below related configurations won't work.
+    # We won't create small index for growing segments and search on these segments will directly use bruteforce scan.
+    smallIndex:
+      nlist: 128 # small index nlist, recommend to set sqrt(chunkRows), must smaller than chunkRows/8
+      nprobe: 16 # nprobe to search small index, based on your accuracy requirement, must smaller than nlist
   cache:
     enabled: true
     memoryLimit: 2147483648 # 2 GB, 2 * 1024 *1024 *1024
 
+  scheduler:
+    receiveChanSize: 10240
+    unsolvedQueueSize: 10240
+    maxReadConcurrency: 0 # maximum concurrency of read task. if set to less or equal 0, it means no uppper limit.
+    cpuRatio: 10.0 # ratio used to estimate read task cpu usage.
+
+  grouping:
+    enabled: true
+    maxNQ: 1000
+    topKMergeRatio: 10.0
 
 indexCoord:
   address: localhost
   port: 31000
 
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
+  gc:
+    interval: 600 # gc interval in seconds
 
 indexNode:
   port: 21121
 
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
+  scheduler:
+    buildParallel: 1
 
 dataCoord:
   address: localhost
   port: 13333
-
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
   enableCompaction: true # Enable data segment compression
-  enableGarbageCollection: false
+  enableGarbageCollection: true
 
   segment:
     maxSize: 512 # Maximum size of a segment in MB
-    sealProportion: 0.75 # It's the minimum proportion for a segment which can be sealed
+    sealProportion: 0.25 # It's the minimum proportion for a segment which can be sealed
     assignmentExpiration: 2000 # The time of the assignment expiration in ms
+    maxLife: 86400 # The max lifetime of segment in seconds, 24*60*60
 
   compaction:
     enableAutoCompaction: true
-    entityExpiration: 9223372037 # Entity expiration in seconds, CAUTION make sure entityExpiration >= retentionDuration and 9223372037 is the maximum value of entityExpiration
 
   gc:
     interval: 3600 # gc interval in seconds
@@ -233,12 +228,6 @@ dataCoord:
 
 dataNode:
   port: 21124
-
-  grpc:
-    serverMaxRecvSize: 2147483647 # math.MaxInt32
-    serverMaxSendSize: 2147483647 # math.MaxInt32
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
 
   dataSync:
     flowGraph:
@@ -250,7 +239,7 @@ dataNode:
 
 # Configures the system log output.
 log:
-  level: info # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
+  level: debug # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
   file:
     # please adjust in embedded Milvus: /var/bin/e-milvus/logs
     rootPath: "/var/bin/e-milvus/logs" # default to stdout, stderr
@@ -258,6 +247,31 @@ log:
     maxAge: 10 # Maximum time for log retention in day.
     maxBackups: 20
   format: text # text/json
+
+grpc:
+  log:
+    level: WARNING
+
+  serverMaxRecvSize: 2147483647 # math.MaxInt32
+  serverMaxSendSize: 2147483647 # math.MaxInt32
+  clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
+  clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
+
+  client:
+    dialTimeout:      5000
+    keepAliveTime:    10000
+    keepAliveTimeout: 20000
+    maxMaxAttempts: 5
+    initialBackOff: 1.0
+    maxBackoff: 60.0
+    backoffMultiplier: 2.0
+
+# Configure the proxy tls enable.
+tls:
+  serverPemPath: configs/cert/server.pem
+  serverKeyPath: configs/cert/server.key
+  caPemPath: configs/cert/ca.pem
+
 
 common:
   # Channel name generation rule: ${namePrefix}-${ChannelIdx}
@@ -288,15 +302,23 @@ common:
   defaultPartitionName: "_default"  # default partition name for a collection
   defaultIndexName: "_default_idx"  # default index name
   retentionDuration: 432000 # 5 days in seconds
+  entityExpiration:  -1     # Entity expiration in seconds, CAUTION make sure entityExpiration >= retentionDuration and -1 means never expire
+
+  gracefulTime: 5000 # milliseconds. it represents the interval (in ms) by which the request arrival time needs to be subtracted in the case of Bounded Consistency.
 
   # Default value: auto
   # Valid values: [auto, avx512, avx2, avx, sse4_2]
   # This configuration is only used by querynode and indexnode, it selects CPU instruction set for Searching and Index-building.
   simdType: auto
-  indexSliceSize: 4 # MB
+  indexSliceSize: 16 # MB
 
   # please adjust in embedded Milvus: local
   storageType: local
 
   security:
     authorizationEnabled: false
+    # tls mode values [0, 1, 2]
+    # 0 is close, 1 is one-way authentication, 2 is two-way authentication.
+    tlsMode: 0
+
+  mem_purge_ratio: 0.2 # in Linux os, if memory-fragmentation-size >= used-memory * ${mem_purge_ratio}, then do `malloc_trim`
