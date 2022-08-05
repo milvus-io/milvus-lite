@@ -66,7 +66,7 @@ python >= 3.6
 * After installation, you need to create the data folder for Milvus under /var/bin/e-mllvus:
     ```shell
     $ sudo mkdir -p /var/bin/e-milvus
-    $ sudo chmod 777 -R /var/bin/e-milvus
+    $ sudo chmod -R 777 /var/bin/e-milvus
     ```
 
 # Running Embedded Milvus
