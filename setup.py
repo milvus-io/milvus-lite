@@ -16,7 +16,7 @@ setuptools.setup(
     author='Milvus Team',
     author_email='milvus-team@zilliz.com',
     description='Embedded Version of Milvus',
-    version='2.1.1',
+    version='2.1.0',
     cmdclass={'bdist_wheel': bdist_wheel},
     url='https://github.com/milvus-io/embd-milvus',
     license='Apache-2.0',
