@@ -84,8 +84,9 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> milvus.before()
 please do the following if you haven not already done so:
 1. install required dependencies: bash /var/bin/e-milvus/lib/install_deps.sh
-2. export LD_PRELOAD=/SOME_PATH/embd-milvus.so
-3. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+2. export LD_PRELOAD=/Users/yuchengao/Documents/GitHub/soothing-rain/embd-milvus/milvus/bin/embd-milvus.so
+3. (on Linux systems) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+   (on MacOS systems) export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 >>>
 ```
 
@@ -100,8 +101,9 @@ $ bash /var/bin/e-milvus/lib/install_deps.sh
 ```bash
 # exit() python interactive mode first
 # Note that this must be done AFTER `import milvus`
-$ export LD_PRELOAD=/SOME_PATH/embd-milvus.so
-$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+$ export LD_PRELOAD=/Users/yuchengao/Documents/GitHub/soothing-rain/embd-milvus/milvus/bin/embd-milvus.so
+(on Linux systems) $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+(on MacOS systems) $ export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 ```
 
 4. Start Milvus:
@@ -198,9 +200,10 @@ hit: (distance: 0.16927233338356018, id: 560)
 
 ```python
 >>> milvus.stop()
-if you need to clean up the environment variables, run:
+to clean up, run:
 export LD_PRELOAD=
-export LD_LIBRARY_PATH=
+(on Linux) export LD_LIBRARY_PATH=
+(on MacOS) export DYLD_LIBRARY_PATH=
 >>>
 >>> exit()
 ```
@@ -212,33 +215,56 @@ export LD_LIBRARY_PATH=
 ```shell
 $ make embd-milvus
 ```
+2. Copy `embedded-milvus.yaml` file and `easylogging.yaml` to `config` folder. (See below for a sample directory structure)
 
-2. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See below for a complete directory structure). 
+3. Upon successful make, a dynamic library (embd-milvus.so and embd-milvus.h) will be created, create a new folder `bin` and put these two files in (See below for a sample directory structure). 
 
-3. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put these files in (See below for a complete directory structure).
+4. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put *all* these files in. (See below for a sample directory structure)
 
-4. After the steps above, your repository should have the structure like below:
+5. After the steps above, your repository should have the structure like below:
 ```shell
-embd-milvus/
+.
 ├── LICENSE
 ├── README.md
 ├── milvus
 │   ├── __init__.py
 │   ├── bin
 │   │   ├── embd-milvus.h
-│   │   ├── embd-milvus.so
+│   │   └── embd-milvus.so
 │   ├── configs
+│   │   ├── easylogging.yaml
 │   │   └── embedded-milvus.yaml
 │   ├── examples
 │   │   └── hello_milvus.py
-│   ├── lib
-│   │   ├── install_deps.sh
-│   │   ├── libfaiss.a
-│   │   ├── libknowhere.dylib                    # or .so
-│   │   ├── libmilvus_common.dylib               # or .so
-│   │   ├── libmilvus_index.dylib                # or .so
-│   │   ├── libmilvus_indexbuilder.dylib         # or .so
-│   │   └── libmilvus_segcore.dylib              # or .so
+│   └── lib
+│       ├── cmake
+│       │   ├── ...
+│       ├── libarrow.a
+│       ├── libarrow_bundled_dependencies.a
+│       ├── libfaiss.a
+│       ├── libknowhere.dylib
+│       ├── libmarisa.0.dylib
+│       ├── libmarisa.a
+│       ├── libmarisa.dylib -> libmarisa.0.dylib
+│       ├── libmarisa.la
+│       ├── libmilvus_common.dylib
+│       ├── libmilvus_index.dylib
+│       ├── libmilvus_indexbuilder.dylib
+│       ├── libmilvus_segcore.dylib
+│       ├── libmilvus_storage.dylib
+│       ├── libparquet.a
+│       ├── librocksdb.a
+│       └── pkgconfig
+│           ├── arrow-compute.pc
+│           ├── arrow.pc
+│           ├── marisa.pc
+│           ├── milvus_common.pc
+│           ├── milvus_indexbuilder.pc
+│           ├── milvus_segcore.pc
+│           ├── milvus_storage.pc
+│           ├── parquet.pc
+│           └── rocksdb.pc
+├── ...
 ├── myeasylog.log
 └── setup.py
 ```
