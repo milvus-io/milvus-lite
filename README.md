@@ -86,7 +86,7 @@ please do the following if you haven not already done so:
 1. install required dependencies: bash /var/bin/e-milvus/lib/install_deps.sh
 2. (Linux system only) export LD_PRELOAD=/Users/yuchengao/Documents/GitHub/soothing-rain/embd-milvus/milvus/bin/embd-milvus.so
 3. (on Linux systems) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
-   (on MacOS systems) export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+   (on MacOS systems) export DYLD_FALLBACK_LIBRARY_PATH=DYLD_FALLBACK_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 >>>
 ```
 
@@ -103,7 +103,7 @@ $ bash /var/bin/e-milvus/lib/install_deps.sh
 # Note that this must be done AFTER `import milvus`
 $ (Linux system only) export LD_PRELOAD=/Users/yuchengao/Documents/GitHub/soothing-rain/embd-milvus/milvus/bin/embd-milvus.so
 (on Linux systems) $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
-(on MacOS systems) $ export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
+(on MacOS systems) $ export DYLD_FALLBACK_LIBRARY_PATH=DYLD_FALLBACK_LIBRARY_PATH:/usr/lib:/usr/local/lib:/var/bin/e-milvus/lib/
 ```
 
 4. Start Milvus:
@@ -203,7 +203,7 @@ hit: (distance: 0.16927233338356018, id: 560)
 to clean up, run:
 (Linux system only) export LD_PRELOAD=
 (on Linux) export LD_LIBRARY_PATH=
-(on MacOS) export DYLD_LIBRARY_PATH=
+(on MacOS) export DYLD_FALLBACK_LIBRARY_PATH=
 >>>
 >>> exit()
 ```

@@ -44,7 +44,7 @@ def before():
     print('1. install required dependencies: bash ' + LIB_PATH + 'install_deps.sh')
     print('2. (Linux system only) export LD_PRELOAD=' + str(files('milvus.bin').joinpath('embd-milvus.so')))
     print('3. (on Linux systems) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
-    print('   (on MacOS systems) export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
+    print('   (on MacOS systems) export DYLD_FALLBACK_LIBRARY_PATH=DYLD_FALLBACK_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
 
 
 def start():
@@ -65,7 +65,7 @@ def stop():
     print('to clean up, run:')
     print('(Linux system only) export LD_PRELOAD=')
     print('(on Linux) export LD_LIBRARY_PATH=')
-    print('(on MacOS) export DYLD_LIBRARY_PATH=')
+    print('(on MacOS) export DYLD_FALLBACK_LIBRARY_PATH=')
     global library, thr
     try:
         library.stopEmbedded()
