@@ -13,6 +13,12 @@ Everything you do with embedded Milvus, every piece of code you write for embedd
 
 Please note that it is not suggested to use embedded Milvus in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud. 
 
+## Software Requirements
+Here's a list of verified OS types where Embedded Milvus can successfully build and run:
+Ubuntu >= 18.04 (x86_64)
+MacOS >= 10.4 (x86_64)
+MacOS >= 11.0 (Apple Silicon)
+
 ## Configuration
 
 A configurable file will be created on initial start located at `/var/bin/e-milvus/configs/embedded-milvus.yaml`
