@@ -6,8 +6,12 @@ import threading
 import pathlib
 import shutil
 import os
-from importlib_resources import files
 from distutils.dir_util import copy_tree
+try:
+    from importlib_resources import files
+except ModuleNotFoundError:
+    os.system("pip install importlib_resources")
+from importlib_resources import files
 
 CONFIG_PATH = '/var/bin/e-milvus/configs/'
 LIB_PATH = '/var/bin/e-milvus/lib/'
