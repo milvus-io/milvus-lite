@@ -95,12 +95,11 @@ def before():
 def start():
     global library, thr
     def run_milvus():
-        if checkEnvs() == True:
-            library.startEmbedded()
-        else:
-            print("Please execute the following command to complete the environment configuration")
-            print('eval $(python -c "import milvus; milvus.init()")')
-            sys.exit(1)
+        library.startEmbedded()
+    if not (checkEnvs() == True):
+        print("Please execute the following command to complete the environment configuration")
+        print('eval $(python -c "import milvus; milvus.init()")')
+        sys.exit(1)
     if not (library is None):
         print("Milvus already started")
         return
