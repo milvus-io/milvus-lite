@@ -98,7 +98,7 @@ def start():
         library.startEmbedded()
     if not (checkEnvs() == True):
         print("Please execute the following command to complete the environment configuration")
-        print('eval $(python -c "import milvus; milvus.init()")')
+        print ("https://github.com/milvus-io/embd-milvus")
         sys.exit(1)
     if not (library is None):
         print("Milvus already started")
