@@ -103,8 +103,13 @@ def start():
     if not (library is None):
         print("Milvus already started")
         return
-    library = ctypes.cdll.LoadLibrary(
-        files('milvus.bin').joinpath('embd-milvus.so'))
+    milvusDL = files('milvus.bin').joinpath('embd-milvus.so')
+    isExist = os.path.exists(milvusDL)
+    if not isExist:
+        print("The program cannot be started, please refer to the documentation to complete the installation of dependencies")
+        print('https://github.com/milvus-io/embd-milvus')
+        sys.exit(1)
+    library = ctypes.cdll.LoadLibrary(milvusDL)
     thr = threading.Thread(target=run_milvus, args=(), kwargs={})
     thr.setDaemon(True)
     thr.start()
