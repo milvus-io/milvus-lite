@@ -52,24 +52,27 @@ def before():
 
 def prepare():
     osType = platform.system()
-    milvusDL = str(files('milvus.bin').joinpath('embd-milvus.so'))
     if osType == 'Linux':
+        milvusDL = str(files('milvus.bin').joinpath('embd-milvus.so'))
         linuxLdPreload = os.getenv('LD_PRELOAD')
         if linuxLdPreload == None:
             os.environ['LD_PRELOAD'] = milvusDL
         elif milvusDL not in linuxLdPreload:
             os.environ['LD_PRELOAD'] = os.environ['LD_PRELOAD'] + ":" + milvusDL
+        os.system('export LD_PRELOAD="' + os.environ['LD_PRELOAD'] + '"')
         linuxLdLibraryPath = os.getenv('LD_LIBRARY_PATH')
         if linuxLdLibraryPath == None:
             os.environ['LD_LIBRARY_PATH'] = "/usr/lib:/usr/local/lib:" + LIB_PATH
         elif LIB_PATH not in linuxLdLibraryPath:
             os.environ['LD_LIBRARY_PATH'] = linuxLdLibraryPath + ":" + LIB_PATH
+        os.system('export LD_LIBRARY_PATH="' + os.environ['LD_LIBRARY_PATH'] + '"')
     elif osType == 'Darwin':
         macDyld = os.getenv('DYLD_FALLBACK_LIBRARY_PATH')
         if macDyld == None:
             os.environ['DYLD_FALLBACK_LIBRARY_PATH'] = "/usr/lib:/usr/local/lib:" + LIB_PATH
         elif LIB_PATH not in macDyld:
             os.environ['DYLD_FALLBACK_LIBRARY_PATH'] = macDyld + ":" + LIB_PATH
+        os.system('export DYLD_FALLBACK_LIBRARY_PATH="' + os.environ['DYLD_FALLBACK_LIBRARY_PATH'] + '"')
 
 def start():
     prepare()
