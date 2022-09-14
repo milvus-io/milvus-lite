@@ -14,10 +14,11 @@ Everything you do with embedded Milvus, every piece of code you write for embedd
 Please note that it is not suggested to use embedded Milvus in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud. 
 
 ## Software Requirements
+
 Here's a list of verified OS types where Embedded Milvus can successfully build and run:
-Ubuntu >= 18.04 (x86_64)
-MacOS >= 10.4 (x86_64)
-MacOS >= 11.0 (Apple Silicon)
+- Ubuntu >= 18.04 (x86_64)
+- MacOS >= 10.4 (x86_64)
+- MacOS >= 11.0 (Apple Silicon)
 
 ## Configuration
 
@@ -61,7 +62,7 @@ python >= 3.6
     You can also install a specific version of embedded Milvus by:
     
     ```shell
-    $ python3 -m pip install milvus==2.0.2rc4
+    $ python3 -m pip install milvus==2.1.0
     ```
     
     You can upgrade embedded Milvus by:
@@ -78,6 +79,7 @@ python >= 3.6
 # Running Embedded Milvus
 
 1. If you are running for the first time. Import and then run `milvus.before()` for setup instructions.
+
 ```shell
 $ python3
 Python 3.9.10 (main, Jan 15 2022, 11:40:53)
@@ -97,6 +99,7 @@ please do the following if you haven not already done so:
 ```
 
 2. If you have not yet installed the required dependency, do so as instructed in 1.
+
 ```bash
 # exit() python interactive mode first
 # Note that this must be done AFTER `import milvus`
@@ -104,6 +107,7 @@ $ bash /var/bin/e-milvus/lib/install_deps.sh
 ```
 
 3. If you have not yet set the environment variable, do so as instructed in 1.
+
 ```bash
 # exit() python interactive mode first
 # Note that this must be done AFTER `import milvus`
@@ -215,6 +219,7 @@ to clean up, run:
 ```
 
 # FAQ
+
 Q: Embedded-Milvus quited with segmentation error on Linux systems.
 
 A: Start another terminal window to run your Milvus client. This is because setting env variable `LD_PRELOAD` in Linux might cause some conflicts.
@@ -231,6 +236,7 @@ A: Please file an issue here: https://github.com/milvus-io/embd-milvus/issues/ne
 # Building the Package
 
 1. In Milvus repository, build it with:
+
 ```shell
 $ make embd-milvus
 ```
@@ -241,6 +247,7 @@ $ make embd-milvus
 4. Upon successful make, Milvus related shared libraries will be created under `internal/core/output/lib`, create a new folder `lib` and put *all* these files in. (See below for a sample directory structure)
 
 5. After the steps above, your repository should have the structure like below:
+
 ```shell
 .
 ├── LICENSE
@@ -289,11 +296,13 @@ $ make embd-milvus
 ```
 
 5. Build the wheel:
+
 ```shell
 $ python3 setup.py bdist_wheel
 ```
 
 6. Double check that the wheel has the right files included:
+
 $ unzip -l dist/milvus-{version}-{python}-{abi}-{platform}.whl
 
 
@@ -316,12 +325,14 @@ Type "help", "copyright", "credits" or "license" for more information.
 ```
 
 8. If everything's good. Upload it to TestPyPI and PyPI.
+
 ```shell
 $ python3 -m twine upload --repository testpypi dist/*
 $ python3 -m twine upload dist/*
 ```
 
 9. Your package will be downloadable and installable now.
+
 ```shell
 $ python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps milvus
 $ python3 -m pip install --no-deps milvus
