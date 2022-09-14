@@ -21,24 +21,23 @@ try:
 except Exception:
     pass
 
-config = str(files('milvus.configs').joinpath(CONFIG_NAME))
-pathlib.Path(CONFIG_PATH).mkdir(parents=True, exist_ok=True)
-pathlib.Path(LIB_PATH).mkdir(parents=True, exist_ok=True)
-pathlib.Path(LOG_PATH).mkdir(parents=True, exist_ok=True)
-pathlib.Path(EG_PATH).mkdir(parents=True, exist_ok=True)
-
-if not os.path.exists(CONFIG_PATH + CONFIG_NAME):
-    print("creating Milvus config for the first time under: " + CONFIG_PATH +
-          CONFIG_NAME)
-    shutil.copy2(config, CONFIG_PATH)
-copy_tree(pathlib.Path(__file__).parent / 'lib', LIB_PATH)
-copy_tree(pathlib.Path(__file__).parent / 'examples', EG_PATH)
-print('--- if you are running Milvus for the first time, type milvus.before() for pre-run instructions ---')
-print('--- otherwise, type milvus.start() ---')
-
 library = None
 thr = None
 
+def init():
+    # Prepare directories and configuration files
+    config = str(files('milvus.configs').joinpath(CONFIG_NAME))
+    pathlib.Path(CONFIG_PATH).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(LIB_PATH).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(LOG_PATH).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(EG_PATH).mkdir(parents=True, exist_ok=True)
+
+    if not os.path.exists(CONFIG_PATH + CONFIG_NAME):
+        print("# Creating Milvus config for the first time under: " + CONFIG_PATH +
+            CONFIG_NAME)
+        shutil.copy2(config, CONFIG_PATH)
+    copy_tree(pathlib.Path(__file__).parent / 'lib', LIB_PATH)
+    copy_tree(pathlib.Path(__file__).parent / 'examples', EG_PATH)
 
 def before():
     osType = platform.system()
