@@ -6,6 +6,7 @@ import threading
 import pathlib
 import shutil
 import os
+import sys
 from importlib_resources import files
 from distutils.dir_util import copy_tree
 import platform
@@ -64,6 +65,21 @@ def init():
             os.environ['DYLD_FALLBACK_LIBRARY_PATH'] = ':'.join([macDyld, LIB_PATH])
         print("export DYLD_FALLBACK_LIBRARY_PATH=" + os.environ['DYLD_FALLBACK_LIBRARY_PATH'])
 
+def checkEnvs():
+    osType = platform.system()
+    if osType == 'Linux':
+        milvusDL = str(files('milvus.bin').joinpath('embd-milvus.so'))
+        linuxLdPreload = os.getenv('LD_PRELOAD')
+        if linuxLdPreload == None or (milvusDL not in linuxLdPreload):
+            return False
+        linuxLdLibraryPath = os.getenv('LD_LIBRARY_PATH')
+        if linuxLdLibraryPath == None or LIB_PATH not in linuxLdLibraryPath:
+            return False
+    elif osType == 'Darwin':
+        macDyld = os.getenv('DYLD_FALLBACK_LIBRARY_PATH')
+        if macDyld == None or (LIB_PATH not in macDyld):
+            return False
+    return True
 
 def before():
     osType = platform.system()
@@ -79,7 +95,12 @@ def before():
 def start():
     global library, thr
     def run_milvus():
-        library.startEmbedded()
+        if checkEnvs() == True:
+            library.startEmbedded()
+        else:
+            print("Please execute the following command to complete the environment configuration")
+            print('eval $(python -c "import milvus; milvus.init()")')
+            sys.exit(1)
     if not (library is None):
         print("Milvus already started")
         return
