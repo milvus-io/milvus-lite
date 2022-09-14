@@ -66,10 +66,13 @@ def start():
 
 
 def stop():
+    osType = platform.system()
     print('to clean up, run:')
-    print('(Linux system only) export LD_PRELOAD=')
-    print('(on Linux) export LD_LIBRARY_PATH=')
-    print('(on MacOS) export DYLD_FALLBACK_LIBRARY_PATH=')
+    if osType == 'Linux':
+        print('export LD_PRELOAD=')
+        print('export LD_LIBRARY_PATH=')
+    elif osType == 'Darwin':
+        print('export DYLD_FALLBACK_LIBRARY_PATH=')
     global library, thr
     try:
         library.stopEmbedded()
