@@ -1,4 +1,5 @@
 import setuptools
+import os
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -11,13 +12,19 @@ try:
 except ImportError:
     bdist_wheel = None
 
+def _post_install():
+    os.system('eval $(python -c "import milvus; milvus.init()")')
+
 setuptools.setup(
     name='milvus',
     author='Milvus Team',
     author_email='milvus-team@zilliz.com',
     description='Embedded Version of Milvus',
     version='2.1.0',
-    cmdclass={'bdist_wheel': bdist_wheel},
+    cmdclass={
+        'bdist_wheel': bdist_wheel,
+        'install': _post_install
+    },
     url='https://github.com/milvus-io/embd-milvus',
     license='Apache-2.0',
     packages=setuptools.find_packages(),
