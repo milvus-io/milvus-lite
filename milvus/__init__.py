@@ -17,15 +17,15 @@ LOG_PATH = '/var/bin/e-milvus/logs/'
 EG_PATH = '/var/bin/e-milvus/examples/'
 CONFIG_NAME = 'embedded-milvus.yaml'
 
-try:
-    shutil.rmtree(LIB_PATH)
-except Exception:
-    pass
-
 library = None
 thr = None
 
 def init():
+    # Ensure a clean and reliable environment
+    try:
+        shutil.rmtree(LIB_PATH)
+    except Exception:
+        pass
     # Prepare directories and configuration files
     config = str(files('milvus.configs').joinpath(CONFIG_NAME))
     pathlib.Path(CONFIG_PATH).mkdir(parents=True, exist_ok=True)

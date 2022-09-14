@@ -1,5 +1,4 @@
 import setuptools
-import os
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -13,7 +12,9 @@ except ImportError:
     bdist_wheel = None
 
 def _post_install():
-    os.system('eval $(python -c "import milvus; milvus.init()")')
+    print ("Installing Milvus completed.")
+    print ("Before using it for the first time, you need to complete the initialization operation and configure the system environment variables correctly.")
+    print ("https://github.com/milvus-io/embd-milvus")
 
 setuptools.setup(
     name='milvus',
