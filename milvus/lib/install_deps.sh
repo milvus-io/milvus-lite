@@ -18,18 +18,22 @@
 
 
 function install_linux_deps() {
-  if [[ -x "$(command -v apt)" ]]; then
-      # for Ubuntu 18.04
-      sudo apt install -y g++ gcc make lcov libtool m4 autoconf automake ccache libssl-dev zlib1g-dev libboost-regex-dev \
-          libboost-program-options-dev libboost-system-dev libboost-filesystem-dev \
-          libboost-serialization-dev python3-dev libboost-python-dev libcurl4-openssl-dev gfortran libtbb-dev
-      # install OpenBLAS, this could take a while.
-      wget https://github.com/xianyi/OpenBLAS/archive/v0.3.9.tar.gz && \
-          tar zxvf v0.3.9.tar.gz && cd OpenBLAS-0.3.9 && \
-          sudo make TARGET=CORE2 DYNAMIC_ARCH=1 DYNAMIC_OLDER=1 USE_THREAD=0 USE_OPENMP=0 FC=gfortran CC=gcc COMMON_OPT="-O3 -g -fPIC" FCOMMON_OPT="-O3 -g -fPIC -frecursive" NMAX="NUM_THREADS=128" LIBPREFIX="libopenblas" LAPACKE="NO_LAPACKE=1" INTERFACE64=0 NO_STATIC=1 && \
-          sudo make PREFIX=/usr NO_STATIC=1 install && \
-          cd .. && rm -rf OpenBLAS-0.3.9 && rm v0.3.9.tar.gz
-  elif [[ -x "$(command -v yum)" ]]; then
+    if [[ -x "$(command -v apt)" ]]; then
+        # for Ubuntu 18.04+
+        # https://github.com/milvus-io/milvus/blob/master/build/docker/openblas/ubuntu18.04/Dockerfile
+        # install OpenBLAS, this could take a while.
+        sudo apt-get update && \
+        sudo apt-get install -y --no-install-recommends wget ca-certificates gnupg2 && \
+        sudo apt-get install -y --no-install-recommends g++ gcc gfortran git make && \
+        wget https://github.com/xianyi/OpenBLAS/archive/v0.3.9.tar.gz && \
+        tar zxvf v0.3.9.tar.gz && cd OpenBLAS-0.3.9 && \
+        sudo make TARGET=CORE2 DYNAMIC_ARCH=1 DYNAMIC_OLDER=1 USE_THREAD=0 USE_OPENMP=0 FC=gfortran CC=gcc COMMON_OPT="-O3 -g -fPIC" FCOMMON_OPT="-O3 -g -fPIC -frecursive" NMAX="NUM_THREADS=128" LIBPREFIX="libopenblas" INTERFACE64=0 NO_STATIC=1 && \
+        sudo make -j4 PREFIX=/usr NO_STATIC=1 install && \
+        cd .. && rm -rf OpenBLAS-0.3.9 && rm v0.3.9.tar.gz
+        # install Boost and Tbb
+        sudo apt-get install -y libssl-dev libcurl4-openssl-dev zlib1g-dev libtbb-dev \
+            libboost-regex-dev libboost-program-options-dev libboost-system-dev libboost-filesystem-dev libboost-serialization-dev libboost-python-dev python3-dev
+    elif [[ -x "$(command -v yum)" ]]; then
       # for CentOS 7
       sudo yum install -y epel-release centos-release-scl-rh && \
       sudo yum install -y git make lcov libtool m4 autoconf automake ccache openssl-devel zlib-devel \
@@ -63,10 +67,12 @@ function install_linux_deps() {
           ./bootstrap.sh --prefix=/usr/local --with-toolset=gcc --without-libraries=python && \
           sudo ./b2 -j2 --prefix=/usr/local --without-python toolset=gcc install && \
           cd ../ && rm -rf ./boost_1_65_1*
-  else
-      echo "Error Install Dependencies ..."
-      exit 1
-  fi
+    else
+        echo "Error Install Dependencies:"
+        echo "Your system is not yet supported. Please visit GitHub and submit your requirements in Issue."
+        echo "https://github.com/milvus-io/embd-milvus/issues"
+        exit 1
+    fi
 }
 
 function install_mac_deps() {
