@@ -8,6 +8,7 @@ import shutil
 import os
 from importlib_resources import files
 from distutils.dir_util import copy_tree
+import platform
 
 CONFIG_PATH = '/var/bin/e-milvus/configs/'
 LIB_PATH = '/var/bin/e-milvus/lib/'
@@ -40,11 +41,14 @@ thr = None
 
 
 def before():
+    osType = platform.system()
     print('please do the following if you haven not already done so:')
     print('1. install required dependencies: bash ' + LIB_PATH + 'install_deps.sh')
-    print('2. (Linux system only) export LD_PRELOAD=' + str(files('milvus.bin').joinpath('embd-milvus.so')))
-    print('3. (on Linux systems) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
-    print('   (on MacOS systems) export DYLD_FALLBACK_LIBRARY_PATH=DYLD_FALLBACK_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
+    if osType == 'Linux':
+        print('2. export LD_PRELOAD=' + str(files('milvus.bin').joinpath('embd-milvus.so')))
+        print('3. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
+    elif osType == 'Darwin':
+        print('2. export DYLD_FALLBACK_LIBRARY_PATH=DYLD_FALLBACK_LIBRARY_PATH:/usr/lib:/usr/local/lib:' + LIB_PATH)
 
 
 def start():
