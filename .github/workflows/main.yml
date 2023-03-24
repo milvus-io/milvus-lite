@@ -1,0 +1,49 @@
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+
+jobs:
+  build:
+    name: Build Wheel - Linux
+    runs-on: ubuntu-latest
+    container:
+      image: matrixji/python-milvus-server-builder:manylinux2004-1
+      env:
+        BUILD_ALREADY_IN_DOCKER: "YES"
+        HOME: /tmp
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Cache go
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: linux-go-
+          restore-keys: linux-go-
+      - name: Cache conan
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.conan/data
+          key: linux-conan-
+          restore-keys: linux-conan-
+      - name: Cache ccache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ github.workspace }}/.ccache
+          key: linux-ccache-
+          restore-keys: linux-ccache-
+      - name: Build Wheel
+        run: |
+          python3.8 -m build -w -n
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheel_linux
+          path: dist/*.whl
+          retention-days: 5
