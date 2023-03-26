@@ -13,24 +13,41 @@ import re
 import subprocess
 import socket
 from time import sleep
+import datetime
 from typing import Any, List
+import urllib.error
+import urllib.request
+import json
+import hashlib
 
-__version__ = '2.2.4'
+__version__ = '2.2.4-rc.1'
 
 LOGGERS = {}
 
 
-def _initialize_data_files() -> None:
-    bin_dir = join(dirname(abspath(__file__)), 'data', 'bin')
-    files = [file[:-5] for file in os.listdir(bin_dir) if file.endswith('.lzma')]
-    files = [file for file in files if not isfile(
-        join(bin_dir, file)) or os.stat(join(bin_dir, file)).st_size < 10]
-    for file in files:
-        lzma_file = join(bin_dir, f'{file}.lzma')
+def _initialize_data_files(base_dir) -> None:
+    bin_dir = join(base_dir, 'bin')
+    os.makedirs(bin_dir, exist_ok=True)
+    lzma_dir = join(dirname(abspath(__file__)), 'data', 'bin')
+    files = filter(lambda x: x.endswith('.lzma'), os.listdir(lzma_dir))
+    files = map(lambda x:x[:-5], files)
+    for filename in files:
+        orig_file = join(bin_dir, filename)
+        lzma_md5_file = orig_file + '.lzma.md5'
+        lzma_file = join(lzma_dir, filename) + '.lzma'
+        with open(lzma_file, 'rb') as raw:
+            md5sum_text = hashlib.md5(raw.read()).hexdigest()
+        if isfile(lzma_md5_file):
+            with open(lzma_md5_file, 'r', encoding='utf-8') as lzma_md5_fp:
+                md5sum_text_pre = lzma_md5_fp.read().strip()
+            if md5sum_text == md5sum_text_pre:
+                continue
         with lzma.LZMAFile(lzma_file, mode='r') as lzma_fp:
-            with open(join(bin_dir, file), 'wb') as raw:
+            with open(orig_file, 'wb') as raw:
                 raw.write(lzma_fp.read())
-                os.chmod(join(bin_dir, file), 0o755)
+                os.chmod(orig_file, 0o755)
+            with open(lzma_md5_file, 'w', encoding='utf-8') as lzma_md5_fp:
+                lzma_md5_fp.write(md5sum_text)
 
 
 def _create_logger(usage: str = 'null') -> logging.Logger:
@@ -98,6 +115,12 @@ class MilvusServerConfig:
         - {{ bar: value }} for variable with default values
         - {{ bar(type) }} and {{ bar(type): value }} for type hint
         """
+        type_mappings = {
+            'int': int,
+            'bool': bool,
+            'str': str,
+            'string': str
+        }
         for line in self.template_text.split('\n'):
             matches = re.match(r'.*\{\{(.*)}}.*', line)
             if matches:
@@ -114,7 +137,7 @@ class MilvusServerConfig:
                     key, type_str = key.split('(')
                     key, type_str = key.strip(), type_str.strip()
                     type_str = type_str.replace(')', '')
-                    value_type = eval(type_str)
+                    value_type = type_mappings[type_str]
                 self.config_key_maps[original_key] = key
                 self.configurable_items[key] = [value_type, self.get_value(val, value_type)]
         self.verbose_configurable_items()
@@ -136,6 +159,19 @@ class MilvusServerConfig:
         self.write_config()
         self.verbose_configurable_items()
 
+    def resolve_port(self, port_start: int):
+        used_ports = self.listen_ports.values()
+        used_ports = [x[0] for x in used_ports if len(x) == 2]
+        used_ports = set(used_ports)
+        for i in range(10000):
+            port = port_start + i
+            if port not in used_ports:
+                sock = self.try_bind_port(port)
+                if sock:
+                    return port, sock
+        return None, None
+
+
     def resolve_all_listen_ports(self):
         port_keys = list(filter(lambda x: x.endswith('_port'), self.configurable_items.keys()))
         for port_key in port_keys:
@@ -144,20 +180,13 @@ class MilvusServerConfig:
                 sock = self.try_bind_port(port)
                 if not sock:
                     raise RuntimeError(f'set {port_key}={port}, but bind failed')
-                else:
-                    self.logger.debug('bind port %d success, using it as %s', port, port_key)
-                self.listen_ports[port_key] = (port, sock)
             else:
                 port_start = self.configurable_items[port_key][1]
                 port_start = port_start or self.RANDOM_PORT_START
                 port_start = int(port_start)
-                for i in range(10000):
-                    port = port_start + i
-                    sock = self.try_bind_port(port)
-                    if sock:
-                        self.listen_ports[port_key] = (port, sock)
-                        self.logger.debug('bind port %d for %s success', port, port_key)
-                        break
+                port, sock = self.resolve_port(port_start)
+            self.listen_ports[port_key] = (port, sock)
+            self.logger.debug('bind port %d for %s success', port, port_key)
         for port_key, data in self.listen_ports.items():
             self.configurable_items[port_key][1] = data[0]
 
@@ -177,9 +206,9 @@ class MilvusServerConfig:
     def get_default_data_dir(cls):
         if sys.platform.lower() == 'win32':
             default_dir = expandvars('%APPDATA%')
-            return join(default_dir, 'milvus.io', 'milvus-server')
+            return join(default_dir, 'milvus.io', 'milvus-server', __version__)
         default_dir = expandvars('${HOME}')
-        return join(default_dir, '.milvus.io', 'milvus-server')
+        return join(default_dir, '.milvus.io', 'milvus-server', __version__)
 
     @classmethod
     def get_value_text(cls, val) -> str:
@@ -250,12 +279,13 @@ class MilvusServer:
     """ Milvus server
     """
 
-    def __init__(self, config: MilvusServerConfig = None, **kwargs):
+    def __init__(self, config: MilvusServerConfig = None, wait_for_started=True, **kwargs):
         """_summary_
 
         Args:
             config (MilvusServerConfig, optional): the server config.
                 Defaults to default_server_config.
+            wait_for_started (bool, optional): wait for server started. Defaults to True.
 
         Kwargs:
         """
@@ -268,14 +298,15 @@ class MilvusServer:
         self.proc_fds = {}
         self._debug = kwargs.get('debug', False)
         self.logger = _create_logger('debug' if self._debug else 'null')
+        self.webservice_port = 9091
+        self.wait_for_started = wait_for_started
 
-    @classmethod
-    def get_milvus_executable_path(cls):
+    def get_milvus_executable_path(self):
         """ get where milvus
         """
         if sys.platform.lower() == 'win32':
-            return join(dirname(abspath(__file__)), 'data', 'bin', 'milvus.exe')
-        return join(dirname(abspath(__file__)), 'data', 'bin', 'milvus')
+            join(self.config.base_data_dir, 'bin', 'milvus.exe')
+        return join(self.config.base_data_dir, 'bin', 'milvus')
 
     def __enter__(self):
         self.start()
@@ -299,13 +330,42 @@ class MilvusServer:
         while self.running:
             sleep(0.1)
 
+    def wait_started(self, timeout=30000):
+        """ wait server started
+
+        Args:
+            timeout:  timeout in milliseconds, default 30,000
+
+        use http client to visit the health api to check if server ready
+        """
+        start_time = datetime.datetime.now()
+        health_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/health'
+        while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000):
+            try:
+                with urllib.request.urlopen(health_url, timeout=100) as resp:
+                    json.loads(resp.read().decode('utf-8'))
+                    self.logger.info('Milvus server is started')
+                    # still wait 1 seconds to make sure server is ready
+                    sleep(1)
+                    return
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+                sleep(0.1)
+        raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
+
     def start(self):
+        _initialize_data_files(self.config.base_data_dir)
         self.config.resolve()
         milvus_exe = self.get_milvus_executable_path()
         old_pwd = os.getcwd()
         os.chdir(self.config.base_data_dir)
         envs = os.environ.copy()
-        envs.update({'DEPLOY_MODE': 'STANDALONE'})
+        # resolve listen port for METRICS_PORT (restful service), default 9091
+        self.webservice_port, sock = self.config.resolve_port(self.webservice_port)
+        sock.close()
+        envs.update({
+            'DEPLOY_MODE': 'STANDALONE',
+            'METRICS_PORT': str(self.webservice_port)
+        })
         if sys.platform.lower() == 'linux':
             self.prepend_path_to_envs(envs, 'LD_LIBRARY_PATH', dirname(milvus_exe))
         if sys.platform.lower() == 'darwin':
@@ -322,6 +382,8 @@ class MilvusServer:
             # pylint: disable=consider-using-with
             self.server_proc = subprocess.Popen(cmds, stdout=proc_fds['stdout'], stderr=proc_fds['stderr'], env=envs)
         os.chdir(old_pwd)
+        if self.wait_for_started:
+            self.wait_started()
 
     def stop(self):
         if self.server_proc:
@@ -367,7 +429,6 @@ class MilvusServer:
         self.config.logger = self.logger
 
 
-_initialize_data_files()
 default_server = MilvusServer()
 debug_server = MilvusServer(MilvusServerConfig(), debug=True)
 
