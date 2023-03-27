@@ -1,0 +1,15 @@
+{
+    "name": "Embd Milvus Development",
+    "rename-me-to-build": {
+        "dockerfile": "Dockerfile"
+    },
+    "image": "matrixji/python-milvus-server-builder:manylinux2004-1",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "bungcip.better-toml"
+            ]
+        }
+    }
+}
