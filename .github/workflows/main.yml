@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  build_linux:
     name: Build Wheel - Linux
     runs-on: ubuntu-latest
     container:
@@ -23,21 +23,21 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: linux-go-
+          key: linux-go-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-go-
       - name: Cache conan
         uses: actions/cache@v3
         with:
           path: |
             ~/.conan/data
-          key: linux-conan-
+          key: linux-conan-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-conan-
       - name: Cache ccache
         uses: actions/cache@v3
         with:
           path: |
             ${{ github.workspace }}/.ccache
-          key: linux-ccache-
+          key: linux-ccache-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-ccache-
       - name: Build Wheel
         run: |
@@ -45,5 +45,47 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: wheel_linux
+          path: dist/*.whl
+          retention-days: 5
+  build_macos:
+    name: Build Wheel - macOS
+    runs-on: macos-11
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Cache go
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-go-
+      - name: Cache conan
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.conan/data
+          key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-conan-
+      - name: Cache ccache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ github.workspace }}/.ccache
+          key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-ccache-
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '~1.18.10'
+      - name: Build Wheel
+        run: |
+          python3 -m pip install build wheel setuptools
+          python3 -m build -w -n
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheel_macos
           path: dist/*.whl
           retention-days: 5

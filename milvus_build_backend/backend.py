@@ -1,6 +1,7 @@
 import os
 import sys
 import lzma
+import platform
 from setuptools import build_meta as _build
 
 
@@ -27,10 +28,11 @@ def _build_milvus_binary():
 
 
 def _get_platform():
+    machine_text = platform.machine().lower()
     if sys.platform.lower() == 'darwin':
-        return 'macosx_11_0_arm64'
+        return f'macosx_11_0_{machine_text}'
     if sys.platform.lower() == 'linux':
-        return 'manylinux2014_x86_64'
+        return f'manylinux2014_{machine_text}'
     if sys.platform.lower() == 'win32':
         return 'win-amd64'
 
