@@ -89,3 +89,65 @@ jobs:
           name: wheel_macos
           path: dist/*.whl
           retention-days: 5
+
+  acceptance_test_many_linux:
+    needs:
+      - build_linux
+    name: Acceptance Test ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu:18.04", "ubuntu:22.04", "centos:7", "fedora:36"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: wheel_linux
+          path: dist
+      - name: Install python3 for os
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "centos:7" ]] ; then
+            yum -y install epel-release
+            yum -y install python36 python36-pip python36-wheel
+          elif [[ "${{ matrix.os }}" == "fedora:36" ]] ; then
+            dnf -y install python3 python3-pip python3-wheel python3-devel gcc gcc-c++
+          elif [[ "${{ matrix.os }}" =~ "ubuntu" ]] ; then
+            apt update
+            apt -y install python3 python3-pip python3-wheel
+          fi
+      - name: Run hello milvus
+        run: |
+          python3 -m pip install -U pip 
+          python3 -m pip install "$(echo dist/*.whl)[client]"
+          cd examples
+          python3 example.py
+  acceptance_test_macos:
+    needs:
+      - build_macos
+    name: Acceptance Test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-11", "macos-12"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - uses: actions/download-artifact@v3
+        with:
+          name: wheel_macos
+          path: dist
+      - name: Run hello milvus
+        run: |
+          python3 -m pip install wheel setuptools
+          python3 -m pip install "$(echo dist/*.whl)[client]"
+          cd examples
+          python3 example.py

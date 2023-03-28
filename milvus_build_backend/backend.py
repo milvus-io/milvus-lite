@@ -2,7 +2,7 @@ import os
 import sys
 import lzma
 import platform
-from setuptools import build_meta as _build
+import setuptools.build_meta as _build
 
 
 def _get_project_dir():
@@ -30,7 +30,10 @@ def _build_milvus_binary():
 def _get_platform():
     machine_text = platform.machine().lower()
     if sys.platform.lower() == 'darwin':
-        return f'macosx_11_0_{machine_text}'
+        if machine_text == 'x86_64':
+            return 'macosx_10_9_x86_64'
+        elif machine_text == 'arm64':
+            return 'macosx_11_0_arm64'
     if sys.platform.lower() == 'linux':
         return f'manylinux2014_{machine_text}'
     if sys.platform.lower() == 'win32':
