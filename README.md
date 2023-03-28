@@ -44,7 +44,7 @@ $ python3 -m pip install "milvus[client]"
 You could load the `default_server` in Python and start it.
 
 ```python
-from milvus_server import default_server
+from milvus import default_server
 from pymilvus import connections
 
 # Optional, if you want store all related data to specific location
@@ -82,13 +82,13 @@ The full options cloud be found by `milvus-server --help`.
 You could use `debug_server` instead of `default_server` for checking startup failures.
 
 ```python
-from milvus_server import debug_server
+from milvus import debug_server
 ```
 
 and you could also try create server instance by your self
 
 ```python
-from milvus_server import MilvusServer
+from milvus import MilvusServer
 
 server = MilvusServer(debug=True)
 ```
@@ -105,7 +105,7 @@ You could close server while you not need it anymore.
 Or, you're able to using `with` context to start/stop it.
 
 ```python
-from milvus_server import default_server
+from milvus import default_server
 
 with default_server:
     # milvus started, using default server here
@@ -119,7 +119,7 @@ By default all data and logs are stored in the following locations: `~/.milvus.i
 You could also set it at runtime(before the server started), by Python code:
 
 ```python
-from milvus_server import default_server
+from milvus import default_server
 default_server.set_base_dir('milvus_data')
 ```
 
@@ -140,10 +140,10 @@ $ python3 -m pip install "milvus[client]"
 
 ## Examples
 
-Embedded Milvus is friendly with jupyter notebook, you could find more examples under [examples](examples) folder.
+Embedded Milvus is friendly with jupyter notebook, you could find more examples under [examples](https://github.com/milvus-io/embd-milvus/blob/main/examples) folder.
 
 ## Contributing
-If you want to contribute to Embedded Milvus, please read the [Contributing Guide](CONTRIBUTING.md) first.
+If you want to contribute to Embedded Milvus, please read the [Contributing Guide](https://github.com/milvus-io/embd-milvus/blob/main/CONTRIBUTING.md) first.
 
 ## License
-Embedded Milvus is under the Apache 2.0 license. See the [LICENSE](LICENSE) file for details.
+Embedded Milvus is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/embd-milvus/blob/main/LICENSE) file for details.

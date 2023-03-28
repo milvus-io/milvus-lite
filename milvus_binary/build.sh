@@ -1,17 +1,13 @@
 #!/bin/bash
 
-## variables
-
-MILVUS_REPO=${MILVUS_REPO:-https://github.com/milvus-io/milvus.git}
-MILVUS_BRANCH=${MILVUS_TAG:-v2.2.4}
-BUILD_PROXY=
-BUILD_FORCE=NO
-
 export LANG=en_US.utf-8
 set -e
 
 build_dir=$(cd $(dirname $0); pwd)
 cd ${build_dir}
+
+# load envs
+. env.sh
 
 # getopts
 while getopts "fr:b:p:" arg; do
@@ -23,7 +19,7 @@ while getopts "fr:b:p:" arg; do
             MILVUS_REPO=$OPTARG
         ;;
         b)
-            MILVUS_BRANCH=$OPTARG
+            MILVUS_VERSION=$OPTARG
         ;;
         p)
             BUILD_PROXY=$OPTARG
@@ -49,7 +45,7 @@ fi
 if [[ ! -d milvus ]] ; then
     git clone ${MILVUS_REPO} milvus
     cd milvus
-    git checkout ${MILVUS_BRANCH}
+    git checkout ${MILVUS_VERSION}
     # apply milvus patch later if needed
     # patch -p1 < ../milvus_patches/${MILVUS_PATCH_NAME}.patch
     cd -
@@ -57,7 +53,7 @@ fi
 
 # get host
 OS=$(uname -s)
-ARCH=$(arch)
+ARCH=$(uname -m)
 
 
 # patch Makefile
@@ -106,8 +102,15 @@ function build_linux_x86_64() {
     done
 }
 
-# build for macos arm64
-build_macosx_arm64() {
+function install_deps_for_macosx() {
+    brew install boost libomp ninja tbb openblas ccache pkg-config
+    if [[ ! -d "/usr/local/opt/llvm" ]]; then
+        ln -s /usr/local/opt/llvm@14 /usr/local/opt/llvm
+    fi
+}
+
+# build for macos arm64/x86_64
+build_macosx_common() {
     cd milvus
     make -j $(sysctl -n hw.physicalcpu) milvus
 
@@ -144,6 +147,17 @@ build_macosx_arm64() {
         done
     done
 }
+
+
+function build_macosx_x86_64() {
+    install_deps_for_macosx
+    build_macosx_common
+}
+
+function build_macosx_arm64() {
+    build_macosx_common
+}
+
 
 function build_milvus() {
     set -e
