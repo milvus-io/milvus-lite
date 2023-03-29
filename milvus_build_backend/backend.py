@@ -15,10 +15,12 @@ def _build_milvus_binary():
     if status != 0:
         raise RuntimeError('Build milvus binary failed')
     # install it to data/bin
-    bin_dir = os.path.join(project_dir, 'milvus_binary', 'milvus', 'bin')
+    bin_dir = os.path.join(project_dir, 'milvus_binary', 'output')
     to_dir = os.path.join(project_dir, 'src', 'milvus', 'data', 'bin')
     os.makedirs(to_dir, exist_ok=True)
     for file in os.listdir(bin_dir):
+        if file.endswith('.txt'):
+            continue
         file_from = os.path.join(bin_dir, file)
         file_to = os.path.join(to_dir, f'{file}.lzma')
         with lzma.open(file_to, 'wb') as lzma_file:
@@ -37,7 +39,7 @@ def _get_platform():
     if sys.platform.lower() == 'linux':
         return f'manylinux2014_{machine_text}'
     if sys.platform.lower() == 'win32':
-        return 'win-amd64'
+        return 'win_amd64'
 
 
 get_requires_for_build_wheel = _build.get_requires_for_build_wheel

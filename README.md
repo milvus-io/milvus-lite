@@ -145,5 +145,9 @@ Embedded Milvus is friendly with jupyter notebook, you could find more examples 
 ## Contributing
 If you want to contribute to Embedded Milvus, please read the [Contributing Guide](https://github.com/milvus-io/embd-milvus/blob/main/CONTRIBUTING.md) first.
 
+## Report a bug
+When you use or develop embd-milvus, if you find any bug, please report it to us. You could submit an issue in [embd-milvus](
+https://github.com/milvus-io/embd-milvus/issues/new/choose) or report you [milvus](https://github.com/milvus-io/milvus/issues/new/choose) repo if you think is a Milvus issue.
+
 ## License
 Embedded Milvus is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/embd-milvus/blob/main/LICENSE) file for details.

@@ -1,9 +1,11 @@
 {
     "name": "Embd Milvus Development",
-    "rename-me-to-build": {
+    "build": {
         "dockerfile": "Dockerfile"
     },
-    "image": "matrixji/python-milvus-server-builder:manylinux2004-1",
+    "initializeCommand": "bash .devcontainer/setup/gen_env.sh",
+    "onCreateCommand": "bash .devcontainer/setup/setup_dev.sh",
+    "containerUser": "${localEnv:USER}",
     "customizations": {
         "vscode": {
             "extensions": [
