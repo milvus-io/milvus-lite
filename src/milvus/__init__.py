@@ -20,7 +20,7 @@ import urllib.request
 import json
 import hashlib
 
-__version__ = '2.2.4'
+__version__ = '2.2.4-1'
 
 LOGGERS = {}
 
@@ -353,8 +353,9 @@ class MilvusServer:
         raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
 
     def start(self):
-        _initialize_data_files(self.config.base_data_dir)
         self.config.resolve()
+        _initialize_data_files(self.config.base_data_dir)
+
         milvus_exe = self.get_milvus_executable_path()
         old_pwd = os.getcwd()
         os.chdir(self.config.base_data_dir)
