@@ -125,11 +125,9 @@ function build_linux_x86_64() {
 }
 
 function install_deps_for_macosx() {
-    brew install boost libomp ninja tbb openblas ccache pkg-config md5sha1sum
-    if [[ ! -d "/usr/local/opt/llvm" ]]; then
-        # 2.3 or later use llvm@15, or marbe this WA it not needed
-        ln -s /usr/local/opt/llvm@14 /usr/local/opt/llvm
-    fi
+    bash milvus/scripts/install_deps.sh
+    # need this for cache binary
+    brew install md5sha1sum
 }
 
 # build for macos arm64/x86_64
@@ -178,6 +176,7 @@ function build_macosx_x86_64() {
 }
 
 function build_macosx_arm64() {
+    install_deps_for_macosx
     build_macosx_common
 }
 
