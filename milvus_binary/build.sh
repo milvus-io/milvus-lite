@@ -86,7 +86,8 @@ fi
 function build_linux_x86_64() {
     cd milvus
     # conan after 2.3
-    # pip3 install "conan<2.0"
+    pip3 install --user "conan<2.0"
+    export PATH=${HOME}/.local/bin:${PATH}
     make -j $(nproc) milvus
     cd bin
     rm -fr lib*
@@ -113,7 +114,7 @@ function build_linux_x86_64() {
                     if test -f $p/$x && ! test -f $x ; then
                         file=$p/$x
                         while test -L $file ; do
-                            file=$(dirname $file)/$(readlink $file)
+                            file=$(realpath $file)
                         done
                         cp -frv $file $x
                         has_new_file=true
