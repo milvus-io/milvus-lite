@@ -17,7 +17,7 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 5
       CCACHE_MAXSIZE: 2G
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -62,55 +62,55 @@ jobs:
           name: wheel_linux
           path: dist/*.whl
           retention-days: 5
-  # build_macos:
-  #   name: Build Wheel - macOS
-  #   runs-on: macos-11
-  #   env:
-  #     CCACHE_DIR: ${{ github.workspace }}/.ccache
-  #     CCACHE_COMPILERCHECK: content
-  #     CCACHE_COMPRESS: 1
-  #     CCACHE_COMPRESSLEVEL: 5
-  #     CCACHE_MAXSIZE: 2G
-  #   timeout-minutes: 120
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
-  #     - name: Cache go
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ~/.cache/go-build
-  #           ~/go/pkg/mod
-  #         key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
-  #         restore-keys: macos-go-
-  #     - name: Cache conan
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ~/.conan/data
-  #         key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
-  #         restore-keys: macos-conan-
-  #     - name: Cache ccache
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           ${{ github.workspace }}/.ccache
-  #         key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
-  #         restore-keys: macos-ccache-
-  #     - name: Setup Go environment
-  #       uses: actions/setup-go@v4
-  #       with:
-  #         go-version: '~1.18.10'
-  #         cache: false
-  #     - name: Build Wheel
-  #       run: |
-  #         python3 -m pip install --user build wheel 'setuptools>64.0'
-  #         python3 -m build -w -n
-  #     - uses: actions/upload-artifact@v3
-  #       with:
-  #         name: wheel_macos
-  #         path: dist/*.whl
-  #         retention-days: 5
+  build_macos:
+    name: Build Wheel - macOS
+    runs-on: macos-11
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_COMPILERCHECK: content
+      CCACHE_COMPRESS: 1
+      CCACHE_COMPRESSLEVEL: 5
+      CCACHE_MAXSIZE: 2G
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Cache go
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-go-
+      - name: Cache conan
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.conan/data
+          key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-conan-
+      - name: Cache ccache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ github.workspace }}/.ccache
+          key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
+          restore-keys: macos-ccache-
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '~1.18.10'
+          cache: false
+      - name: Build Wheel
+        run: |
+          python3 -m pip install --user build wheel 'setuptools>64.0'
+          python3 -m build -w -n
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheel_macos
+          path: dist/*.whl
+          retention-days: 5
   # build_windows:
   #   name: Build Wheel - windows
   #   runs-on: windows-latest
@@ -120,7 +120,7 @@ jobs:
   #     CCACHE_COMPRESS: 1
   #     CCACHE_COMPRESSLEVEL: 5
   #     CCACHE_MAXSIZE: 2G
-  #   timeout-minutes: 120
+  #   timeout-minutes: 180
   #   steps:
   #     - name: Set git to use LF
   #       run: |
@@ -210,31 +210,43 @@ jobs:
           python3 -m pip install --user "$(echo dist/*.whl)[client]"
           cd examples
           python3 example.py
-  # acceptance_test_macos:
-  #   needs:
-  #     - build_macos
-  #   name: Acceptance Test ${{ matrix.os }}
-  #   runs-on: ${{ matrix.os }}
-  #   timeout-minutes: 60
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       os: ["macos-11", "macos-12"]
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.8'
-  #     - uses: actions/download-artifact@v3
-  #       with:
-  #         name: wheel_macos
-  #         path: dist
-  #     - name: Run hello milvus
-  #       run: |
-  #         python3 -m pip install --user wheel setuptools
-  #         python3 -m pip install --user "$(echo dist/*.whl)[client]"
-  #         cd examples
-  #         python3 example.py
+      - name: Upload runtime log
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() }}
+        with:
+          name: milvus-log
+          path: ~/.milvus.io/milvus-server/**/*.log
+  acceptance_test_macos:
+    needs:
+      - build_macos
+    name: Acceptance Test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-11", "macos-12"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - uses: actions/download-artifact@v3
+        with:
+          name: wheel_macos
+          path: dist
+      - name: Run hello milvus
+        run: |
+          python3 -m pip install --user wheel setuptools
+          python3 -m pip install --user "$(echo dist/*.whl)[client]"
+          cd examples
+          python3 example.py
+      - name: Upload runtime log
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() }}
+        with:
+          name: milvus-log
+          path: ~/.milvus.io/milvus-server/**/*.log
   # acceptance_test_windows:
   #   needs:
   #     - build_windows
