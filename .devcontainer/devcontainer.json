@@ -13,5 +13,8 @@
                 "bungcip.better-toml"
             ]
         }
-    }
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind,consistency=cached"
+    ]
 }

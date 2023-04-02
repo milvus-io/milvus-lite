@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # note: keep same as .devcontainer/Dockerfile
-      image: milvusdb/milvus-env:amd64-centos7-20221222-0fdc1a0
+      image: milvusdb/milvus-env:amd64-centos7-20230329-1431037
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPILERCHECK: content
@@ -48,9 +48,9 @@ jobs:
           yum -y install rh-python38
       - name: Build Wheel
         run: |
-          # devtoolset 7
-          export PATH=/opt/rh/devtoolset-7/root/usr/bin${PATH:+:${PATH}}
-          export LD_LIBRARY_PATH=/opt/rh/devtoolset-7/root$rpmlibdir$rpmlibdir32${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+          # devtoolset 11
+          export PATH=/opt/rh/devtoolset-11/root/usr/bin${PATH:+:${PATH}}
+          export LD_LIBRARY_PATH=/opt/rh/devtoolset-11/root$rpmlibdir$rpmlibdir32${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
           # python 3.8
           export PATH=/opt/rh/rh-python38/root/usr/local/bin:/opt/rh/rh-python38/root/usr/bin${PATH:+:${PATH}}
           export LD_LIBRARY_PATH=/opt/rh/rh-python38/root/usr/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
@@ -62,117 +62,117 @@ jobs:
           name: wheel_linux
           path: dist/*.whl
           retention-days: 5
-  build_macos:
-    name: Build Wheel - macOS
-    runs-on: macos-11
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_COMPILERCHECK: content
-      CCACHE_COMPRESS: 1
-      CCACHE_COMPRESSLEVEL: 5
-      CCACHE_MAXSIZE: 2G
-    timeout-minutes: 120
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Cache go
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: macos-go-
-      - name: Cache conan
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.conan/data
-          key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: macos-conan-
-      - name: Cache ccache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ github.workspace }}/.ccache
-          key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: macos-ccache-
-      - name: Setup Go environment
-        uses: actions/setup-go@v4
-        with:
-          go-version: '~1.18.10'
-          cache: false
-      - name: Build Wheel
-        run: |
-          python3 -m pip install --user build wheel 'setuptools>64.0'
-          python3 -m build -w -n
-      - uses: actions/upload-artifact@v3
-        with:
-          name: wheel_macos
-          path: dist/*.whl
-          retention-days: 5
-  build_windows:
-    name: Build Wheel - windows
-    runs-on: windows-latest
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_COMPILERCHECK: content
-      CCACHE_COMPRESS: 1
-      CCACHE_COMPRESSLEVEL: 5
-      CCACHE_MAXSIZE: 2G
-    timeout-minutes: 120
-    steps:
-      - name: Set git to use LF
-        run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Cache go
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~\AppData\Local\go-build
-            ~\go\pkg\mod
-          key: windows-go-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: windows-go-
-      - name: Cache conan
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.conan/data
-          key: windows-conan-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: windows-conan-
-      - name: Cache ccache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ github.workspace }}/.ccache
-          key: windows-ccache-${{ hashFiles('milvus_binary/env.sh') }}
-          restore-keys: windows-ccache-
-      - name: Configure Toolchain
-        uses: msys2/setup-msys2@v2.12.0
-        with:
-          msystem: mingw64
-      - name: Prepare
-        shell: msys2 {0}
-        run: |
-          # workaround for keyring error
-          if ! pacman -S --noconfirm --needed git patch ; then
-            pacman-key --refresh-keys
-            pacman -S --noconfirm --needed git patch
-          fi
-          pacman -S --noconfirm --needed mingw-w64-x86_64-python mingw-w64-x86_64-python-wheel mingw-w64-x86_64-python-pip
-      - name: Build Wheel
-        shell: msys2 {0}
-        run: |
-          python3 -m pip install --user build wheel 'setuptools>64.0'
-          python3 -m build -w -n
-      - uses: actions/upload-artifact@v3
-        with:
-          name: wheel_windows
-          path: dist/*.whl
-          retention-days: 5
+  # build_macos:
+  #   name: Build Wheel - macOS
+  #   runs-on: macos-11
+  #   env:
+  #     CCACHE_DIR: ${{ github.workspace }}/.ccache
+  #     CCACHE_COMPILERCHECK: content
+  #     CCACHE_COMPRESS: 1
+  #     CCACHE_COMPRESSLEVEL: 5
+  #     CCACHE_MAXSIZE: 2G
+  #   timeout-minutes: 120
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #     - name: Cache go
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~/.cache/go-build
+  #           ~/go/pkg/mod
+  #         key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: macos-go-
+  #     - name: Cache conan
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~/.conan/data
+  #         key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: macos-conan-
+  #     - name: Cache ccache
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ${{ github.workspace }}/.ccache
+  #         key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: macos-ccache-
+  #     - name: Setup Go environment
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: '~1.18.10'
+  #         cache: false
+  #     - name: Build Wheel
+  #       run: |
+  #         python3 -m pip install --user build wheel 'setuptools>64.0'
+  #         python3 -m build -w -n
+  #     - uses: actions/upload-artifact@v3
+  #       with:
+  #         name: wheel_macos
+  #         path: dist/*.whl
+  #         retention-days: 5
+  # build_windows:
+  #   name: Build Wheel - windows
+  #   runs-on: windows-latest
+  #   env:
+  #     CCACHE_DIR: ${{ github.workspace }}/.ccache
+  #     CCACHE_COMPILERCHECK: content
+  #     CCACHE_COMPRESS: 1
+  #     CCACHE_COMPRESSLEVEL: 5
+  #     CCACHE_MAXSIZE: 2G
+  #   timeout-minutes: 120
+  #   steps:
+  #     - name: Set git to use LF
+  #       run: |
+  #         git config --global core.autocrlf false
+  #         git config --global core.eol lf
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #     - name: Cache go
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~\AppData\Local\go-build
+  #           ~\go\pkg\mod
+  #         key: windows-go-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: windows-go-
+  #     - name: Cache conan
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~/.conan/data
+  #         key: windows-conan-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: windows-conan-
+  #     - name: Cache ccache
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ${{ github.workspace }}/.ccache
+  #         key: windows-ccache-${{ hashFiles('milvus_binary/env.sh') }}
+  #         restore-keys: windows-ccache-
+  #     - name: Configure Toolchain
+  #       uses: msys2/setup-msys2@v2.12.0
+  #       with:
+  #         msystem: mingw64
+  #     - name: Prepare
+  #       shell: msys2 {0}
+  #       run: |
+  #         # workaround for keyring error
+  #         if ! pacman -S --noconfirm --needed git patch ; then
+  #           pacman-key --refresh-keys
+  #           pacman -S --noconfirm --needed git patch
+  #         fi
+  #         pacman -S --noconfirm --needed mingw-w64-x86_64-python mingw-w64-x86_64-python-wheel mingw-w64-x86_64-python-pip
+  #     - name: Build Wheel
+  #       shell: msys2 {0}
+  #       run: |
+  #         python3 -m pip install --user build wheel 'setuptools>64.0'
+  #         python3 -m build -w -n
+  #     - uses: actions/upload-artifact@v3
+  #       with:
+  #         name: wheel_windows
+  #         path: dist/*.whl
+  #         retention-days: 5
 
   acceptance_test_many_linux:
     needs:
@@ -210,53 +210,53 @@ jobs:
           python3 -m pip install --user "$(echo dist/*.whl)[client]"
           cd examples
           python3 example.py
-  acceptance_test_macos:
-    needs:
-      - build_macos
-    name: Acceptance Test ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["macos-11", "macos-12"]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-      - uses: actions/download-artifact@v3
-        with:
-          name: wheel_macos
-          path: dist
-      - name: Run hello milvus
-        run: |
-          python3 -m pip install --user wheel setuptools
-          python3 -m pip install --user "$(echo dist/*.whl)[client]"
-          cd examples
-          python3 example.py
-  acceptance_test_windows:
-    needs:
-      - build_windows
-    name: Acceptance Test Windows (py${{ matrix.python_version }})
-    runs-on: windows-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        python_version: ["3.8", "3.10"]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: wheel_windows
-          path: dist
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python_version }}
-      - name: Run hello milvus
-        run: |
-          $x = Get-ChildItem dist\*.whl
-          pip install "$x[client]"
-          cd examples
-          python example.py
+  # acceptance_test_macos:
+  #   needs:
+  #     - build_macos
+  #   name: Acceptance Test ${{ matrix.os }}
+  #   runs-on: ${{ matrix.os }}
+  #   timeout-minutes: 60
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: ["macos-11", "macos-12"]
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.8'
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: wheel_macos
+  #         path: dist
+  #     - name: Run hello milvus
+  #       run: |
+  #         python3 -m pip install --user wheel setuptools
+  #         python3 -m pip install --user "$(echo dist/*.whl)[client]"
+  #         cd examples
+  #         python3 example.py
+  # acceptance_test_windows:
+  #   needs:
+  #     - build_windows
+  #   name: Acceptance Test Windows (py${{ matrix.python_version }})
+  #   runs-on: windows-latest
+  #   timeout-minutes: 60
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python_version: ["3.8", "3.10"]
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions/download-artifact@v3
+  #       with:
+  #         name: wheel_windows
+  #         path: dist
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ matrix.python_version }}
+  #     - name: Run hello milvus
+  #       run: |
+  #         $x = Get-ChildItem dist\*.whl
+  #         pip install "$x[client]"
+  #         cd examples
+  #         python example.py

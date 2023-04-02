@@ -20,7 +20,7 @@ import urllib.request
 import json
 import hashlib
 
-__version__ = '2.2.5'
+__version__ = '2.3.0-beta.1'
 
 LOGGERS = {}
 
