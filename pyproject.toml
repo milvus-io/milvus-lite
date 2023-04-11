@@ -2,3 +2,8 @@
 requires = ["setuptools>=64.0"]
 build-backend = "backend"
 backend-path = ["milvus_build_backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--cov=milvus"

@@ -30,7 +30,7 @@ def _initialize_data_files(base_dir) -> None:
     os.makedirs(bin_dir, exist_ok=True)
     lzma_dir = join(dirname(abspath(__file__)), 'data', 'bin')
     files = filter(lambda x: x.endswith('.lzma'), os.listdir(lzma_dir))
-    files = map(lambda x:x[:-5], files)
+    files = map(lambda x: x[:-5], files)
     for filename in files:
         orig_file = join(bin_dir, filename)
         lzma_md5_file = orig_file + '.lzma.md5'
@@ -89,6 +89,7 @@ class MilvusServerConfig:
         self.template_text: str = ''
         self.config_key_maps = {}
         self.configurable_items = {}
+        self.extra_configs = {}
         self.load_template()
         self.parse_template()
         self.listen_ports = {}
@@ -170,7 +171,6 @@ class MilvusServerConfig:
                 if sock:
                     return port, sock
         return None, None
-
 
     def resolve_all_listen_ports(self):
         port_keys = list(filter(lambda x: x.endswith('_port'), self.configurable_items.keys()))
@@ -255,8 +255,11 @@ class MilvusServerConfig:
         return self.configurable_items[attr][0]
 
     def set(self, attr, val) -> None:
-        if isinstance(val, self.configurable_items[attr][0]):
-            self.configurable_items[attr][1] = val
+        if attr in self.configurable_items:
+            if isinstance(val, self.configurable_items[attr][0]):
+                self.configurable_items[attr][1] = val
+        else:
+            self.extra_configs[attr] = val
 
     def cleanup_listen_ports(self):
         for data in self.listen_ports.values():
@@ -266,13 +269,43 @@ class MilvusServerConfig:
 
     def write_config(self):
         config_file = join(self.base_data_dir, 'configs', 'milvus.yaml')
+        os.makedirs(dirname(config_file), exist_ok=True)
         content = self.template_text
         for key, val in self.config_key_maps.items():
             value = self.configurable_items[val][1]
             value_text = self.get_value_text(value)
             content = content.replace(key, value_text)
+        content = self.update_extra_configs(content)
         with open(config_file, 'w', encoding='utf-8') as config:
             config.write(content)
+
+    def update_extra_configs(self, content):
+        current_key = []
+        new_content = ''
+        for line in content.splitlines():
+            if line.strip().startswith('#'):
+                new_content += line + os.linesep
+                continue
+            matches = re.match(
+                r'^( *[a-zA-Z0-9_]):([^#]*)(.*)$', line.rstrip())
+            if not matches:
+                new_content += line + os.linesep
+                continue
+            key_with_prefix = matches.group(1).rstrip()
+            comment = matches.group(3)
+            key = key_with_prefix.strip()
+            level = (len(key_with_prefix) - len(key)) // 2
+            current_key = current_key[:level]
+            current_key.append(key)
+            current_key_text = '.'.join(current_key)
+            for extra_key, extra_val in self.extra_configs.items():
+                if extra_key == current_key_text:
+                    if comment.strip():
+                        line = f'{key_with_prefix}: {extra_val} # {comment.strip()}'
+                    else:
+                        line = f'{key_with_prefix}: {extra_val}'
+            new_content += line + os.linesep
+        return new_content
 
 
 class MilvusServer:
@@ -434,10 +467,26 @@ default_server = MilvusServer()
 debug_server = MilvusServer(MilvusServerConfig(), debug=True)
 
 
+# pylint: disable=unused-argument
+def extra_config_action(option, opt_str, value, parser):
+    if '=' not in value:
+        raise ValueError(f'Invalid extra config: {value}')
+    key, val = value.split('=', 1)
+    if val.isdigit():
+        val = int(val)
+    if val.replace('.', '', 1).isdigit():
+        val = float(val)
+    if val.lower() in ('true', 'false'):
+        val = val.lower() == 'true'
+    parser.values.extra_config[key] = val
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('--debug', action='store_true', dest='debug', default=False, help='enable debug')
     parser.add_argument('--data', dest='data_dir', default='', help='set base data dir for milvus')
+    parser.add_argument('--extra-config', dest='extra_config', default={},
+                        help='set extra config for milvus', action=extra_config_action)
 
     # dynamic configurations
     for key in default_server.config_keys:

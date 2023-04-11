@@ -1,0 +1,7 @@
+# requirements for devel
+build
+wheel
+setuptools>64.0
+pytest
+pytest-cov
+pyyaml
