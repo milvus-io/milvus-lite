@@ -1,23 +1,23 @@
 # Contributing Guide
 
-Welcome contributors! This guide will help you get started with contributing to embd-milvus.
+Welcome contributors! This guide will help you get started with contributing to Milvus-lite.
 
-Please always find the latest version of this guide at [CONTRIBUTING.md:main](https://github.com/milvus-io/embd-milvus/blob/main/CONTRIBUTING.md)
+Please always find the latest version of this guide at [CONTRIBUTING.md:main](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md)
 
 ## How to set up the development environment
-The embd-milvus project is written in Python. To set up the development environment, you need to install Python 3.8 or later(Our release is supported Python3.6+). We recommend that you use a virtual environment to install the dependencies, although the embd-milvus project requires a very small number of external packages.
+The Milvus-lite project is written in Python. To set up the development environment, you need to install Python 3.8 or later(Our release is supported Python3.6+). We recommend that you use a virtual environment to install the dependencies, although the Milvus-lite project requires a very small number of external packages.
 
-The main dependencies for build embd-milvus is to install dependencies of milvis, so generally you could refer to milvus's [install_deps.sh](https://github.com/milvus-io/milvus/blob/master/scripts/install_deps.sh) as a reference. Please note, you should follow the related branch of milvus. For example, if you want to build embd-milvus with milvus 2.2.0, you should checkout the branch of milvus 2.2.0.
+The main dependencies for build Milvus-lite is to install dependencies of milvis, so generally you could refer to Milvus's [install_deps.sh](https://github.com/milvus-io/milvus/blob/master/scripts/install_deps.sh) as a reference. Please note, you should follow the related branch of Milvus. For example, if you want to build Milvus-lite with Milvus 2.2.0, you should checkout the branch of Milvus 2.2.0.
 
 For python3 build wheel, we use the build module and requires newer version of setuptools. So you should install the latest version of setuptools and build.
 
 ### Setup development environment under linux
-We release the embd-milvus with CentOS image, which reuses from milvusdb/milvus-env, so the binary distribution is compatiable with manylinux2014.
+We release the Milvus-lite with CentOS image, which reuses from milvusdb/milvus-env, so the binary distribution is compatiable with manylinux2014.
 
 If you open the project with VSCode, you could alse use devcontainer to setup the development environment(recommanded). That will help you install all dependencies automatically.
 
 ### Setup development environment under macOS
-As we build embd-milvus with macos 11 and 12, and all dependencies are resloved during build.
+As we build Milvus-lite with macos 11 and 12, and all dependencies are resloved during build.
 Generally, you need first install [brew](https://brew.sh/), then install the following packages:
 
 ```bash
@@ -36,7 +36,7 @@ pacman -S git patch
 pacman -S mingw-w64-x86_64-python mingw-w64-x86_64-python-wheel mingw-w64-x86_64-python-pip
 ```
 
-## Build embd-milvus
+## Build Milvus-lite
 ```bash
 python3 -m build --wheel
 ```

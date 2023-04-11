@@ -15,7 +15,6 @@ Everything you do with Milvus Lite, every piece of code you write for Milvus Lit
 Please note that it is not suggested to use Milvus Lite in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud. 
 
 
-
 ## Requirements
 
 Embedded Milvus in available in:
