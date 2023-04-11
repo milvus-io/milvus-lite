@@ -4,21 +4,21 @@
 
 ## Introduction
 
-The embedded Milvus is a lightweight version of Milvus that can be embedded into your Python application. It is a single binary that can be easily installed and run on your machine.
+The Milvus-lite is a lightweight version of Milvus that can be embedded into your Python application. It is a single binary that can be easily installed and run on your machine.
 
 It could be imported as a Python library, as well as use it as a command standalone server.
 
-Thanks to Milvus standalone version could be run with embeded etcd and local storage, embedded milvus does not have any other dependencies.
+Thanks to Milvus standalone version could be run with embeded etcd and local storage, Milvus-lite does not have any other dependencies.
 
-Everything you do with embedded Milvus, every piece of code you write for embedded Milvus can be safely migrated to other forms of Milvus (standalone version, cluster version, cloud version, etc.).
+Everything you do with Milvus-lite, every piece of code you write for Milvus-lite can be safely migrated to other forms of Milvus (standalone version, cluster version, cloud version, etc.).
 
-Please note that it is not suggested to use embedded Milvus in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud. 
+Please note that it is not suggested to use Milvus-lite in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud. 
 
 
 
 ## Requirements
 
-Here's a list of verified OS types where Embedded Milvus can successfully build and run:
+Here's a list of verified OS types where Milvus-lite can successfully build and run:
 - Ubuntu >= 18.04 (x86_64)
 - CentOS >= 7.0 (x86_64)
 - MacOS >= 11.0 (Apple Silicon)
@@ -27,7 +27,7 @@ For linux we use manylinux2014 as the base image, so it should be able to run on
 
 ## Installation
 
-Embedded Milvus is available on PyPI. You can install it via `pip` for Python 3.6+:
+Milvus-lite is available on PyPI. You can install it via `pip` for Python 3.6+:
 
 ```bash
 $ python3 -m pip install milvus
@@ -114,7 +114,7 @@ with default_server:
 
 ### Data and Log Persistence
 
-By default all data and logs are stored in the following locations: `~/.milvus.io/milvus-server/VERSION` (VERSION is the versiong string of embedded Milvus).
+By default all data and logs are stored in the following locations: `~/.milvus.io/milvus-server/VERSION` (VERSION is the versiong string of Milvus).
 
 You could also set it at runtime(before the server started), by Python code:
 
@@ -131,7 +131,7 @@ $ milvus-server --data milvus_data
 
 ### Working with PyMilvus
 
-Embedded Milvus could be run without pymilvus if you just want run as a server.
+Milvus-lite could be run without pymilvus if you just want run as a server.
 You could also install with extras `client` to get pymilvus.
 
 ```bash
@@ -140,14 +140,14 @@ $ python3 -m pip install "milvus[client]"
 
 ## Examples
 
-Embedded Milvus is friendly with jupyter notebook, you could find more examples under [examples](https://github.com/milvus-io/embd-milvus/blob/main/examples) folder.
+Milvus-lite is friendly with jupyter notebook, you could find more examples under [examples](https://github.com/milvus-io/milvus-lite/blob/main/examples) folder.
 
 ## Contributing
-If you want to contribute to Embedded Milvus, please read the [Contributing Guide](https://github.com/milvus-io/embd-milvus/blob/main/CONTRIBUTING.md) first.
+If you want to contribute to Milvus-lite, please read the [Contributing Guide](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md) first.
 
 ## Report a bug
-When you use or develop embd-milvus, if you find any bug, please report it to us. You could submit an issue in [embd-milvus](
-https://github.com/milvus-io/embd-milvus/issues/new/choose) or report you [milvus](https://github.com/milvus-io/milvus/issues/new/choose) repo if you think is a Milvus issue.
+When you use or develop Milvus-lite, if you find any bug, please report it to us. You could submit an issue in [Milvus-lite](
+https://github.com/milvus-io/milvus-lite/issues/new/choose) or report to [Milvus](https://github.com/milvus-io/milvus/issues/new/choose) repo if you think is a Milvus issue.
 
 ## License
-Embedded Milvus is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/embd-milvus/blob/main/LICENSE) file for details.
+Milvus-lite is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/milvus-lite/blob/main/LICENSE) file for details.
