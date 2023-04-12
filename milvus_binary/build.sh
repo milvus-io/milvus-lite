@@ -67,8 +67,8 @@ if [[ ! -d milvus ]] ; then
     cd milvus
     git checkout ${MILVUS_VERSION}
     # apply milvus patch later if needed
-    if [ -f ../patches/${osname}-${MILVUS_VERSION}.patch ] ; then
-        patch -p1 < ../patches/${osname}-${MILVUS_VERSION}.patch
+    if [ -f ../patches/milvus-${MILVUS_VERSION}.patch ] ; then
+        patch -p1 < ../patches/milvus-${MILVUS_VERSION}.patch
     fi
     cd -
 fi

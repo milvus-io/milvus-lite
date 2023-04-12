@@ -30,7 +30,7 @@ For linux we use manylinux2014 as the base image, so it should be able to run on
 
 ## Installation
 
-Milvus Lite is available on PyPI. You can install it via `pip` for Python 3.7+:
+Milvus Lite is available on PyPI. You can install it via `pip` for Python 3.6+:
 
 ```bash
 $ python3 -m pip install milvus
@@ -40,6 +40,7 @@ Or, install with client(pymilvus):
 ```bash
 $ python3 -m pip install "milvus[client]"
 ```
+Note: pymilvus now requires Python 3.7+
 
 ## Usage
 
@@ -103,6 +104,48 @@ If you're using CLI `milvus-server`, you could use `--debug` to enable debug mod
 
 ```bash
 $ milvus-server --debug
+```
+
+### Configurations for Milvus
+Milvus Lite could set configure by API as well as by CLI. We seperate the configurations into two parts: `basic` and `extra`.
+
+#### The basic configurations
+You could find available configurations by `milvus-server --help` for got the list of `basic` configurations.
+
+These basic configurations including:
+- Some listen ports for service, e.g. `--proxy-port` for specifying the port of proxy service.
+- Some storage configurations, e.g. `--data` for specifying the data directory.
+- Some log configurations. e.g. `--system-log-level` for specifying the log level.
+
+If you using Python API, you could set these configurations by `MilvusServer.config.set` method.
+
+```python
+# this have the same effect as `milvus-server --system-log-level info`
+default_server.config.set('system_log_level', 'info')
+```
+
+All configuable basic configurations could be found in config yaml template, which is installed with milvus package.
+
+#### The extra configurations
+Other configurations are `extra` configurations, which could also be set by `MilvusServer.config.set` method.
+
+for example, if we want to set `dataCoord.segment.maxSize` to 1024, we could do:
+
+```python
+default_server.config.set('dataCoord.segment.maxSize', 1024)
+```
+
+or by CLI:
+
+``` bash
+milvus-server --extra-config dataCoord.segment.maxSize=1024
+```
+
+Both of them will update the content of Milvus config yaml with:
+``` yaml
+dataCoord:
+  segment:
+    maxSize: 1024
 ```
 
 ### Context
