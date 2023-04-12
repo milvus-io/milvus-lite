@@ -18,8 +18,8 @@ Please note that it is not suggested to use Milvus Lite in a production environm
 ## Requirements
 
 Embedded Milvus in available in:
-- Google Colab [example](https://raw.githubusercontent.com/milvus-io/milvus-lite/main/examples/example.ipynb)
-- Jupiter Notebook
+- Google Colab [example](https://github.com/milvus-io/milvus-lite/blob/main/examples/example.ipynb)
+- Jupyter Notebook
 
 Here's a list of verified OS types where Milvus Lite can successfully build and run:
 - Ubuntu >= 18.04 (x86_64)
@@ -44,27 +44,30 @@ $ python3 -m pip install "milvus[client]"
 ## Usage
 
 ### Import as Python library
-You could load the `default_server` in Python and start it.
+Simply import `milvus.default_server`.
 
 ```python
 from milvus import default_server
-from pymilvus import connections
+from pymilvus import connections, utility
 
-# Optional, if you want store all related data to specific location
-# default it wil using:
+# (OPTIONAL) Set if you want store all related data to specific location
+# Default location:
 #   %APPDATA%/milvus-io/milvus-server on windows
 #   ~/.milvus-io/milvus-server on linux
-default_server.set_base_dir('milvus_data')
+# default_server.set_base_dir('milvus_data')
 
-# Optional, if you want cleanup previous data
-default_server.cleanup()
+# (OPTIONAL) if you want cleanup previous data
+# default_server.cleanup()
 
-# star you milvus server
+# Start you milvus server
 default_server.start()
 
-# Now you could connect with localhost and the port
-# The port is in default_server.listen_port
+# Now you could connect with localhost and the given port
+# Port is defined by default_server.listen_port
 connections.connect(host='127.0.0.1', port=default_server.listen_port)
+
+# Check if the server is ready.
+print(utility.get_server_version())
 ```
 
 ### CLI milvus-server
