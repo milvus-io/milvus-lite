@@ -43,9 +43,9 @@ jobs:
             ${{ github.workspace }}/.ccache
           key: linux-ccache-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-ccache-
-      - name: Install python38
+      - name: Install build requires
         run: |
-          yum -y install rh-python38
+          yum -y install rh-python38 patch
       - name: Build Wheel
         run: |
           # devtoolset 7
