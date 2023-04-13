@@ -1,5 +1,5 @@
 diff --git a/go.mod b/go.mod
-index deec9bc45..bd3e016a6 100644
+index 42e64c166..1035a64e6 100644
 --- a/go.mod
 +++ b/go.mod
 @@ -18,7 +18,6 @@ require (
@@ -11,7 +11,7 @@ index deec9bc45..bd3e016a6 100644
  	github.com/golang/mock v1.5.0
  	github.com/golang/protobuf v1.5.2
 diff --git a/go.sum b/go.sum
-index 3c1045ac3..f8da7f96c 100644
+index bc410f4ad..bd2f09e7a 100644
 --- a/go.sum
 +++ b/go.sum
 @@ -221,8 +221,6 @@ github.com/gin-contrib/sse v0.1.0 h1:Y/yl/+YNO8GZSjAhjMsSuLt29uWRFHdHYUb5lYOV9qE
@@ -77,7 +77,7 @@ index 1b58ab37b..c85dffb50 100644
  endif ()
  
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index 05711722e..4c0989e29 100644
+index 05711722e..5bf6358f0 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
 +++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
 @@ -52,6 +52,7 @@ macro(build_knowhere)
@@ -264,3 +264,15 @@ index 5d58bb3f5..bb7f00a65 100755
  }
  
  if ! command -v go &> /dev/null
+diff --git a/scripts/setenv.sh b/scripts/setenv.sh
+index 577683dfb..08a80abe3 100644
+--- a/scripts/setenv.sh
++++ b/scripts/setenv.sh
+@@ -42,6 +42,7 @@ case "${unameOut}" in
+       export RPATH=$LD_LIBRARY_PATH;;
+     Darwin*)    
+       export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$ROOT_DIR/internal/core/output/lib/pkgconfig"
++      export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$(brew --prefix openssl)/lib/pkgconfig"
+       export DYLD_LIBRARY_PATH=$ROOT_DIR/internal/core/output/lib
+       export RPATH=$DYLD_LIBRARY_PATH;;
+     MINGW*)          

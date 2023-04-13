@@ -1,6 +1,7 @@
 """Milvus Server
 """
-from argparse import ArgumentParser
+
+from argparse import ArgumentParser, Action
 import logging
 import os
 import shutil
@@ -287,12 +288,12 @@ class MilvusServerConfig:
                 new_content += line + os.linesep
                 continue
             matches = re.match(
-                r'^( *[a-zA-Z0-9_]):([^#]*)(.*)$', line.rstrip())
+                r'^( *[a-zA-Z0-9_]+):([^#]*)(#.*)?$', line.rstrip())
             if not matches:
                 new_content += line + os.linesep
                 continue
             key_with_prefix = matches.group(1).rstrip()
-            comment = matches.group(3)
+            comment = matches.group(3) or ''
             key = key_with_prefix.strip()
             level = (len(key_with_prefix) - len(key)) // 2
             current_key = current_key[:level]
@@ -301,7 +302,7 @@ class MilvusServerConfig:
             for extra_key, extra_val in self.extra_configs.items():
                 if extra_key == current_key_text:
                     if comment.strip():
-                        line = f'{key_with_prefix}: {extra_val} # {comment.strip()}'
+                        line = f'{key_with_prefix}: {extra_val} #{comment.strip()[1:]}'
                     else:
                         line = f'{key_with_prefix}: {extra_val}'
             new_content += line + os.linesep
@@ -373,7 +374,7 @@ class MilvusServer:
         """
         start_time = datetime.datetime.now()
         health_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/health'
-        while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000):
+        while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000) and self.running:
             try:
                 with urllib.request.urlopen(health_url, timeout=100) as resp:
                     json.loads(resp.read().decode('utf-8'))
@@ -383,7 +384,10 @@ class MilvusServer:
                     return
             except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
                 sleep(0.1)
-        raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
+        if self.running:
+            raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
+        else:
+            raise RuntimeError('Milvus server already stopped')
 
     def start(self):
         self.config.resolve()
@@ -418,6 +422,25 @@ class MilvusServer:
         os.chdir(old_pwd)
         if self.wait_for_started:
             self.wait_started()
+        if not self._debug:
+            self.show_banner()
+
+    def show_banner(self):
+        print(r"""
+
+    __  _________ _   ____  ______
+   /  |/  /  _/ /| | / / / / / __/
+  / /|_/ // // /_| |/ / /_/ /\ \
+ /_/  /_/___/____/___/\____/___/ {Lite}
+
+ Welcome to use Milvus!
+""")
+        print(f' Version:   v{__version__}-lite')
+        print(f' Process:   {self.server_proc.pid}')
+        print(f' Started:   {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        print(f' Config:    {join(self.config.base_data_dir, "configs", "milvus.yaml")}')
+        print(f' Logs:      {join(self.config.base_data_dir, "logs")}')
+        print('\n Ctrl+C to exit ...')
 
     def stop(self):
         if self.server_proc:
@@ -468,25 +491,36 @@ debug_server = MilvusServer(MilvusServerConfig(), debug=True)
 
 
 # pylint: disable=unused-argument
-def extra_config_action(option, opt_str, value, parser):
-    if '=' not in value:
-        raise ValueError(f'Invalid extra config: {value}')
-    key, val = value.split('=', 1)
-    if val.isdigit():
-        val = int(val)
-    if val.replace('.', '', 1).isdigit():
-        val = float(val)
-    if val.lower() in ('true', 'false'):
-        val = val.lower() == 'true'
-    parser.values.extra_config[key] = val
+class ExtraConfigAcxtion(Action):
+    """ action class for extra config
+
+    the extra config is in format of key=value, the value will be converted to int or float if possible
+    for setting a value to subkey, use key.subkey=value
+    """
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if '=' not in values:
+            raise ValueError(f'Invalid extra config: {values}')
+        key, val = values.split('=', 1)
+        if val.isdigit():
+            val = int(val)
+        elif val.replace('.', '', 1).isdigit():
+            val = float(val)
+        elif val.lower() in ('true', 'false'):
+            val = val.lower() == 'true'
+        obj = getattr(namespace, self.dest)
+        obj[key] = val
+        setattr(namespace, self.dest, obj)
 
 
 def main():
     parser = ArgumentParser()
     parser.add_argument('--debug', action='store_true', dest='debug', default=False, help='enable debug')
     parser.add_argument('--data', dest='data_dir', default='', help='set base data dir for milvus')
-    parser.add_argument('--extra-config', dest='extra_config', default={},
-                        help='set extra config for milvus', action=extra_config_action)
+    parser.add_argument('--extra-config', dest='extra_config', default={}, help='set extra config for milvus',
+                        action=ExtraConfigAcxtion)
 
     # dynamic configurations
     for key in default_server.config_keys:
@@ -511,10 +545,18 @@ def main():
     for name, value in args._get_kwargs():
         if name.startswith('x_'):
             server.config.set(name[2:], value)
+    for key, value in args.extra_config.items():
+        server.config.set(key, value)
 
     signal.signal(signal.SIGINT, lambda sig, h: server.stop())
 
-    server.start()
+    try:
+        server.start()
+    except TimeoutError:
+        print('Wait for milvus server started timeout.')
+    except RuntimeError:
+        print('Milvus server already stopped.')
+
     server.wait()
 
 

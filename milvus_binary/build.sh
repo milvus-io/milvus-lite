@@ -77,9 +77,11 @@ fi
 if [[ "${osname}" == "macosx" ]] ; then
     sed -i '' 's/-ldflags="/-ldflags="-s -w /' milvus/Makefile
     sed -i '' 's/-ldflags="-s -w -s -w /-ldflags="-s -w /' milvus/Makefile
+    sed -i '' 's/="-dev"/="-lite"/' milvus/Makefile
 else
     sed 's/-ldflags="/-ldflags="-s -w /' -i milvus/Makefile
     sed 's/-ldflags="-s -w -s -w /-ldflags="-s -w /' -i milvus/Makefile
+    sed 's/="-dev"/="-lite"/' -i milvus/Makefile
 fi
 
 # build for linux x86_64
