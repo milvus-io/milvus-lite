@@ -332,7 +332,7 @@ dataNode:
 # Configures the system log output.
 log:
   level: {{ system_log_level: debug }} # Only supports debug, info, warn, error, panic, or fatal. Default 'info'.
-  stdout: "true" # default true, print log to stdout
+  stdout: {{ log_stdout:false }} # default true, print log to stdout
   file:
     # please adjust in embedded Milvus: /tmp/milvus/logs
     rootPath: {{ system_log_path }} # default to stdout, stderr
