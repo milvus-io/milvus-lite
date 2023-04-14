@@ -17,16 +17,18 @@ Please note that it is not suggested to use Milvus Lite in a production environm
 
 ## Requirements
 
-Embedded Milvus in available in:
+Milvus Lite is available in:
 - Google Colab [example](https://github.com/milvus-io/milvus-lite/blob/main/examples/example.ipynb)
 - Jupyter Notebook
 
-Here's a list of verified OS types where Milvus Lite can successfully build and run:
+Here's also a list of verified OS types where Milvus Lite can successfully build and run:
 - Ubuntu >= 18.04 (x86_64)
 - CentOS >= 7.0 (x86_64)
 - MacOS >= 11.0 (Apple Silicon)
 
-For linux we use manylinux2014 as the base image, so it should be able to run on most linux distributions.
+*NOTE*
+* For linux we use manylinux2014 as the base image, so it should be able to run on most linux distributions.
+* Milvus Lite can also run on **Windows**. However, this is not strictly verified.
 
 ## Installation
 
