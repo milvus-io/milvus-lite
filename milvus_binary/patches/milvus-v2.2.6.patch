@@ -1,0 +1,278 @@
+diff --git a/go.mod b/go.mod
+index 42e64c166..1035a64e6 100644
+--- a/go.mod
++++ b/go.mod
+@@ -18,7 +18,6 @@ require (
+ 	github.com/confluentinc/confluent-kafka-go v1.9.1
+ 	github.com/containerd/cgroups v1.0.2
+ 	github.com/gin-gonic/gin v1.7.7
+-	github.com/go-basic/ipv4 v1.0.0
+ 	github.com/gofrs/flock v0.8.1
+ 	github.com/golang/mock v1.5.0
+ 	github.com/golang/protobuf v1.5.2
+diff --git a/go.sum b/go.sum
+index bc410f4ad..bd2f09e7a 100644
+--- a/go.sum
++++ b/go.sum
+@@ -221,8 +221,6 @@ github.com/gin-contrib/sse v0.1.0 h1:Y/yl/+YNO8GZSjAhjMsSuLt29uWRFHdHYUb5lYOV9qE
+ github.com/gin-contrib/sse v0.1.0/go.mod h1:RHrZQHXnP2xjPF+u1gW/2HnVO7nvIa9PG3Gm+fLHvGI=
+ github.com/gin-gonic/gin v1.7.7 h1:3DoBmSbJbZAWqXJC3SLjAPfutPJJRN1U5pALB7EeTTs=
+ github.com/gin-gonic/gin v1.7.7/go.mod h1:axIBovoeJpVj8S3BwE0uPMTeReE4+AfFtqpqaZ1qq1U=
+-github.com/go-basic/ipv4 v1.0.0 h1:gjyFAa1USC1hhXTkPOwBWDPfMcUaIM+tvo1XzV9EZxs=
+-github.com/go-basic/ipv4 v1.0.0/go.mod h1:etLBnaxbidQfuqE6wgZQfs38nEWNmzALkxDZe4xY8Dg=
+ github.com/go-fonts/dejavu v0.1.0/go.mod h1:4Wt4I4OU2Nq9asgDCteaAaWZOV24E+0/Pwo0gppep4g=
+ github.com/go-fonts/latin-modern v0.2.0/go.mod h1:rQVLdDMK+mK1xscDwsqM5J8U2jrRa3T0ecnM9pNujks=
+ github.com/go-fonts/liberation v0.1.1/go.mod h1:K6qoJYypsmfVjWg8KOVDQhLc8UDgIK2HYqyqAO9z7GY=
+diff --git a/internal/core/CMakeLists.txt b/internal/core/CMakeLists.txt
+index eb1f727d2..d70ef40d4 100644
+--- a/internal/core/CMakeLists.txt
++++ b/internal/core/CMakeLists.txt
+@@ -19,19 +19,21 @@ cmake_minimum_required( VERSION 3.18 )
+ if ( APPLE )
+     set( CMAKE_CROSSCOMPILING TRUE )
+     set( RUN_HAVE_GNU_POSIX_REGEX 0 )
+-    set( CMAKE_C_COMPILER "/usr/local/opt/llvm/bin/clang" )
+-    set( CMAKE_CXX_COMPILER "/usr/local/opt/llvm/bin/clang++" )
+ endif ()
+ 
+ add_definitions(-DELPP_THREAD_SAFE)
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
++
++if ( MSYS )
++    add_definitions(-DPROTOBUF_USE_DLLS)
++endif ()
++
+ message( STATUS "Building using CMake version: ${CMAKE_VERSION}" )
+ 
+ project(core)
+ include(CheckCXXCompilerFlag)
+ if ( APPLE )
+     message(STATUS "==============Darwin Environment==============")
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/usr/local/opt/llvm/include -I/usr/local/include -I/usr/local/opt/libomp/include -L/usr/local/opt/libomp/lib")
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+     message(STATUS "==============Linux Environment===============")
+     set(LINUX TRUE)
+diff --git a/internal/core/src/indexbuilder/CMakeLists.txt b/internal/core/src/indexbuilder/CMakeLists.txt
+index cae7415c9..29cef2aa0 100644
+--- a/internal/core/src/indexbuilder/CMakeLists.txt
++++ b/internal/core/src/indexbuilder/CMakeLists.txt
+@@ -23,6 +23,7 @@ add_library(milvus_indexbuilder SHARED ${INDEXBUILDER_FILES})
+ find_library(TBB NAMES tbb)
+ set(PLATFORM_LIBS dl)
+ if (MSYS)
++find_library(TBB NAMES tbb12)
+ set(PLATFORM_LIBS -Wl,--allow-multiple-definition)
+ endif ()
+ 
+diff --git a/internal/core/src/segcore/CMakeLists.txt b/internal/core/src/segcore/CMakeLists.txt
+index 1b58ab37b..c85dffb50 100644
+--- a/internal/core/src/segcore/CMakeLists.txt
++++ b/internal/core/src/segcore/CMakeLists.txt
+@@ -41,6 +41,7 @@ add_library(milvus_segcore SHARED ${SEGCORE_FILES})
+ find_library(TBB NAMES tbb)
+ set(PLATFORM_LIBS dl)
+ if (MSYS)
++find_library(TBB NAMES tbb12)
+ set(PLATFORM_LIBS )
+ endif ()
+ 
+diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
+index 05711722e..5bf6358f0 100644
+--- a/internal/core/thirdparty/knowhere/CMakeLists.txt
++++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
+@@ -52,6 +52,7 @@ macro(build_knowhere)
+             PREFIX          ${CMAKE_BINARY_DIR}/3rdparty_download/knowhere-subbuild
+             BINARY_DIR      knowhere-bin
+             INSTALL_DIR     ${KNOWHERE_INSTALL_PREFIX}
++            PATCH_COMMAND   patch -p1 < ${CMAKE_SOURCE_DIR}/../../../patches/knowhere-v1.3.11.patch
+             )
+ 
+     ExternalProject_Get_Property(knowhere_ep INSTALL_DIR)
+diff --git a/internal/util/etcd/etcd_server.go b/internal/util/etcd/etcd_server.go
+index 75f81c43e..ffd758812 100644
+--- a/internal/util/etcd/etcd_server.go
++++ b/internal/util/etcd/etcd_server.go
+@@ -1,6 +1,9 @@
+ package etcd
+ 
+ import (
++	"net/url"
++	"os"
++	"runtime"
+ 	"sync"
+ 
+ 	"github.com/milvus-io/milvus/internal/log"
+@@ -45,6 +48,12 @@ func InitEtcdServer(
+ 			} else {
+ 				cfg = embed.NewConfig()
+ 			}
++			if runtime.GOOS == "windows" {
++				err := zap.RegisterSink("winfile", newWinFileSink)
++				if err != nil {
++					initError = err
++				}
++			}
+ 			cfg.Dir = dataDir
+ 			cfg.LogOutputs = []string{logPath}
+ 			cfg.LogLevel = logLevel
+@@ -73,3 +82,10 @@ func StopEtcdServer() {
+ 		})
+ 	}
+ }
++
++// special file sink for zap, as etcd using zap as Logger
++// See: https://github.com/uber-go/zap/issues/621
++func newWinFileSink(u *url.URL) (zap.Sink, error) {
++	// e.g. winfile:///D:/test/ -> D:/test/
++	return os.OpenFile(u.Path[1:], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
++}
+diff --git a/internal/util/funcutil/func.go b/internal/util/funcutil/func.go
+index 061224ba2..71d91f099 100644
+--- a/internal/util/funcutil/func.go
++++ b/internal/util/funcutil/func.go
+@@ -31,7 +31,6 @@ import (
+ 	"strings"
+ 	"time"
+ 
+-	"github.com/go-basic/ipv4"
+ 	"go.uber.org/zap"
+ 	grpcStatus "google.golang.org/grpc/status"
+ 
+@@ -56,7 +55,16 @@ func CheckGrpcReady(ctx context.Context, targetCh chan error) {
+ 
+ // GetLocalIP return the local ip address
+ func GetLocalIP() string {
+-	return ipv4.LocalIP()
++	addrs, err := net.InterfaceAddrs()
++	if err == nil {
++		for _, addr := range addrs {
++			ipaddr, ok := addr.(*net.IPNet)
++			if ok && ipaddr.IP.IsGlobalUnicast() && ipaddr.IP.To4() != nil {
++				return ipaddr.IP.String()
++			}
++		}
++	}
++	return "127.0.0.1"
+ }
+ 
+ // WaitForComponentStates wait for component's state to be one of the specific states
+diff --git a/internal/util/paramtable/grpc_param.go b/internal/util/paramtable/grpc_param.go
+index af684ed69..6736c4645 100644
+--- a/internal/util/paramtable/grpc_param.go
++++ b/internal/util/paramtable/grpc_param.go
+@@ -17,8 +17,8 @@ import (
+ 	"sync"
+ 	"time"
+ 
+-	"github.com/go-basic/ipv4"
+ 	"github.com/milvus-io/milvus/internal/log"
++	"github.com/milvus-io/milvus/internal/util/funcutil"
+ 	"go.uber.org/zap"
+ )
+ 
+@@ -81,7 +81,7 @@ func (p *grpcConfig) init(domain string) {
+ 
+ // LoadFromEnv is used to initialize configuration items from env.
+ func (p *grpcConfig) LoadFromEnv() {
+-	p.IP = ipv4.LocalIP()
++	p.IP = funcutil.GetLocalIP()
+ }
+ 
+ // LoadFromArgs is used to initialize configuration items from args.
+diff --git a/scripts/core_build.sh b/scripts/core_build.sh
+index 0c33d9439..57d343a39 100755
+--- a/scripts/core_build.sh
++++ b/scripts/core_build.sh
+@@ -186,15 +186,31 @@ fi
+ 
+ unameOut="$(uname -s)"
+ case "${unameOut}" in
+-    Darwin*)
+-        llvm_prefix="$(brew --prefix llvm)"
+-        export CLANG_TOOLS_PATH="${llvm_prefix}/bin"
+-        export CC="${llvm_prefix}/bin/clang"
+-        export CXX="${llvm_prefix}/bin/clang++"
+-        export LDFLAGS="-L${llvm_prefix}/lib -L/usr/local/opt/libomp/lib"
+-        export CXXFLAGS="-I${llvm_prefix}/include -I/usr/local/include -I/usr/local/opt/libomp/include"
+-        ;;
+-          *)   echo "==System:${unameOut}";
++  Darwin*)
++    # detect llvm version by valid list
++    for llvm_version in 15 14 NOT_FOUND ; do
++      if brew ls --versions llvm@${llvm_version} > /dev/null; then
++        break
++      fi
++    done
++    if [ "${llvm_version}" = "NOT_FOUND" ] ; then
++      echo "llvm@14~15 is not installed"
++      exit 1
++    fi
++    llvm_prefix="$(brew --prefix llvm@${llvm_version})"
++    export CLANG_TOOLS_PATH="${llvm_prefix}/bin"
++    export PATH=${CLANG_TOOLS_PATH}:${PATH}
++    export CC="${llvm_prefix}/bin/clang"
++    export CXX="${llvm_prefix}/bin/clang++"
++    export CFLAGS="-Wno-deprecated-declarations -I${llvm_prefix}/include -I/usr/local/include -I$(brew --prefix libomp)/include -I$(brew --prefix boost)/include -I$(brew --prefix tbb)/include"
++    export CXXFLAGS=${CFLAGS}
++    export LDFLAGS="-L${llvm_prefix}/lib -L$(brew --prefix libomp)/lib -L$(brew --prefix boost)/lib -L$(brew --prefix tbb)/lib"
++    ;;
++  Linux*)
++    ;;
++  *)
++    echo "Cannot build on windows"
++    ;;
+ esac
+ 
+ 
+diff --git a/scripts/install_deps.sh b/scripts/install_deps.sh
+index 5d58bb3f5..bb7f00a65 100755
+--- a/scripts/install_deps.sh
++++ b/scripts/install_deps.sh
+@@ -29,7 +29,7 @@ function install_linux_deps() {
+       sudo yum install -y git make lcov libtool m4 autoconf automake ccache openssl-devel zlib-devel libzstd-devel \
+           libcurl-devel python3-devel \
+           devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-gcc-gfortran \
+-          llvm-toolset-7.0-clang llvm-toolset-7.0-clang-tools-extra libuuid-devel pulseaudio-libs-devel 
++          llvm-toolset-7.0-clang llvm-toolset-7.0-clang-tools-extra libuuid-devel pulseaudio-libs-devel
+ 
+       echo "source scl_source enable devtoolset-7" | sudo tee -a /etc/profile.d/devtoolset-7.sh
+       echo "source scl_source enable llvm-toolset-7.0" | sudo tee -a /etc/profile.d/llvm-toolset-7.sh
+@@ -57,25 +57,8 @@ function install_linux_deps() {
+ 
+ function install_mac_deps() {
+   sudo xcode-select --install  > /dev/null 2>&1
+-  brew install boost libomp ninja tbb cmake llvm ccache zstd
+-  brew uninstall grep
++  brew install boost libomp ninja tbb openblas cmake llvm@15 ccache pkg-config zstd openssl librdkafka
+   brew install grep
+-  export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
+-  brew update && brew upgrade && brew cleanup
+-
+-  if [[ $(arch) == 'arm64' ]]; then
+-    brew install openssl
+-    brew install librdkafka
+-    brew install pkg-config
+-    sudo mkdir /usr/local/include
+-    sudo mkdir /usr/local/opt
+-    sudo ln -s "$(brew --prefix llvm)" "/usr/local/opt/llvm"
+-    sudo ln -s "$(brew --prefix libomp)/include/omp.h" "/usr/local/include/omp.h"
+-    sudo ln -s "$(brew --prefix libomp)" "/usr/local/opt/libomp"
+-    sudo ln -s "$(brew --prefix boost)/include/boost" "/usr/local/include/boost"
+-    sudo ln -s "$(brew --prefix tbb)/include/tbb" "/usr/local/include/tbb"
+-    sudo ln -s "$(brew --prefix tbb)/include/oneapi" "/usr/local/include/oneapi"
+-  fi
+ }
+ 
+ if ! command -v go &> /dev/null
+diff --git a/scripts/setenv.sh b/scripts/setenv.sh
+index 577683dfb..08a80abe3 100644
+--- a/scripts/setenv.sh
++++ b/scripts/setenv.sh
+@@ -42,6 +42,7 @@ case "${unameOut}" in
+       export RPATH=$LD_LIBRARY_PATH;;
+     Darwin*)    
+       export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$ROOT_DIR/internal/core/output/lib/pkgconfig"
++      export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$(brew --prefix openssl)/lib/pkgconfig"
+       export DYLD_LIBRARY_PATH=$ROOT_DIR/internal/core/output/lib
+       export RPATH=$DYLD_LIBRARY_PATH;;
+     MINGW*)          
