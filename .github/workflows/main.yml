@@ -151,7 +151,7 @@ jobs:
           key: windows-ccache-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: windows-ccache-
       - name: Configure Toolchain
-        uses: msys2/setup-msys2@v2.12.0
+        uses: msys2/setup-msys2@v2.17.0
         with:
           msystem: mingw64
       - name: Prepare

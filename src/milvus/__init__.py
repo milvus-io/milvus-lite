@@ -21,7 +21,7 @@ import urllib.request
 import json
 import hashlib
 
-__version__ = '2.2.6'
+__version__ = '2.2.8'
 
 LOGGERS = {}
 
@@ -246,7 +246,7 @@ class MilvusServerConfig:
 
         # data
         self.set('etcd_data_dir', join(storage_dir, 'etcd.data'))
-        self.set('local_storage_dir', join(storage_dir, 'storage'))
+        self.set('local_storage_dir', storage_dir)
         self.set('rocketmq_data_dir', join(storage_dir, 'rocketmq'))
 
     def get(self, attr) -> Any:

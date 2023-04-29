@@ -194,12 +194,30 @@ function build_msys() {
 
     cd bin
     mv milvus milvus.exe
+    rm -fr *.log *.dll
 
-    find .. -name \*.dll | xargs -I {} cp -frv {} . || :
-    for x in $(ldd milvus.exe | awk '{print $1}') ; do
-        if [ -f ${MINGW_PREFIX}/bin/$x ] ; then
-            cp -frv ${MINGW_PREFIX}/bin/$x .
-        fi
+    has_new_file=true
+    while ${has_new_file} ; do
+        has_new_file=false
+        for binary in milvus.exe *.dll ; do
+            for x in $(ldd ${binary} | grep -vi /windows/ | awk '{print $1}') ; do
+                if test -f $x ; then
+                    :
+                else
+                    echo $x
+                    for p in ../internal/core/output/lib ../internal/core/output/bin /mingw64/bin ; do
+                        if test -f $p/$x && ! test -f $x ; then
+                            file=$p/$x
+                            while test -L $file ; do
+                                file=$(dirname $file)/$(readlink $file)
+                            done
+                            cp -frv $file $x
+                            has_new_file=true
+                        fi
+                    done
+                fi
+            done
+        done
     done
 }
 
