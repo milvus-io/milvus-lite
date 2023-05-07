@@ -1,0 +1,269 @@
+diff --git a/aws-cpp-sdk-core/include/aws/core/utils/Array.h b/aws-cpp-sdk-core/include/aws/core/utils/Array.h
+index 2b5bbc566d..419defb246 100644
+--- a/aws-cpp-sdk-core/include/aws/core/utils/Array.h
++++ b/aws-cpp-sdk-core/include/aws/core/utils/Array.h
+@@ -54,7 +54,7 @@ namespace Aws
+                 {
+                     m_data.reset(Aws::NewArray<T>(m_size, ARRAY_ALLOCATION_TAG));
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+                     std::copy(arrayToCopy, arrayToCopy + arraySize, stdext::checked_array_iterator< T * >(m_data.get(), m_size));
+ #else
+                     std::copy(arrayToCopy, arrayToCopy + arraySize, m_data.get());
+@@ -82,7 +82,7 @@ namespace Aws
+                     if(arr->m_size > 0 && arr->m_data)
+                     {
+                         size_t arraySize = arr->m_size;
+-#ifdef _WIN32
++#ifdef _MSC_VER
+                         std::copy(arr->m_data.get(), arr->m_data.get() + arraySize, stdext::checked_array_iterator< T * >(m_data.get() + location, m_size));
+ #else
+                         std::copy(arr->m_data.get(), arr->m_data.get() + arraySize, m_data.get() + location);
+@@ -101,7 +101,7 @@ namespace Aws
+                 {
+                     m_data.reset(Aws::NewArray<T>(m_size, ARRAY_ALLOCATION_TAG));
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+                     std::copy(other.m_data.get(), other.m_data.get() + other.m_size, stdext::checked_array_iterator< T * >(m_data.get(), m_size));
+ #else
+                     std::copy(other.m_data.get(), other.m_data.get() + other.m_size, m_data.get());
+@@ -134,7 +134,7 @@ namespace Aws
+                 {
+                     m_data.reset(Aws::NewArray<T>(m_size, ARRAY_ALLOCATION_TAG));
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+                     std::copy(other.m_data.get(), other.m_data.get() + other.m_size, stdext::checked_array_iterator< T * >(m_data.get(), m_size));
+ #else
+                     std::copy(other.m_data.get(), other.m_data.get() + other.m_size, m_data.get());
+diff --git a/aws-cpp-sdk-core/include/aws/core/utils/crypto/bcrypt/CryptoImpl.h b/aws-cpp-sdk-core/include/aws/core/utils/crypto/bcrypt/CryptoImpl.h
+index e26e36b605..dc24545b65 100644
+--- a/aws-cpp-sdk-core/include/aws/core/utils/crypto/bcrypt/CryptoImpl.h
++++ b/aws-cpp-sdk-core/include/aws/core/utils/crypto/bcrypt/CryptoImpl.h
+@@ -29,7 +29,14 @@ namespace Aws
+     {
+         namespace Crypto
+         {
++            #ifdef __MINGW32__
++            #pragma GCC diagnostic push
++            #pragma GCC diagnostic ignored "-Wunused-variable"
++            #endif
+             static const char* SecureRandom_BCrypt_Tag = "SecureRandom_BCrypt";
++            #ifdef __MINGW32__
++            #pragma GCC diagnostic pop
++            #endif
+ 
+             class SecureRandomBytes_BCrypt : public SecureRandomBytes
+             {
+diff --git a/aws-cpp-sdk-core/include/aws/core/utils/event/EventHeader.h b/aws-cpp-sdk-core/include/aws/core/utils/event/EventHeader.h
+index 3be0d7d783..6a8916521f 100644
+--- a/aws-cpp-sdk-core/include/aws/core/utils/event/EventHeader.h
++++ b/aws-cpp-sdk-core/include/aws/core/utils/event/EventHeader.h
+@@ -14,6 +14,12 @@
+ #include <aws/event-stream/event_stream.h>
+ #include <cassert>
+ 
++#ifdef __MINGW32__
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
++#pragma GCC diagnostic ignored "-Wuninitialized"
++#endif
++
+ namespace Aws
+ {
+     namespace Utils
+@@ -318,3 +324,7 @@ namespace Aws
+         }
+     }
+ }
++
++#ifdef __MINGW32__
++#pragma GCC diagnostic pop
++#endif
+diff --git a/aws-cpp-sdk-core/source/http/windows/WinHttpSyncHttpClient.cpp b/aws-cpp-sdk-core/source/http/windows/WinHttpSyncHttpClient.cpp
+index f08f59ff98..92d99e665e 100644
+--- a/aws-cpp-sdk-core/source/http/windows/WinHttpSyncHttpClient.cpp
++++ b/aws-cpp-sdk-core/source/http/windows/WinHttpSyncHttpClient.cpp
+@@ -266,7 +266,7 @@ bool WinHttpSyncHttpClient::DoQueryHeaders(void* hHttpRequest, std::shared_ptr<H
+     wmemset(contentTypeStr, 0, static_cast<size_t>(dwSize / sizeof(wchar_t)));
+ 
+     WinHttpQueryHeaders(hHttpRequest, WINHTTP_QUERY_CONTENT_TYPE, nullptr, &contentTypeStr, &dwSize, 0);
+-    if (contentTypeStr[0] != NULL)
++    if (contentTypeStr[0])
+     {
+         Aws::String contentStr = StringUtils::FromWString(contentTypeStr);
+         response->SetContentType(contentStr);
+@@ -297,7 +297,7 @@ bool WinHttpSyncHttpClient::DoQueryHeaders(void* hHttpRequest, std::shared_ptr<H
+ 
+ bool WinHttpSyncHttpClient::DoSendRequest(void* hHttpRequest) const
+ {
+-    return (WinHttpSendRequest(hHttpRequest, NULL, NULL, 0, 0, 0, NULL) != 0);
++    return (WinHttpSendRequest(hHttpRequest, NULL, 0, 0, 0, 0, 0) != 0);
+ }
+ 
+ bool WinHttpSyncHttpClient::DoReadData(void* hHttpRequest, char* body, uint64_t size, uint64_t& read) const
+diff --git a/aws-cpp-sdk-core/source/http/windows/WinINetSyncHttpClient.cpp b/aws-cpp-sdk-core/source/http/windows/WinINetSyncHttpClient.cpp
+index 5854cc3342..70184a358c 100644
+--- a/aws-cpp-sdk-core/source/http/windows/WinINetSyncHttpClient.cpp
++++ b/aws-cpp-sdk-core/source/http/windows/WinINetSyncHttpClient.cpp
+@@ -225,7 +225,7 @@ bool WinINetSyncHttpClient::DoQueryHeaders(void* hHttpRequest, std::shared_ptr<H
+     char contentTypeStr[1024];
+     dwSize = sizeof(contentTypeStr);
+     HttpQueryInfoA(hHttpRequest, HTTP_QUERY_CONTENT_TYPE, &contentTypeStr, &dwSize, 0);
+-    if (contentTypeStr[0] != NULL)
++    if (contentTypeStr[0])
+     {
+         response->SetContentType(contentTypeStr);
+         AWS_LOGSTREAM_DEBUG(GetLogTag(), "Received content type " << contentTypeStr);
+diff --git a/aws-cpp-sdk-core/source/http/windows/WinSyncHttpClient.cpp b/aws-cpp-sdk-core/source/http/windows/WinSyncHttpClient.cpp
+index d7513cc3c8..e390a8d4e1 100644
+--- a/aws-cpp-sdk-core/source/http/windows/WinSyncHttpClient.cpp
++++ b/aws-cpp-sdk-core/source/http/windows/WinSyncHttpClient.cpp
+@@ -349,7 +349,7 @@ std::shared_ptr<HttpResponse> WinSyncHttpClient::MakeRequest(const std::shared_p
+         }
+     }
+ 
+-    if (!success && !IsRequestProcessingEnabled() || !ContinueRequest(*request))
++    if (!success && (!IsRequestProcessingEnabled() || !ContinueRequest(*request)))
+     {
+         response->SetClientErrorType(CoreErrors::USER_CANCELLED);
+         response->SetClientErrorMessage("Request processing disabled or continuation cancelled by user's continuation handler.");
+diff --git a/aws-cpp-sdk-core/source/platform/windows/Environment.cpp b/aws-cpp-sdk-core/source/platform/windows/Environment.cpp
+index d8b5403123..d2b38ab67a 100644
+--- a/aws-cpp-sdk-core/source/platform/windows/Environment.cpp
++++ b/aws-cpp-sdk-core/source/platform/windows/Environment.cpp
+@@ -19,6 +19,7 @@ that would need to be manually freed in all the client functions, just copy it i
+ */
+ Aws::String GetEnv(const char *variableName)
+ {
++#ifdef _MSC_VER
+     char* variableValue = nullptr;
+     std::size_t valueSize = 0;
+     auto queryResult = _dupenv_s(&variableValue, &valueSize, variableName);
+@@ -31,6 +32,10 @@ Aws::String GetEnv(const char *variableName)
+     }
+ 
+     return result;
++#else // __MINGW32__
++    auto variableValue = std::getenv(variableName);
++    return Aws::String( variableValue ? variableValue : "" );
++#endif
+ }
+ 
+ } // namespace Environment
+diff --git a/aws-cpp-sdk-core/source/platform/windows/FileSystem.cpp b/aws-cpp-sdk-core/source/platform/windows/FileSystem.cpp
+index 2ea82de6f8..26bc5f9b87 100644
+--- a/aws-cpp-sdk-core/source/platform/windows/FileSystem.cpp
++++ b/aws-cpp-sdk-core/source/platform/windows/FileSystem.cpp
+@@ -11,7 +11,9 @@
+ #include <iostream>
+ #include <Userenv.h>
+ 
+-#pragma warning( disable : 4996)
++#ifdef _MSC_VER
++#    pragma warning( disable : 4996)
++#endif
+ 
+ using namespace Aws::Utils;
+ namespace Aws
+@@ -304,6 +306,9 @@ Aws::String CreateTempFilePath()
+ {
+ #ifdef _MSC_VER
+ #pragma warning(disable: 4996) // _CRT_SECURE_NO_WARNINGS
++#elif !defined(L_tmpnam_s)
++    // Definition from the MSVC stdio.h
++    #define L_tmpnam_s (sizeof("\\") + 16)
+ #endif
+     char s_tempName[L_tmpnam_s+1];
+ 
+diff --git a/aws-cpp-sdk-core/source/platform/windows/OSVersionInfo.cpp b/aws-cpp-sdk-core/source/platform/windows/OSVersionInfo.cpp
+index 0180f7fbf6..3adbab3131 100644
+--- a/aws-cpp-sdk-core/source/platform/windows/OSVersionInfo.cpp
++++ b/aws-cpp-sdk-core/source/platform/windows/OSVersionInfo.cpp
+@@ -9,7 +9,9 @@
+ 
+ #include <iomanip>
+ 
++#ifdef _MSC_VER
+ #pragma warning(disable: 4996)
++#endif
+ #include <windows.h>
+ #include <stdio.h>
+ namespace Aws
+diff --git a/aws-cpp-sdk-core/source/utils/crypto/factory/Factories.cpp b/aws-cpp-sdk-core/source/utils/crypto/factory/Factories.cpp
+index 2ee517b48d..3b0dce665f 100644
+--- a/aws-cpp-sdk-core/source/utils/crypto/factory/Factories.cpp
++++ b/aws-cpp-sdk-core/source/utils/crypto/factory/Factories.cpp
+@@ -939,7 +939,7 @@ std::shared_ptr<Aws::Utils::Crypto::HMAC> Aws::Utils::Crypto::CreateSha256HMACIm
+     return GetSha256HMACFactory()->CreateImplementation();
+ }
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #pragma warning( push )
+ #pragma warning( disable : 4702 )
+ #endif
+@@ -1032,7 +1032,7 @@ std::shared_ptr<SymmetricCipher> Aws::Utils::Crypto::CreateAES_KeyWrapImplementa
+     return GetAES_KeyWrapFactory()->CreateImplementation(key);
+ }
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #pragma warning(pop)
+ #endif
+ 
+diff --git a/aws-cpp-sdk-s3-integration-tests/BucketAndObjectOperationTest.cpp b/aws-cpp-sdk-s3-integration-tests/BucketAndObjectOperationTest.cpp
+index 294ec623d6..2be2f4c49d 100644
+--- a/aws-cpp-sdk-s3-integration-tests/BucketAndObjectOperationTest.cpp
++++ b/aws-cpp-sdk-s3-integration-tests/BucketAndObjectOperationTest.cpp
+@@ -48,8 +48,9 @@
+ #include <aws/testing/mocks/monitoring/TestingMonitoring.h>
+ #include <fstream>
+ 
+-#ifdef _WIN32
++#ifdef _MSC_VER
+ #pragma warning(disable: 4127)
++#endif
+ #ifdef GetObject
+ #undef GetObject
+ #endif
+diff --git a/cmake/compiler_settings.cmake b/cmake/compiler_settings.cmake
+index cae5b92248..9453de832b 100644
+--- a/cmake/compiler_settings.cmake
++++ b/cmake/compiler_settings.cmake
+@@ -11,6 +11,9 @@ else()
+         set(COMPILER_CLANG 1)
+     else()
+         set(COMPILER_GCC 1)
++        if(MINGW)
++            set(COMPILER_MINGW 1)
++        endif()
+     endif()
+     set(USE_GCC_FLAGS 1)
+ endif()
+@@ -34,6 +37,9 @@ endfunction()
+ 
+ macro(set_gcc_flags)
+     list(APPEND AWS_COMPILER_FLAGS "-fno-exceptions" "-std=c++${CPP_STANDARD}")
++    if(COMPILER_IS_MINGW)
++        list(APPEND AWS_COMPILER_FLAGS -D__USE_MINGW_ANSI_STDIO=1)
++    endif()
+ 
+     if(NOT BUILD_SHARED_LIBS)
+         list(APPEND AWS_COMPILER_FLAGS "-fPIC")
+diff --git a/testing-resources/source/platform/windows/PlatformTesting.cpp b/testing-resources/source/platform/windows/PlatformTesting.cpp
+index f3c375a2c1..729c2e0170 100644
+--- a/testing-resources/source/platform/windows/PlatformTesting.cpp
++++ b/testing-resources/source/platform/windows/PlatformTesting.cpp
+@@ -5,7 +5,9 @@
+ 
+ #include <aws/testing/platform/PlatformTesting.h>
+ 
++#ifdef _MSC_VER
+ #pragma warning(disable: 4996)
++#endif
+ #include <windows.h>
+ #include <aws/core/utils/memory/stl/AWSStringStream.h>
+ 
