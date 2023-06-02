@@ -70,6 +70,11 @@ if [[ ! -d milvus ]] ; then
     if [ -f ../patches/milvus-${MILVUS_VERSION}.patch ] ; then
         patch -p1 < ../patches/milvus-${MILVUS_VERSION}.patch
     fi
+    if [ -d ../patches/milvus-${MILVUS_VERSION} ] ; then
+        for pf in ../patches/milvus-${MILVUS_VERSION}/*.patch ; do
+            git apply ${pf}
+        done
+    fi
     cd -
 fi
 
