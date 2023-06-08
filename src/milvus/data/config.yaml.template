@@ -120,8 +120,8 @@ kafka:
 rocksmq:
   # please adjust in embedded Milvus: /tmp/milvus/rdb_data
   path: {{ rocketmq_data_dir }} # The path where the message is stored in rocksmq
-  rocksmqPageSize: 268435456 # 256 MB, 256 * 1024 * 1024 bytes, The size of each page of messages in rocksmq
-  retentionTimeInMinutes: 7200 # 5 days, 5 * 24 * 60 minutes, The retention time of the message in rocksmq.
+  rocksmqPageSize: 67108864 # 64 MB, 64 * 1024 * 1024 bytes, The size of each page of messages in rocksmq
+  retentionTimeInMinutes: 4320 # 3 days, 3 * 24 * 60 minutes, The retention time of the message in rocksmq.
   retentionSizeInMB: 8192 # 8 GB, 8 * 1024 MB, The retention size of the message in rocksmq.
   compactionInterval: 86400 # 1 day, trigger rocksdb compaction every day to remove deleted data
   lrucacheratio: 0.06 # rocksdb cache memory ratio
@@ -132,7 +132,8 @@ rootCoord:
   port: {{ root_coord_port(int) }}
   enableActiveStandby: false  # Enable active-standby
 
-  dmlChannelNum: 256 # The number of dml channels created at system startup
+  dmlChannelNum: 16 # The number of dml channels created at system startup
+  maxDatabaseNum: 64 # Maximum number of database
   maxPartitionNum: 4096 # Maximum number of partitions in a collection
   minSegmentSizeToEnableIndex: 1024 # It's a threshold. When the segment size is less than this value, the segment will not be indexed
 
@@ -179,6 +180,10 @@ queryCoord:
   port: {{ query_coord_port(int) }}
   autoHandoff: true # Enable auto handoff
   autoBalance: true # Enable auto balance
+  balancer: ScoreBasedBalancer # Balancer to use
+  globalRowCountFactor: 0.1 # expert parameters, only used by scoreBasedBalancer
+  scoreUnbalanceTolerationFactor: 0.05 # expert parameters, only used by scoreBasedBalancer
+  reverseUnBalanceTolerationFactor: 1.3 #expert parameters, only used by scoreBasedBalancer
   overloadedMemoryThresholdPercentage: 90 # The threshold percentage that memory overload
   balanceIntervalSeconds: 60
   memoryUsageMaxDifferencePercentage: 30
@@ -191,6 +196,7 @@ queryCoord:
   taskMergeCap: 16
   taskExecutionCap: 256
   enableActiveStandby: false  # Enable active-standby
+  refreshTargetsIntervalSeconds: 300
 
 # Related configuration of queryNode, used to run hybrid search between vector and scalar data.
 queryNode:
@@ -210,6 +216,7 @@ queryNode:
   # Segcore will divide a segment into multiple chunks to enbale small index
   segcore:
     chunkRows: 1024 # The number of vectors in a chunk.
+    knowhereThreadPoolNumRatio: 4 # Use more threads to make good use of SSD throughput
     # Note: we have disabled segment small index since @2022.05.12. So below related configurations won't work.
     # We won't create small index for growing segments and search on these segments will directly use bruteforce scan.
     smallIndex:
@@ -232,6 +239,18 @@ queryNode:
     # if the lag is larger than this config, scheduler will return error without waiting.
     # the valid value is [3600, infinite)
     maxTimestampLag: 86400
+    # read task schedule policy: fifo(by default), user-task-polling.
+    scheduleReadPolicy: 
+      # fifo: A FIFO queue support the schedule.
+      # user-task-polling: 
+      #     The user's tasks will be polled one by one and scheduled. 
+      #     Scheduling is fair on task granularity.
+      #     The policy is based on the username for authentication.
+      #     And an empty username is considered the same user. 
+      #     When there are no multi-users, the policy decay into FIFO
+      name: fifo
+      # user-task-polling configure:
+      taskQueueExpire: 60 # 1 min by default, expire time of inner user task queue since queue is empty.
 
   grouping:
     enabled: true
@@ -299,6 +318,7 @@ dataCoord:
     compactableProportion: 0.85 # A compaction will happen on small segments if the segment after compaction will have
     # over (compactableProportion * segment max # of rows) rows.
     # MUST BE GREATER THAN OR EQUAL TO <smallProportion>!!!
+    expansionRate: 1.25 # During compaction, the size of segment # of rows is able to exceed segment max # of rows by (expansionRate-1) * 100%.
 
   compaction:
     enableAutoCompaction: true
@@ -432,8 +452,11 @@ common:
     tlsMode: {{ tls_mode(int): 0 }}
 
   session:
-    ttl: 60 # ttl value when session granting a lease to register service
+    ttl: 20 # ttl value when session granting a lease to register service
     retryTimes: 30 # retry times when session sending etcd requests
+
+  ImportMaxFileSize: 17179869184  # 16 * 1024 * 1024 * 1024
+  # max file size to import for bulkInsert
 
 # QuotaConfig, configurations of Milvus quota and limits.
 # By default, we enable:
@@ -448,7 +471,9 @@ common:
 # If necessary, you can also manually force to deny RW requests.
 quotaAndLimits:
   enabled: true # `true` to enable quota and limits, `false` to disable.
-
+  limits:
+    maxCollectionNum: 65536
+    maxCollectionNumPerDB: 65536
   # quotaCenterCollectInterval is the time interval that quotaCenter
   # collects metrics from Proxies, Query cluster and Data cluster.
   quotaCenterCollectInterval: 3 # seconds, (0 ~ 65536)
@@ -473,10 +498,16 @@ quotaAndLimits:
   dml:
     enabled: false
     insertRate:
+      collection:
+        max: -1 # MB/s, default no limit
       max: -1 # MB/s, default no limit
     deleteRate:
+      collection:
+        max: -1 # MB/s, default no limit
       max: -1 # MB/s, default no limit
     bulkLoadRate: # not support yet. TODO: limit bulkLoad rate
+      collection:
+        max: -1 # MB/s, default no limit
       max: -1 # MB/s, default no limit
 
   # dql limit rates, default no limit.
@@ -484,8 +515,12 @@ quotaAndLimits:
   dql:
     enabled: false
     searchRate:
+      collection:
+        max: -1 # vps (vectors per second), default no limit
       max: -1 # vps (vectors per second), default no limit
     queryRate:
+      collection:
+        max: -1 # qps, default no limit
       max: -1 # qps, default no limit
 
   # limitWriting decides whether dml requests are allowed.
@@ -509,10 +544,18 @@ quotaAndLimits:
       dataNodeMemoryHighWaterLevel: 0.95 # (0, 1], memoryHighWaterLevel in DataNodes
       queryNodeMemoryLowWaterLevel: 0.85 # (0, 1], memoryLowWaterLevel in QueryNodes
       queryNodeMemoryHighWaterLevel: 0.95 # (0, 1], memoryHighWaterLevel in QueryNodes
+    growingSegmentsSizeProtection:
+      # 1. No action will be taken if the ratio of growing segments size is less than the low water level.
+      # 2. The DML rate will be reduced if the ratio of growing segments size is greater than the low water level and less than the high water level.
+      # 3. All DML requests will be rejected if the ratio of growing segments size is greater than the high water level.
+      enabled: false
+      lowWaterLevel: 0.2
+      highWaterLevel: 0.4
     diskProtection:
       # When the total file size of object storage is greater than `diskQuota`, all dml requests would be rejected;
       enabled: true
       diskQuota: -1 # MB, (0, +inf), default no limit
+      diskQuotaPerCollection: -1 # MB, (0, +inf), default no limit
 
   # limitReading decides whether dql requests are allowed.
   limitReading:
@@ -539,3 +582,7 @@ quotaAndLimits:
       maxReadResultRate: -1 # MB/s, default no limit
     # coolOffSpeed is the speed of search&query rates cool off.
     coolOffSpeed: 0.9 # (0, 1]
+
+autoIndex:
+  params:
+    build: '{"M": 30,"efConstruction": 360,"index_type": "HNSW", "metric_type": "IP"}'
