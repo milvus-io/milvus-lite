@@ -187,13 +187,13 @@ queryCoord:
   overloadedMemoryThresholdPercentage: 90 # The threshold percentage that memory overload
   balanceIntervalSeconds: 60
   memoryUsageMaxDifferencePercentage: 30
-  checkInterval: 1000
+  checkInterval: 10000
   channelTaskTimeout: 60000 # 1 minute
   segmentTaskTimeout: 120000 # 2 minute
   distPullInterval: 500
-  loadTimeoutSeconds: 600
+  loadTimeoutSeconds: 1800
   checkHandoffInterval: 5000
-  taskMergeCap: 16
+  taskMergeCap: 8
   taskExecutionCap: 256
   enableActiveStandby: false  # Enable active-standby
   refreshTargetsIntervalSeconds: 300
@@ -254,7 +254,7 @@ queryNode:
 
   grouping:
     enabled: true
-    maxNQ: 1000
+    maxNQ: 50000
     topKMergeRatio: 10.0
 
 indexCoord:
@@ -293,7 +293,7 @@ dataCoord:
   enableActiveStandby: false  # Enable active-standby
 
   channel:
-    watchTimeoutInterval: 30 # Timeout on watching channels (in seconds). Datanode tickler update watch progress will reset timeout timer.
+    watchTimeoutInterval: 120 # Timeout on watching channels (in seconds). Datanode tickler update watch progress will reset timeout timer.
     balanceSilentDuration: 300 # The duration before the channelBalancer on datacoord to run
     balanceInterval: 360 #The interval for the channelBalancer on datacoord to check balance status
 
@@ -345,9 +345,10 @@ dataNode:
     syncPeriod: 600 # Seconds, 10min
 
   memory:
-    forceSyncEnable: false # `true` to force sync if memory usage is too high
-    forceSyncThreshold: 0.6 # forceSync only take effects when memory usage ratio > forceSyncThreshold  
-    forceSyncSegmentRatio: 0.3 # ratio of segments to sync, top largest forceSyncSegmentRatio segments will be synced
+    forceSyncEnable: true # `true` to force sync if memory usage is too high
+    forceSyncSegmentNum: 1 # number of segments to sync, segments with top largest buffer will be synced.
+    watermarkStandalone: 0.2 # memory watermark for standalone, upon reaching this watermark, segments will be synced.
+    watermarkCluster: 0.5 # memory watermark for cluster, upon reaching this watermark, segments will be synced.
 
 # Configures the system log output.
 log:
@@ -371,7 +372,7 @@ grpc:
   clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
 
   client:
-    dialTimeout: 5000
+    dialTimeout: 200
     keepAliveTime: 10000
     keepAliveTimeout: 20000
     maxMaxAttempts: 5
@@ -585,4 +586,4 @@ quotaAndLimits:
 
 autoIndex:
   params:
-    build: '{"M": 30,"efConstruction": 360,"index_type": "HNSW", "metric_type": "IP"}'
+    build: '{"M": 18,"efConstruction": 240,"index_type": "HNSW", "metric_type": "IP"}'
