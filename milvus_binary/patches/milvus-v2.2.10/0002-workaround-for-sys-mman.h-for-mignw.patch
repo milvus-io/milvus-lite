@@ -1,0 +1,31 @@
+From 0fcaa39987214e4206ef81b3582a77dc53b14e86 Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Thu, 8 Jun 2023 19:34:14 +0800
+Subject: [PATCH 2/4] workaround for sys/mman.h for mignw
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ internal/core/src/common/Column.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/internal/core/src/common/Column.h b/internal/core/src/common/Column.h
+index 4a8f39457..b1d59635c 100644
+--- a/internal/core/src/common/Column.h
++++ b/internal/core/src/common/Column.h
+@@ -10,8 +10,12 @@
+ // or implied. See the License for the specific language governing permissions and limitations under the License
+ 
+ #pragma once
+-
++#ifndef __MINGW64__
+ #include <sys/mman.h>
++#else
++// mman for win32, we have it in annoy
++#include <annoy/src/mman.h>
++#endif
+ 
+ #include <cstddef>
+ #include <ostream>
+-- 
+2.25.1
+
