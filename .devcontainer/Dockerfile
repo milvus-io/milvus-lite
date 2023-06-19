@@ -1,4 +1,4 @@
-FROM milvusdb/milvus-env:amd64-centos7-20230329-1431037
+FROM milvusdb/milvus-env:amd64-centos7-20230606-c9d9940
 
 # Ignore tool missing warnings, and wo also not need clang-tools
 RUN rm -fr /etc/profile.d/llvm-toolset*.sh

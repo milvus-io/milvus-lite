@@ -1,5 +1,5 @@
 
 MILVUS_REPO="https://github.com/milvus-io/milvus.git"
-MILVUS_VERSION="v2.3.0-beta"
+MILVUS_VERSION="e9f1515a"
 BUILD_PROXY=
 BUILD_FORCE=NO
