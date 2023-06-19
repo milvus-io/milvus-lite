@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # note: keep same as .devcontainer/Dockerfile
-      image: milvusdb/milvus-env:amd64-centos7-20230329-1431037
+      image: milvusdb/milvus-env:amd64-centos7-20230606-c9d9940
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPILERCHECK: content
@@ -215,7 +215,7 @@ jobs:
         if: ${{ failure() }}
         with:
           name: milvus-log
-          path: ~/.milvus.io/milvus-server/**/*.log
+          path: test_milvus/logs/*.log
   acceptance_test_macos:
     needs:
       - build_macos

@@ -22,7 +22,7 @@ from pymilvus import (
 
 # Optional, if you want store all related data to specific location
 # default it wil using ~/.milvus-io/milvus-server/<__version_of_milvus__>
-# default_server.set_base_dir('test_milvus')
+default_server.set_base_dir('test_milvus')
 
 # Optional, if you want cleanup previous data
 default_server.cleanup()

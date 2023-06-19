@@ -246,8 +246,8 @@ class MilvusServerConfig:
 
         # data
         self.set('etcd_data_dir', join(storage_dir, 'etcd.data'))
-        self.set('local_storage_dir', join(storage_dir, 'storage'))
-        self.set('rocketmq_data_dir', join(storage_dir, 'rocketmq'))
+        self.set('local_storage_dir', storage_dir)
+        self.set('rocksmq_data_dir', join(storage_dir, 'rocksmq'))
 
     def get(self, attr) -> Any:
         return self.configurable_items[attr][1]
@@ -373,15 +373,17 @@ class MilvusServer:
         use http client to visit the health api to check if server ready
         """
         start_time = datetime.datetime.now()
-        health_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/health'
+        check_collection_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/collection/existence'
+        check_collection_req = urllib.request.Request(check_collection_url, method='GET', data=b'{"collection_name": "test"}')
         while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000) and self.running:
             try:
-                with urllib.request.urlopen(health_url, timeout=100) as resp:
-                    json.loads(resp.read().decode('utf-8'))
-                    self.logger.info('Milvus server is started')
-                    # still wait 1 seconds to make sure server is ready
-                    sleep(1)
-                    return
+                with urllib.request.urlopen(check_collection_req) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    error_code = data.get('status', {}).get('error_code', 0)
+                    if not error_code:
+                        self.logger.info('Milvus server is started')
+                        print('server ready')
+                        return
             except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
                 sleep(0.1)
         if self.running:
@@ -402,7 +404,8 @@ class MilvusServer:
         sock.close()
         envs.update({
             'DEPLOY_MODE': 'STANDALONE',
-            'METRICS_PORT': str(self.webservice_port)
+            'METRICS_PORT': str(self.webservice_port),
+            'MILVUS_RUN_DIR': join(self.config.base_data_dir, 'run')
         })
         if sys.platform.lower() == 'linux':
             self.prepend_path_to_envs(envs, 'LD_LIBRARY_PATH', dirname(milvus_exe))

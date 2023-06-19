@@ -10,3 +10,5 @@ echo DEV_GROUP=$(id -gn) >> ${this_dir}/env
 echo DEV_GID=$(id -g) >> ${this_dir}/env
 echo DEV_HOME=$HOME >> ${this_dir}/env
 echo DEV_SHELL=$SHELL >> ${this_dir}/env
+
+mkdir -p ${this_dir}/../../.conan
