@@ -1,0 +1,49 @@
+From 13fef9f303684953fc3469fd6e57740a9e9cc72b Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Fri, 16 Jun 2023 11:06:10 +0800
+Subject: [PATCH 4/4] patch for v2.2.10
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ internal/core/src/storage/MinioChunkManager.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/internal/core/src/storage/MinioChunkManager.cpp b/internal/core/src/storage/MinioChunkManager.cpp
+index 09d0f541e..89e2156a7 100644
+--- a/internal/core/src/storage/MinioChunkManager.cpp
++++ b/internal/core/src/storage/MinioChunkManager.cpp
+@@ -56,6 +56,7 @@ namespace milvus::storage {
+ std::atomic<size_t> MinioChunkManager::init_count_(0);
+ std::mutex MinioChunkManager::client_mutex_;
+ 
++#ifndef WIN32
+ static void
+ SwallowHandler(int signal) {
+ #pragma GCC diagnostic push
+@@ -71,6 +72,7 @@ SwallowHandler(int signal) {
+     }
+ #pragma GCC diagnostic pop
+ }
++#endif
+ 
+ /**
+  * @brief convert std::string to Aws::String
+@@ -105,6 +107,7 @@ MinioChunkManager::InitSDKAPI(RemoteStorageType type, bool useIAM, const std::st
+     std::scoped_lock lock{client_mutex_};
+     const size_t initCount = init_count_++;
+     if (initCount == 0) {
++#ifndef WIN32
+         // sdk_options_.httpOptions.installSigPipeHandler = true;
+         struct sigaction psa;
+         memset(&psa, 0, sizeof psa);
+@@ -114,6 +117,7 @@ MinioChunkManager::InitSDKAPI(RemoteStorageType type, bool useIAM, const std::st
+         sigemptyset(&psa.sa_mask);
+         sigaddset(&psa.sa_mask, SIGPIPE);
+         sigaction(SIGPIPE, &psa, 0);
++#endif
+ #ifdef BUILD_GCP
+         if (type == RemoteStorageType::GOOGLE_CLOUD && useIAM) {
+             sdk_options_.httpOptions.httpClientFactory_create_fn = []() {
+-- 
+2.41.0
+

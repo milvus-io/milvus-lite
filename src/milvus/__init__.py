@@ -18,10 +18,9 @@ import datetime
 from typing import Any, List
 import urllib.error
 import urllib.request
-import json
 import hashlib
 
-__version__ = '2.2.11'
+__version__ = '2.2.12'
 
 LOGGERS = {}
 
@@ -373,16 +372,19 @@ class MilvusServer:
         use http client to visit the health api to check if server ready
         """
         start_time = datetime.datetime.now()
-        health_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/health'
+        health_url = f'http://127.0.0.1:{self.webservice_port}/healthz'
         while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000) and self.running:
             try:
                 with urllib.request.urlopen(health_url, timeout=100) as resp:
-                    json.loads(resp.read().decode('utf-8'))
-                    self.logger.info('Milvus server is started')
-                    # still wait 1 seconds to make sure server is ready
-                    sleep(1)
-                    return
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+                    content = resp.read().decode('utf-8')
+                    if 'OK' in content:
+                        self.logger.info('Milvus server is started')
+                        # still wait 1 seconds to make sure server is ready
+                        sleep(1)
+                        return
+                    else:
+                        sleep(0.1)
+            except (urllib.error.URLError, urllib.error.HTTPError, ConnectionResetError):
                 sleep(0.1)
         if self.running:
             raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
@@ -445,7 +447,11 @@ class MilvusServer:
     def stop(self):
         if self.server_proc:
             self.server_proc.terminate()
-            self.server_proc.wait()
+            try:
+                self.server_proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self.server_proc.kill()
+                self.server_proc.wait(timeout=3)
             self.server_proc = None
         for fd in self.proc_fds.values():
             fd.close()
