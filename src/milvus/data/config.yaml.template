@@ -93,6 +93,9 @@ minio:
   # Custom endpoint for fetch IAM role credentials. when useIAM is true & cloudProvider is "aws".
   # Leave it empty if you want to use AWS default endpoint
   iamEndpoint: ""
+  # Log level for aws sdk log. 
+  # Supported level:  off, fatal, error, warn, info, debug, trace
+  logLevel: error
 
 # Milvus supports three MQ: rocksmq(based on RockDB), Pulsar and Kafka, which should be reserved in config what you use.
 # There is a note about enabling priority if we config multiple mq in this file
@@ -238,6 +241,13 @@ queryNode:
     # Max read concurrency must greater than or equal to 1, and less than or equal to runtime.NumCPU * 100.
     maxReadConcurrentRatio: 2.0 # (0, 100]
     cpuRatio: 10.0 # ratio used to estimate read task cpu usage.
+    # To allow better parallelism when the estimated cpu usage of a few tasks exceeds the total cpu usage,
+    # querynode task scheduler allows concurrent tasks when concurrent task num is less than
+    # runtime.NumCPU / minCPUParallelTaskNumRatio. For example: on a node with 16 cores and minCPUParallelTaskNumRatio
+    # set to 4, querynode task scheduler will send new tasks to knowhere if there are less than 4 running
+    # tasks, even if that'll cause the total estimated cpu usage of all running tasks to exceed max cpu usage.
+    # This config will be effective only when fifo scheduleReadPolicy is used.
+    minCPUParallelTaskNumRatio: 4
     # maxTimestampLag is the max ts lag between serviceable and guarantee timestamp.
     # if the lag is larger than this config, scheduler will return error without waiting.
     # the valid value is [3600, infinite)
@@ -307,7 +317,12 @@ dataCoord:
     # Sealing early can prevent producing large growing segments in case these segments might slow down our search/query.
     # Segments that sealed early will be compacted into a larger segment (within maxSize) eventually.
     sealProportion: 0.23
-    assignmentExpiration: 2000 # The time of the assignment expiration in ms
+    # The time of the assignment expiration in ms
+    # Warning! this parameter is an expert variable and closely related to data integrity. Without specific
+    # target and solid understanding of the scenarios, it should not be changed. If it's necessary to alter
+    # this parameter, make sure that the newly changed value is larger than the previous value used before restart
+    # otherwise there could be a large possibility of data loss
+    assignmentExpiration: 2000
     maxLife: 86400 # The max lifetime of segment in seconds, 24*60*60
     # If a segment didn't accept dml records in `maxIdleTime` and the size of segment is greater than
     # `minSizeFromIdleToSealed`, Milvus will automatically seal it.
@@ -325,6 +340,9 @@ dataCoord:
 
   compaction:
     enableAutoCompaction: true
+    rpcTimeout: 10 # compaction rpc request timeout in seconds
+    maxParallelTaskNum: 100 # max parallel compaction task number
+    indexBasedCompaction: true
 
   gc:
     interval: 3600 # gc interval in seconds
@@ -339,6 +357,7 @@ dataNode:
     flowGraph:
       maxQueueLength: 1024 # Maximum length of task queue in flowgraph
       maxParallelism: 1024 # Maximum number of tasks executed in parallel in the flowgraph
+    maxParallelSyncTaskNum: 2 # Maximum number of sync tasks executed in parallel in each flush manager
   segment:
     # Max buffer size to flush for a single segment.
     insertBufSize: 16777216 # Bytes, 16 MB
@@ -352,6 +371,9 @@ dataNode:
     forceSyncSegmentNum: 1 # number of segments to sync, segments with top largest buffer will be synced.
     watermarkStandalone: 0.2 # memory watermark for standalone, upon reaching this watermark, segments will be synced.
     watermarkCluster: 0.5 # memory watermark for cluster, upon reaching this watermark, segments will be synced.
+
+  timetick:
+    byRPC: true # 'true' to use RPC instead of msgstream to report datanode timetick message
 
 # Configures the system log output.
 log:
