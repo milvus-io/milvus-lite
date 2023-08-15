@@ -1,0 +1,40 @@
+From 8123dcdb6d417a4c62bd0839772709abef3b0163 Mon Sep 17 00:00:00 2001
+From: Bennu <yunmei.li@zilliz.com>
+Date: Wed, 9 Aug 2023 14:35:22 +0800
+Subject: [PATCH 4/4] Bump milvus version to 2.2.13 (#26233)
+
+Signed-off-by: Bennu-Li <yunmei.li@zilliz.com>
+---
+ deployments/binary/README.md                     | 2 +-
+ deployments/docker/standalone/docker-compose.yml | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/deployments/binary/README.md b/deployments/binary/README.md
+index c746196b0..c42bc46a8 100644
+--- a/deployments/binary/README.md
++++ b/deployments/binary/README.md
+@@ -30,7 +30,7 @@ $ ./minio server /minio
+ To start Milvus standalone, you need a Milvus binary file. Currently you can get the latest version of Milvus binary file through the Milvus docker image. (We will upload Milvus binary files in the future)
+ 
+ ```shell
+-$ docker run -d --name milvus milvusdb/milvus:v2.2.12 /bin/bash
++$ docker run -d --name milvus milvusdb/milvus:v2.2.13 /bin/bash
+ $ docker cp milvus:/milvus .
+ ```
+ 
+diff --git a/deployments/docker/standalone/docker-compose.yml b/deployments/docker/standalone/docker-compose.yml
+index 9750a238d..e2a48d938 100644
+--- a/deployments/docker/standalone/docker-compose.yml
++++ b/deployments/docker/standalone/docker-compose.yml
+@@ -30,7 +30,7 @@ services:
+ 
+   standalone:
+     container_name: milvus-standalone
+-    image: milvusdb/milvus:v2.2.12
++    image: milvusdb/milvus:v2.2.13
+     command: ["milvus", "run", "standalone"]
+     environment:
+       ETCD_ENDPOINTS: etcd:2379
+-- 
+2.41.0
+
