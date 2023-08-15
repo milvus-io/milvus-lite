@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 import hashlib
 
-__version__ = '2.2.12'
+__version__ = '2.2.13'
 
 LOGGERS = {}
 
@@ -333,6 +333,7 @@ class MilvusServer:
         self.logger = _create_logger('debug' if self._debug else 'null')
         self.webservice_port = 9091
         self.wait_for_started = wait_for_started
+        self.show_startup_banner = False
 
     def get_milvus_executable_path(self):
         """ get where milvus
@@ -428,7 +429,8 @@ class MilvusServer:
             self.show_banner()
 
     def show_banner(self):
-        print(r"""
+        if self.show_startup_banner:
+            print(r"""
 
     __  _________ _   ____  ______
    /  |/  /  _/ /| | / / / / / __/
@@ -437,12 +439,12 @@ class MilvusServer:
 
  Welcome to use Milvus!
 """)
-        print(f' Version:   v{__version__}-lite')
-        print(f' Process:   {self.server_proc.pid}')
-        print(f' Started:   {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-        print(f' Config:    {join(self.config.base_data_dir, "configs", "milvus.yaml")}')
-        print(f' Logs:      {join(self.config.base_data_dir, "logs")}')
-        print('\n Ctrl+C to exit ...')
+            print(f' Version:   v{__version__}-lite')
+            print(f' Process:   {self.server_proc.pid}')
+            print(f' Started:   {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            print(f' Config:    {join(self.config.base_data_dir, "configs", "milvus.yaml")}')
+            print(f' Logs:      {join(self.config.base_data_dir, "logs")}')
+            print('\n Ctrl+C to exit ...')
 
     def stop(self):
         if self.server_proc:
@@ -541,6 +543,7 @@ def main():
 
     # select server
     server = debug_server if args.debug else default_server
+    server.show_startup_banner = True
 
     # set base dir if configured
     if args.data_dir:
