@@ -123,12 +123,14 @@ function build_linux_x86_64() {
                             file=$(dirname $file)/$(readlink $file)
                         done
                         cp -frv $file $x
+                        patchelf --remove-rpath $x
                         has_new_file=true
                     fi
                 done
             fi
         done
     done
+    patchelf --remove-rpath milvus
 }
 
 function install_deps_for_macosx() {
