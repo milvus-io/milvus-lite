@@ -21,7 +21,7 @@ import urllib.request
 import json
 import hashlib
 
-__version__ = '2.3.0-beta.1'
+__version__ = '2.3.0'
 
 LOGGERS = {}
 
@@ -105,6 +105,7 @@ class MilvusServerConfig:
         """
         if not self.template_file:
             self.template_file = join(dirname(abspath(__file__)), 'data', 'config.yaml.template')
+            self.glog_conf_file = join(dirname(abspath(__file__)), 'data', 'glog.conf')
         with open(self.template_file, 'r', encoding='utf-8') as template:
             self.template_text = template.read()
 
@@ -270,6 +271,7 @@ class MilvusServerConfig:
 
     def write_config(self):
         config_file = join(self.base_data_dir, 'configs', 'milvus.yaml')
+        glog_conf = join(self.base_data_dir, 'configs', 'glog.conf')
         os.makedirs(dirname(config_file), exist_ok=True)
         content = self.template_text
         for key, val in self.config_key_maps.items():
@@ -279,6 +281,7 @@ class MilvusServerConfig:
         content = self.update_extra_configs(content)
         with open(config_file, 'w', encoding='utf-8') as config:
             config.write(content)
+        shutil.copy(self.glog_conf_file, glog_conf)
 
     def update_extra_configs(self, content):
         current_key = []
@@ -334,6 +337,7 @@ class MilvusServer:
         self.logger = _create_logger('debug' if self._debug else 'null')
         self.webservice_port = 9091
         self.wait_for_started = wait_for_started
+        self.show_startup_banner = False
 
     def get_milvus_executable_path(self):
         """ get where milvus
@@ -364,7 +368,7 @@ class MilvusServer:
         while self.running:
             sleep(0.1)
 
-    def wait_started(self, timeout=30000):
+    def wait_started(self, timeout=180000):
         """ wait server started
 
         Args:
@@ -373,18 +377,19 @@ class MilvusServer:
         use http client to visit the health api to check if server ready
         """
         start_time = datetime.datetime.now()
-        check_collection_url = f'http://127.0.0.1:{self.webservice_port}/api/v1/collection/existence'
-        check_collection_req = urllib.request.Request(check_collection_url, method='GET', data=b'{"collection_name": "test"}')
+        health_url = f'http://127.0.0.1:{self.webservice_port}/healthz'
         while (datetime.datetime.now() - start_time).total_seconds() < (timeout / 1000) and self.running:
             try:
-                with urllib.request.urlopen(check_collection_req) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    error_code = data.get('status', {}).get('error_code', 0)
-                    if not error_code:
+                with urllib.request.urlopen(health_url, timeout=100) as resp:
+                    content = resp.read().decode('utf-8')
+                    if 'OK' in content:
                         self.logger.info('Milvus server is started')
-                        print('server ready')
+                        # still wait 1 seconds to make sure server is ready
+                        sleep(1)
                         return
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+                    else:
+                        sleep(0.1)
+            except (urllib.error.URLError, urllib.error.HTTPError, ConnectionResetError):
                 sleep(0.1)
         if self.running:
             raise TimeoutError(f'Milvus not startd in {timeout/1000} seconds')
@@ -429,7 +434,8 @@ class MilvusServer:
             self.show_banner()
 
     def show_banner(self):
-        print(r"""
+        if self.show_startup_banner:
+            print(r"""
 
     __  _________ _   ____  ______
    /  |/  /  _/ /| | / / / / / __/
@@ -438,17 +444,21 @@ class MilvusServer:
 
  Welcome to use Milvus!
 """)
-        print(f' Version:   v{__version__}-lite')
-        print(f' Process:   {self.server_proc.pid}')
-        print(f' Started:   {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-        print(f' Config:    {join(self.config.base_data_dir, "configs", "milvus.yaml")}')
-        print(f' Logs:      {join(self.config.base_data_dir, "logs")}')
-        print('\n Ctrl+C to exit ...')
+            print(f' Version:   v{__version__}-lite')
+            print(f' Process:   {self.server_proc.pid}')
+            print(f' Started:   {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            print(f' Config:    {join(self.config.base_data_dir, "configs", "milvus.yaml")}')
+            print(f' Logs:      {join(self.config.base_data_dir, "logs")}')
+            print('\n Ctrl+C to exit ...')
 
     def stop(self):
         if self.server_proc:
             self.server_proc.terminate()
-            self.server_proc.wait()
+            try:
+                self.server_proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self.server_proc.kill()
+                self.server_proc.wait(timeout=3)
             self.server_proc = None
         for fd in self.proc_fds.values():
             fd.close()
@@ -538,6 +548,7 @@ def main():
 
     # select server
     server = debug_server if args.debug else default_server
+    server.show_startup_banner = True
 
     # set base dir if configured
     if args.data_dir:

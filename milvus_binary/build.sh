@@ -92,7 +92,7 @@ fi
 # build for linux x86_64
 function build_linux_x86_64() {
     cd milvus
-    # conan after 2.3
+    # conan need for milvus 2.3
     pip3 install --user "conan<2.0"
     export PATH=${HOME}/.local/bin:${PATH}
     make -j $(nproc) milvus
@@ -121,15 +121,24 @@ function build_linux_x86_64() {
                     if test -f $p/$x && ! test -f $x ; then
                         file=$p/$x
                         while test -L $file ; do
-                            file=$(realpath $file)
+                            filelink=$(readlink $file)
+                            if [[ $filelink =~ ^/ ]] ; then
+                                file=$filelink
+                            else
+                                file=$(dirname $file)/$filelink
+                            fi
                         done
-                        cp -frv $file $x
+                        cp -frv $file $x.normal
+                        echo remove rpath for $x}
+                        patchelf --remove-rpath $x.normal
+                        mv -fv $x.normal $x
                         has_new_file=true
                     fi
                 done
             fi
         done
     done
+    patchelf --remove-rpath milvus
 }
 
 function install_deps_for_macosx() {

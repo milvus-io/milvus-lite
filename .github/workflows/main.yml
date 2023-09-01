@@ -17,7 +17,7 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 5
       CCACHE_MAXSIZE: 2G
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -56,6 +56,8 @@ jobs:
           export LD_LIBRARY_PATH=/opt/rh/rh-python38/root/usr/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
           python3 -m pip install --user -U pip
           python3 -m pip install --user build wheel 'setuptools>64.0'
+          # install patchelf
+          yum -y install patchelf
           python3 -m build -w -n
       - uses: actions/upload-artifact@v3
         with:
@@ -71,7 +73,7 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 5
       CCACHE_MAXSIZE: 2G
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -246,7 +248,7 @@ jobs:
         if: ${{ failure() }}
         with:
           name: milvus-log
-          path: ~/.milvus.io/milvus-server/**/*.log
+          path: test_milvus/logs/*.log
   # acceptance_test_windows:
   #   needs:
   #     - build_windows
