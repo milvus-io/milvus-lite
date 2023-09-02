@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 import hashlib
 
-__version__ = '2.2.13-2'
+__version__ = '2.2.13-3'
 
 LOGGERS = {}
 
