@@ -173,7 +173,7 @@ proxy:
   # So adjust at your risk!
   maxDimension: 32768 # Maximum dimension of a vector
   # It's strongly DISCOURAGED to set `maxShardNum` > 64.
-  maxShardNum: 64 # Maximum number of shards in a collection
+  maxShardNum: 16 # Maximum number of shards in a collection
   maxTaskNum: 1024 # max task number of proxy task queue
   # please adjust in embedded Milvus: false
   ginLogging: false # Whether to produce gin logs.
@@ -216,7 +216,6 @@ queryNode:
   loadMemoryUsageFactor: 3 # The multiply factor of calculating the memory usage while loading segments
   enableDisk: true # enable querynode load disk index, and search on disk index
   maxDiskUsagePercentage: 95
-  gracefulStopTimeout: 30
 
   stats:
     publishInterval: 1000 # Interval for querynode to report node information (milliseconds)
@@ -258,13 +257,13 @@ queryNode:
     # the valid value is [3600, infinite)
     maxTimestampLag: 86400
     # read task schedule policy: fifo(by default), user-task-polling.
-    scheduleReadPolicy: 
+    scheduleReadPolicy:
       # fifo: A FIFO queue support the schedule.
-      # user-task-polling: 
-      #     The user's tasks will be polled one by one and scheduled. 
+      # user-task-polling:
+      #     The user's tasks will be polled one by one and scheduled.
       #     Scheduling is fair on task granularity.
       #     The policy is based on the username for authentication.
-      #     And an empty username is considered the same user. 
+      #     And an empty username is considered the same user.
       #     When there are no multi-users, the policy decay into FIFO
       name: fifo
       # user-task-polling configure:
@@ -298,7 +297,6 @@ indexNode:
   port: {{ index_node_port(int) }}
   enableDisk: true # enable index node build disk vector index
   maxDiskUsagePercentage: 95
-  gracefulStopTimeout: 30
 
   scheduler:
     buildParallel: 1
@@ -351,8 +349,8 @@ dataCoord:
 
   gc:
     interval: 3600 # gc interval in seconds
-    missingTolerance: 86400 # file meta missing tolerance duration in seconds, 60*24
-    dropTolerance: 3600 # file belongs to dropped entity tolerance duration in seconds
+    missingTolerance: 3600 # file meta missing tolerance duration in seconds, 60*24
+    dropTolerance: 10800 # file belongs to dropped entity tolerance duration in seconds
 
 
 dataNode:
@@ -407,7 +405,7 @@ grpc:
     keepAliveTimeout: 20000
     maxMaxAttempts: 5
     initialBackOff: 1.0
-    maxBackoff: 60.0
+    maxBackoff: 10.0
     backoffMultiplier: 2.0
   server:
     retryTimes: 5 # retry times when receiving a grpc return value with a failure and retryable state code
@@ -451,7 +449,7 @@ common:
   entityExpiration: -1     # Entity expiration in seconds, CAUTION make sure entityExpiration >= retentionDuration and -1 means never expire
 
   gracefulTime: 5000 # milliseconds. it represents the interval (in ms) by which the request arrival time needs to be subtracted in the case of Bounded Consistency.
-  gracefulStopTimeout: 30 # seconds. it will force quit the server if the graceful stop process is not completed during this time.
+  gracefulStopTimeout: 1800 # seconds. it will force quit the server if the graceful stop process is not completed during this time.
 
   # Default value: auto
   # Valid values: [auto, avx512, avx2, avx, sse4_2]
@@ -576,9 +574,9 @@ quotaAndLimits:
       queryNodeMemoryLowWaterLevel: 0.85 # (0, 1], memoryLowWaterLevel in QueryNodes
       queryNodeMemoryHighWaterLevel: 0.95 # (0, 1], memoryHighWaterLevel in QueryNodes
     growingSegmentsSizeProtection:
-      # 1. No action will be taken if the ratio of growing segments size is less than the low water level.
-      # 2. The DML rate will be reduced if the ratio of growing segments size is greater than the low water level and less than the high water level.
-      # 3. All DML requests will be rejected if the ratio of growing segments size is greater than the high water level.
+      # No action will be taken if the growing segments size is less than the low watermark.
+      # When the growing segments size exceeds the low watermark, the dml rate will be reduced,
+      # but the rate will not be lower than `minRateRatio * dmlRate`.
       enabled: false
       minRateRatio: 0.5
       lowWaterLevel: 0.2
