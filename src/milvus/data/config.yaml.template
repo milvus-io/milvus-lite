@@ -48,16 +48,6 @@ metastore:
   # Valid values: [etcd, mysql]
   type: etcd
 
-# Related configuration of mysql, used to store Milvus metadata.
-mysql:
-  username: root
-  password: 123456
-  address: localhost
-  port: 3306
-  dbName: milvus_meta
-  maxOpenConns: 20
-  maxIdleConns: 5
-
 localStorage:
   path: {{ local_storage_dir }} # please adjust in embedded Milvus: /tmp/milvus/data/
 
@@ -177,7 +167,7 @@ rootCoord:
 # Related configuration of proxy, used to validate client requests and reduce the returned results.
 proxy:
   timeTickInterval: 200 # ms, the interval that proxy synchronize the time tick
-  healthCheckTimetout: 3000 # ms, the interval that to do component healthy check
+  healthCheckTimeout: 3000 # ms, the interval that to do component healthy check
   msgStream:
     timeTick:
       bufSize: 512
@@ -416,10 +406,10 @@ grpc:
     dialTimeout: 200
     keepAliveTime: 10000
     keepAliveTimeout: 20000
-    maxMaxAttempts: 5
-    initialBackoff: 1
-    maxBackoff: 10
-    backoffMultiplier: 2
+    maxMaxAttempts: 10
+    initialBackOff: 0.2 # seconds
+    maxBackoff: 10 # seconds
+    backoffMultiplier: 2.0 # deprecated
   clientMaxSendSize: 268435456
   clientMaxRecvSize: 268435456
 
@@ -450,8 +440,7 @@ common:
     dataNodeSubNamePrefix: dataNode
   defaultPartitionName: _default # default partition name for a collection
   defaultIndexName: _default_idx # default index name
-  retentionDuration: 0 # time travel reserved time, insert/delete will not be cleaned in this period. disable it by default
-  entityExpiration: -1 # Entity expiration in seconds, CAUTION make sure entityExpiration >= retentionDuration and -1 means never expire
+  entityExpiration: -1 # Entity expiration in seconds, CAUTION -1 means never expire
   indexSliceSize: 16 # MB
   threadCoreCoefficient:
     highPriority: 10 # This parameter specify how many times the number of threads is the number of cores in high priority thread pool
@@ -516,7 +505,7 @@ quotaAndLimits:
   enabled: true # `true` to enable quota and limits, `false` to disable.
   limits:
     maxCollectionNum: 65536
-    maxCollectionNumPerDB: 64
+    maxCollectionNumPerDB: 65536
   # quotaCenterCollectInterval is the time interval that quotaCenter
   # collects metrics from Proxies, Query cluster and Data cluster.
   # seconds, (0 ~ 65536)
