@@ -132,6 +132,7 @@ function build_linux_x86_64() {
                         echo remove rpath for $x}
                         patchelf --remove-rpath $x.normal
                         mv -fv $x.normal $x
+                        strip $x
                         has_new_file=true
                     fi
                 done
@@ -139,6 +140,7 @@ function build_linux_x86_64() {
         done
     done
     patchelf --remove-rpath milvus
+    strip milvus
 }
 
 function install_deps_for_macosx() {
