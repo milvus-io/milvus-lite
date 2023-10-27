@@ -27,7 +27,7 @@ default_server.set_base_dir('test_milvus')
 # Optional, if you want cleanup previous data
 default_server.cleanup()
 
-# star you milvus server
+# start you milvus server
 default_server.start()
 
 _HOST = '127.0.0.1'
