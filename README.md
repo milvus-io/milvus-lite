@@ -78,7 +78,7 @@ print(utility.get_server_version())
 You could also use the `milvus-server` command to start the server.
 
 ```bash
-$ milvus-serevr
+$ milvus-server
 ```
 
 The full options cloud be found by `milvus-server --help`.
