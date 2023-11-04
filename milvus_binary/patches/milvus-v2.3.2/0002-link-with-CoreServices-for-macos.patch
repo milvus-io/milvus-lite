@@ -1,0 +1,28 @@
+From 9ec041db457b54188d61c47740238eaab338d952 Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Sun, 5 Nov 2023 22:22:51 +0800
+Subject: [PATCH 2/2] link with CoreServices for macos
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ internal/core/src/storage/azure-blob-storage/CMakeLists.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/internal/core/src/storage/azure-blob-storage/CMakeLists.txt b/internal/core/src/storage/azure-blob-storage/CMakeLists.txt
+index 91c2cc347..4441a2fae 100644
+--- a/internal/core/src/storage/azure-blob-storage/CMakeLists.txt
++++ b/internal/core/src/storage/azure-blob-storage/CMakeLists.txt
+@@ -25,5 +25,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter -Wno-return-type -
+ add_library(blob-chunk-manager SHARED AzureBlobChunkManager.cpp)
+ target_link_libraries(blob-chunk-manager PRIVATE Azure::azure-identity Azure::azure-storage-blobs)
+ 
++if (APPLE)
++    find_library(CORESERVICES_LIBRARY CoreServices)
++    target_link_libraries(blob-chunk-manager PRIVATE ${CORESERVICES_LIBRARY})
++endif (APPLE)
++
+ install(TARGETS blob-chunk-manager DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+ 
+-- 
+2.42.1
+

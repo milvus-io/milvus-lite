@@ -1,0 +1,34 @@
+From b731a16cb656bfe964a6253e6d7e3a28c30045ac Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Sun, 5 Nov 2023 18:27:32 +0800
+Subject: [PATCH] fix for gettid
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ include/knowhere/comp/thread_pool.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/knowhere/comp/thread_pool.h b/include/knowhere/comp/thread_pool.h
+index a00920d..60546f5 100644
+--- a/include/knowhere/comp/thread_pool.h
++++ b/include/knowhere/comp/thread_pool.h
+@@ -13,6 +13,7 @@
+ 
+ #include <omp.h>
+ #include <sys/resource.h>
++#include <sys/syscall.h>
+ 
+ #include <cerrno>
+ #include <cstring>
+@@ -35,7 +36,7 @@ class ThreadPool {
+         std::thread
+         newThread(folly::Func&& func) override {
+             return folly::NamedThreadFactory::newThread([&, func = std::move(func)]() mutable {
+-                if (setpriority(PRIO_PROCESS, gettid(), 19) != 0) {
++                if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), 19) != 0) {
+                     LOG_KNOWHERE_ERROR_ << "Failed to set priority of knowhere thread. Error is: "
+                                         << std::strerror(errno);
+                 } else {
+-- 
+2.42.1
+
