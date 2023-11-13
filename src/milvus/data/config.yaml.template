@@ -87,15 +87,15 @@ minio:
   # Custom endpoint for fetch IAM role credentials. when useIAM is true & cloudProvider is "aws".
   # Leave it empty if you want to use AWS default endpoint
   iamEndpoint:
-  # Log level for aws sdk log. 
+  # Log level for aws sdk log.
   # Supported level:  off, fatal, error, warn, info, debug, trace
-  logLevel: error
+  logLevel: fatal
   # Cloud data center region
   region: ""
   # Cloud whether use virtual host bucket mode
   useVirtualHost: false
   # timeout for request time in milliseconds
-  requestTimeoutMs: 3000
+  requestTimeoutMs: 10000
 
 # Milvus supports four MQ: rocksmq(based on RockDB), natsmq(embedded nats-server), Pulsar and Kafka.
 # You can change your mq by setting mq.type field.
@@ -221,7 +221,7 @@ proxy:
 # Related configuration of queryCoord, used to manage topology and load balancing for the query nodes, and handoff from growing segments to sealed segments.
 queryCoord:
   autoHandoff: true # Enable auto handoff
-  autoBalance: true # Enable auto balance
+  autoBalance: false # Enable auto balance
   balancer: ScoreBasedBalancer # Balancer to use
   globalRowCountFactor: 0.1 # expert parameters, only used by scoreBasedBalancer
   scoreUnbalanceTolerationFactor: 0.05 # expert parameters, only used by scoreBasedBalancer
@@ -512,7 +512,7 @@ common:
     # superUsers: root
     tlsMode: {{ tls_mode(int): 0 }}
   session:
-    ttl: 60 # ttl value when session granting a lease to register service
+    ttl: 30 # ttl value when session granting a lease to register service
     retryTimes: 30 # retry times when session sending etcd requests
 
   # preCreatedTopic decides whether using existed topic
