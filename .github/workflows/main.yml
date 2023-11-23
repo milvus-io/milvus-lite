@@ -160,10 +160,8 @@ jobs:
         shell: msys2 {0}
         run: |
           # workaround for keyring error
-          if ! pacman -S --noconfirm --needed git patch ; then
-            pacman-key --refresh-keys
-            pacman -S --noconfirm --needed git patch
-          fi
+          sed -i 's/SigLevel.*/SigLevel = Never/' /etc/pacman.conf
+          pacman -S --noconfirm --needed git patch
           pacman -S --noconfirm --needed mingw-w64-x86_64-python mingw-w64-x86_64-python-wheel mingw-w64-x86_64-python-pip
       - name: Build Wheel
         shell: msys2 {0}
@@ -187,7 +185,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu:18.04", "ubuntu:22.04", "centos:7", "fedora:36"]
+        os: ["ubuntu:18.04", "ubuntu:22.04", "centos:7", "fedora:38"]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3
@@ -200,7 +198,7 @@ jobs:
           if [[ "${{ matrix.os }}" == "centos:7" ]] ; then
             yum -y install epel-release
             yum -y install python36 python36-pip python36-wheel
-          elif [[ "${{ matrix.os }}" == "fedora:36" ]] ; then
+          elif [[ "${{ matrix.os }}" == "fedora:38" ]] ; then
             dnf -y install python3 python3-pip python3-wheel python3-devel gcc gcc-c++
           elif [[ "${{ matrix.os }}" =~ "ubuntu" ]] ; then
             apt update

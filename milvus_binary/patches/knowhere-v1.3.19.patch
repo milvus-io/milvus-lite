@@ -1,0 +1,48 @@
+From aba7299dd6e5202ca6a348dd686c421a993f2923 Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Thu, 23 Nov 2023 10:26:22 +0800
+Subject: [PATCH] patch for v1.3.19
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ CMakeLists.txt                    | 4 +---
+ knowhere/archive/KnowhereConfig.h | 1 +
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 36f7332..64d8f10 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -32,8 +32,6 @@ if ( APPLE )
+     else()
+         set( APPLE_LLVM_PREFIX "/usr/local" )
+     endif()
+-    set ( CMAKE_C_COMPILER "${APPLE_LLVM_PREFIX}/opt/llvm/bin/clang" )
+-    set ( CMAKE_CXX_COMPILER "${APPLE_LLVM_PREFIX}/opt/llvm/bin/clang++" )
+ endif ()
+ 
+ set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
+@@ -80,7 +78,7 @@ include( CheckCXXCompilerFlag )
+ if ( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+     message(STATUS "MacOS")
+     set ( MACOS TRUE )
+-    set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${APPLE_LLVM_PREFIX}/opt/libomp/lib" )
++    set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${APPLE_LLVM_PREFIX}/opt/libomp/include" )
+ elseif ( "${CMAKE_SYSTEM}" MATCHES "Linux" )
+     message( STATUS "Linux")
+     set ( LINUX TRUE )
+diff --git a/knowhere/archive/KnowhereConfig.h b/knowhere/archive/KnowhereConfig.h
+index f83bb94..f794e8b 100644
+--- a/knowhere/archive/KnowhereConfig.h
++++ b/knowhere/archive/KnowhereConfig.h
+@@ -11,6 +11,7 @@
+ 
+ #pragma once
+ 
++#include <cstdint>
+ #include <vector>
+ #include <string>
+ 
+-- 
+2.42.1
+
