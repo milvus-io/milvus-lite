@@ -137,6 +137,7 @@ function install_deps_for_macosx() {
     bash milvus/scripts/install_deps.sh
     # need this for cache binary
     brew install md5sha1sum
+    brew install libomp
 }
 
 # build for macos arm64/x86_64
