@@ -94,6 +94,7 @@ function build_linux_x86_64() {
     cd milvus
     # conan after 2.3
     # pip3 install "conan<2.0"
+    export PATH=${HOME}/.local/bin:${PATH}
     make -j $(nproc) milvus
     cd bin
     rm -fr lib*
@@ -120,10 +121,18 @@ function build_linux_x86_64() {
                     if test -f $p/$x && ! test -f $x ; then
                         file=$p/$x
                         while test -L $file ; do
-                            file=$(dirname $file)/$(readlink $file)
+                            filelink=$(readlink $file)
+                            if [[ $filelink =~ ^/ ]] ; then
+                                file=$filelink
+                            else
+                                file=$(dirname $file)/$filelink
+                            fi
                         done
-                        cp -frv $file $x
-                        patchelf --remove-rpath $x
+                        cp -frv $file $x.normal
+                        echo remove rpath for $x}
+                        patchelf --remove-rpath $x.normal
+                        mv -fv $x.normal $x
+                        strip $x
                         has_new_file=true
                     fi
                 done
@@ -131,6 +140,7 @@ function build_linux_x86_64() {
         done
     done
     patchelf --remove-rpath milvus
+    strip milvus
 }
 
 function install_deps_for_macosx() {
@@ -202,6 +212,7 @@ function build_msys() {
 
     cd bin
     mv milvus milvus.exe
+    strip milvus.exe
     rm -fr *.log *.dll
 
     has_new_file=true
@@ -220,6 +231,7 @@ function build_msys() {
                                 file=$(dirname $file)/$(readlink $file)
                             done
                             cp -frv $file $x
+                            strip $x
                             has_new_file=true
                         fi
                     done
