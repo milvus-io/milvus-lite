@@ -52,17 +52,6 @@ etcd:
 metastore:
   type: etcd
 
-# Related configuration of mysql, used to store Milvus metadata.
-mysql:
-  username: root
-  password: 123456
-  address: localhost
-  port: 3306
-  dbName: milvus_meta
-  driverName: mysql
-  maxOpenConns: 20
-  maxIdleConns: 5
-
 # please adjust in embedded Milvus: /tmp/milvus/data/
 localStorage:
   path: {{ local_storage_dir }}
@@ -81,13 +70,13 @@ minio:
   # For more infomation, refer to
   # aws: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html
   # gcp: https://cloud.google.com/storage/docs/access-control/iam
-  # aliyun (ack): https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/use-rrsa-to-enforce-access-control 
+  # aliyun (ack): https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/use-rrsa-to-enforce-access-control
   # aliyun (ecs): https://www.alibabacloud.com/help/en/elastic-compute-service/latest/attach-an-instance-ram-role
   useIAM: false
-  # Cloud Provider of S3. Supports: "aws", "gcp", "aliyun". 
+  # Cloud Provider of S3. Supports: "aws", "gcp", "aliyun".
   # You can use "aws" for other cloud provider supports S3 API with signature v4, e.g.: minio
   # You can use "gcp" for other cloud provider supports S3 API with signature v2
-  # You can use "aliyun" for other cloud provider uses virtual host style bucket 
+  # You can use "aliyun" for other cloud provider uses virtual host style bucket
   # When useIAM enabled, only "aws", "gcp", "aliyun" is supported for now
   cloudProvider: aws
   # Custom endpoint for fetch IAM role credentials. when useIAM is true & cloudProvider is "aws".
@@ -114,6 +103,7 @@ pulsar:
   maxMessageSize: 5242880 # 5 * 1024 * 1024 Bytes, Maximum size of each message in pulsar.
   tenant: public
   namespace: default
+  requestTimeout: 60 # pulsar client global request timeout in seconds
 
 # If you want to enable kafka, needs to comment the pulsar configs
 kafka:
@@ -178,10 +168,9 @@ proxy:
   # please adjust in embedded Milvus: false
   ginLogging: false # Whether to produce gin logs.
   grpc:
+    # change to smaller value to limit client request and response
     serverMaxRecvSize: 67108864 # 64M
     serverMaxSendSize: 67108864 # 64M
-    clientMaxRecvSize: 104857600 # 100 MB, 100 * 1024 * 1024
-    clientMaxSendSize: 104857600 # 100 MB, 100 * 1024 * 1024
 
 
 
