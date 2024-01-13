@@ -79,7 +79,7 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 5
       CCACHE_MAXSIZE: 2G
-    timeout-minutes: 360
+    timeout-minutes: 900
     steps:
       - name: Checkout
         uses: actions/checkout@v3
