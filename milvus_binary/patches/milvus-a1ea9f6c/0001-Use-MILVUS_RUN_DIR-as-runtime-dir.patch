@@ -1,0 +1,31 @@
+From aad6e69333c4a6bba474148e4642f05af158bef1 Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Tue, 20 Jun 2023 09:26:42 +0800
+Subject: [PATCH] Use MILVUS_RUN_DIR as runtime dir
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ cmd/milvus/util.go | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/cmd/milvus/util.go b/cmd/milvus/util.go
+index 1e40bb404..b6315096d 100644
+--- a/cmd/milvus/util.go
++++ b/cmd/milvus/util.go
+@@ -41,6 +41,13 @@ func createRuntimeDir(sType string) string {
+ 		writer = os.Stderr
+ 	}
+ 	runtimeDir := "/run/milvus"
++	// try create if MILVUS_RUN_DIR provided
++	if runtimeDirFromEnv := os.Getenv("MILVUS_RUN_DIR"); runtimeDirFromEnv != "" {
++		if err := makeRuntimeDir(runtimeDirFromEnv); err == nil {
++			// create ok
++			return runtimeDirFromEnv
++		}
++	}
+ 	if runtime.GOOS == "windows" {
+ 		runtimeDir = "run"
+ 		if err := makeRuntimeDir(runtimeDir); err != nil {
+-- 
+2.25.1
+

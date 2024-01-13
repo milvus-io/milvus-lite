@@ -1,0 +1,106 @@
+diff --git a/internal/core/CMakeLists.txt b/internal/core/CMakeLists.txt
+index eb1f727d2..bc47fe8a3 100644
+--- a/internal/core/CMakeLists.txt
++++ b/internal/core/CMakeLists.txt
+@@ -19,8 +19,6 @@ cmake_minimum_required( VERSION 3.18 )
+ if ( APPLE )
+     set( CMAKE_CROSSCOMPILING TRUE )
+     set( RUN_HAVE_GNU_POSIX_REGEX 0 )
+-    set( CMAKE_C_COMPILER "/usr/local/opt/llvm/bin/clang" )
+-    set( CMAKE_CXX_COMPILER "/usr/local/opt/llvm/bin/clang++" )
+ endif ()
+ 
+ add_definitions(-DELPP_THREAD_SAFE)
+@@ -31,7 +29,6 @@ project(core)
+ include(CheckCXXCompilerFlag)
+ if ( APPLE )
+     message(STATUS "==============Darwin Environment==============")
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/usr/local/opt/llvm/include -I/usr/local/include -I/usr/local/opt/libomp/include -L/usr/local/opt/libomp/lib")
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+     message(STATUS "==============Linux Environment===============")
+     set(LINUX TRUE)
+diff --git a/scripts/core_build.sh b/scripts/core_build.sh
+index 0c33d9439..57d343a39 100755
+--- a/scripts/core_build.sh
++++ b/scripts/core_build.sh
+@@ -186,15 +186,31 @@ fi
+ 
+ unameOut="$(uname -s)"
+ case "${unameOut}" in
+-    Darwin*)
+-        llvm_prefix="$(brew --prefix llvm)"
+-        export CLANG_TOOLS_PATH="${llvm_prefix}/bin"
+-        export CC="${llvm_prefix}/bin/clang"
+-        export CXX="${llvm_prefix}/bin/clang++"
+-        export LDFLAGS="-L${llvm_prefix}/lib -L/usr/local/opt/libomp/lib"
+-        export CXXFLAGS="-I${llvm_prefix}/include -I/usr/local/include -I/usr/local/opt/libomp/include"
+-        ;;
+-          *)   echo "==System:${unameOut}";
++  Darwin*)
++    # detect llvm version by valid list
++    for llvm_version in 15 14 NOT_FOUND ; do
++      if brew ls --versions llvm@${llvm_version} > /dev/null; then
++        break
++      fi
++    done
++    if [ "${llvm_version}" = "NOT_FOUND" ] ; then
++      echo "llvm@14~15 is not installed"
++      exit 1
++    fi
++    llvm_prefix="$(brew --prefix llvm@${llvm_version})"
++    export CLANG_TOOLS_PATH="${llvm_prefix}/bin"
++    export PATH=${CLANG_TOOLS_PATH}:${PATH}
++    export CC="${llvm_prefix}/bin/clang"
++    export CXX="${llvm_prefix}/bin/clang++"
++    export CFLAGS="-Wno-deprecated-declarations -I${llvm_prefix}/include -I/usr/local/include -I$(brew --prefix libomp)/include -I$(brew --prefix boost)/include -I$(brew --prefix tbb)/include"
++    export CXXFLAGS=${CFLAGS}
++    export LDFLAGS="-L${llvm_prefix}/lib -L$(brew --prefix libomp)/lib -L$(brew --prefix boost)/lib -L$(brew --prefix tbb)/lib"
++    ;;
++  Linux*)
++    ;;
++  *)
++    echo "Cannot build on windows"
++    ;;
+ esac
+ 
+ 
+diff --git a/scripts/install_deps.sh b/scripts/install_deps.sh
+index 5d58bb3f5..bb7f00a65 100755
+--- a/scripts/install_deps.sh
++++ b/scripts/install_deps.sh
+@@ -29,7 +29,7 @@ function install_linux_deps() {
+       sudo yum install -y git make lcov libtool m4 autoconf automake ccache openssl-devel zlib-devel libzstd-devel \
+           libcurl-devel python3-devel \
+           devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-gcc-gfortran \
+-          llvm-toolset-7.0-clang llvm-toolset-7.0-clang-tools-extra libuuid-devel pulseaudio-libs-devel 
++          llvm-toolset-7.0-clang llvm-toolset-7.0-clang-tools-extra libuuid-devel pulseaudio-libs-devel
+ 
+       echo "source scl_source enable devtoolset-7" | sudo tee -a /etc/profile.d/devtoolset-7.sh
+       echo "source scl_source enable llvm-toolset-7.0" | sudo tee -a /etc/profile.d/llvm-toolset-7.sh
+@@ -57,25 +57,8 @@ function install_linux_deps() {
+ 
+ function install_mac_deps() {
+   sudo xcode-select --install  > /dev/null 2>&1
+-  brew install boost libomp ninja tbb cmake llvm ccache zstd
+-  brew uninstall grep
++  brew install boost libomp ninja tbb openblas cmake llvm@15 ccache pkg-config zstd openssl librdkafka
+   brew install grep
+-  export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
+-  brew update && brew upgrade && brew cleanup
+-
+-  if [[ $(arch) == 'arm64' ]]; then
+-    brew install openssl
+-    brew install librdkafka
+-    brew install pkg-config
+-    sudo mkdir /usr/local/include
+-    sudo mkdir /usr/local/opt
+-    sudo ln -s "$(brew --prefix llvm)" "/usr/local/opt/llvm"
+-    sudo ln -s "$(brew --prefix libomp)/include/omp.h" "/usr/local/include/omp.h"
+-    sudo ln -s "$(brew --prefix libomp)" "/usr/local/opt/libomp"
+-    sudo ln -s "$(brew --prefix boost)/include/boost" "/usr/local/include/boost"
+-    sudo ln -s "$(brew --prefix tbb)/include/tbb" "/usr/local/include/tbb"
+-    sudo ln -s "$(brew --prefix tbb)/include/oneapi" "/usr/local/include/oneapi"
+-  fi
+ }
+ 
+ if ! command -v go &> /dev/null

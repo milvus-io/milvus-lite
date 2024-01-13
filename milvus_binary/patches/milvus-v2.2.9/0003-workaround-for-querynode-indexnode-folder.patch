@@ -1,0 +1,65 @@
+From 80488981b173826818e6c8190d402f43a49aeffa Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Thu, 8 Jun 2023 19:01:18 +0800
+Subject: [PATCH 3/3] workaround for querynode/indexnode folder
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ internal/core/src/storage/Util.cpp | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
+index 659307570..5d4335037 100644
+--- a/internal/core/src/storage/Util.cpp
++++ b/internal/core/src/storage/Util.cpp
+@@ -33,6 +33,29 @@
+ #include "storage/DiskFileManagerImpl.h"
+ #endif
+ 
++namespace  {
++std::string patch_index_files_path(const std::string& path) {
++    auto file = path;
++    auto index = file.find("querynode/index_files");
++    if (index != std::string::npos) {
++        file.replace(index, strlen("querynode/index_files"), "index_files");
++    }
++    index = file.find("querynode\\index_files");
++    if (index != std::string::npos) {
++        file.replace(index, strlen("querynode\\index_files"), "index_files");
++    }
++    index = file.find("indexnode/index_files");
++    if (index != std::string::npos) {
++        file.replace(index, strlen("indexnode/index_files"), "index_files");
++    }
++    index = file.find("indexnode\\index_files");
++    if (index != std::string::npos) {
++        file.replace(index, strlen("indexnode\\index_files"), "index_files");
++    }
++    return file;
++}
++}
++
+ namespace milvus::storage {
+ 
+ std::map<std::string, ChunkManagerType> ChunkManagerType_Map = {{"local", ChunkManagerType::Local},
+@@ -360,6 +383,8 @@ DownloadAndDecodeRemoteFile(RemoteChunkManager* remote_chunk_manager, std::strin
+     ChunkManager *chunk_manager = remote_chunk_manager;
+     if (! chunk_manager) {
+         chunk_manager = &LocalChunkManager::GetInstance();
++        // workaround: replace any /querynode/ /indexnode/ => /
++        file = patch_index_files_path(file);
+     }
+     auto fileSize = chunk_manager->Size(file);
+     auto buf = std::shared_ptr<uint8_t[]>(new uint8_t[fileSize]);
+@@ -386,6 +411,8 @@ EncodeAndUploadIndexSlice(RemoteChunkManager* remote_chunk_manager,
+     ChunkManager *chunk_manager = remote_chunk_manager;
+     if (! chunk_manager) {
+         chunk_manager = &LocalChunkManager::GetInstance();
++        // workaround: replace any /querynode/ /indexnode/ => /
++        object_key = patch_index_files_path(object_key);
+     }
+     chunk_manager->Write(object_key, serialized_index_data.data(), serialized_index_size);
+     return std::pair<std::string, size_t>(object_key, serialized_index_size);
+-- 
+2.39.2 (Apple Git-143)
+

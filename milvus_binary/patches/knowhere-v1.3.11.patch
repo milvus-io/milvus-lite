@@ -1,0 +1,26 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 36f7332..6cb7e8b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -27,13 +27,6 @@ add_definitions( -DAUTO_INITIALIZE_EASYLOGGINGPP )
+ if ( APPLE )
+     set ( CMAKE_CROSSCOMPILING TRUE )
+     set ( RUN_HAVE_GNU_POSIX_REGEX 0 )
+-    if ( DEFINED ENV{HOMEBREW_PREFIX} )
+-        set( APPLE_LLVM_PREFIX $ENV{HOMEBREW_PREFIX} )
+-    else()
+-        set( APPLE_LLVM_PREFIX "/usr/local" )
+-    endif()
+-    set ( CMAKE_C_COMPILER "${APPLE_LLVM_PREFIX}/opt/llvm/bin/clang" )
+-    set ( CMAKE_CXX_COMPILER "${APPLE_LLVM_PREFIX}/opt/llvm/bin/clang++" )
+ endif ()
+ 
+ set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
+@@ -80,7 +73,6 @@ include( CheckCXXCompilerFlag )
+ if ( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+     message(STATUS "MacOS")
+     set ( MACOS TRUE )
+-    set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${APPLE_LLVM_PREFIX}/opt/libomp/lib" )
+ elseif ( "${CMAKE_SYSTEM}" MATCHES "Linux" )
+     message( STATUS "Linux")
+     set ( LINUX TRUE )
