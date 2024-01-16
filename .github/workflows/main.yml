@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Cache go
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.cache/go-build
@@ -30,14 +30,14 @@ jobs:
           key: linux-go-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-go-
       - name: Cache conan
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.conan/data
           key: linux-conan-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: linux-conan-
       - name: Cache ccache
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ${{ github.workspace }}/.ccache
@@ -65,6 +65,25 @@ jobs:
           yum -y install patchelf
           yum -y install perl-IPC-Cmd
           python3 -m build -w -n
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: linux-go-${{ hashFiles('milvus_binary/env.sh') }}
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.conan/data
+          key: linux-conan-${{ hashFiles('milvus_binary/env.sh') }}
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ${{ github.workspace }}/.ccache
+          key: linux-ccache-${{ hashFiles('milvus_binary/env.sh') }}
       - uses: actions/upload-artifact@v3
         with:
           name: wheel_linux
@@ -79,12 +98,12 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 5
       CCACHE_MAXSIZE: 2G
-    timeout-minutes: 900
+    timeout-minutes: 360
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Cache go
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.cache/go-build
@@ -92,14 +111,14 @@ jobs:
           key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: macos-go-
       - name: Cache conan
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.conan/data
           key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
           restore-keys: macos-conan-
       - name: Cache ccache
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ${{ github.workspace }}/.ccache
@@ -113,7 +132,27 @@ jobs:
       - name: Build Wheel
         run: |
           python3 -m pip install --user build wheel 'setuptools>64.0'
-          python3 -m build -w -n
+          brew install coreutils
+          timeout 10800 python3 -m build -w -n
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: macos-go-${{ hashFiles('milvus_binary/env.sh') }}
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ~/.conan/data
+          key: macos-conan-${{ hashFiles('milvus_binary/env.sh') }}
+      - uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            ${{ github.workspace }}/.ccache
+          key: macos-ccache-${{ hashFiles('milvus_binary/env.sh') }}
       - uses: actions/upload-artifact@v3
         with:
           name: wheel_macos
