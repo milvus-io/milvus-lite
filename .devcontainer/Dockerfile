@@ -24,11 +24,11 @@ RUN . /tmp/env && \
     fi ; \
     if id $DEV_USER 2>/dev/null 1>/dev/null ; then \
         echo user $DEV_USER already exist ; \
-        exit 1 ; \
     elif id $DEV_UID 2>/dev/null 1>/dev/null ; then \
         echo user $DEV_UID already exist ; \
-        exit 1 ; \
     else \
         useradd -g $DEV_GID -u $DEV_UID -m -d $DEV_HOME -s /bin/bash $DEV_USER ; \
     fi && \
-    echo "${DEV_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/user
+    if [ $DEV_UID -ne 0 ] ; then \
+        echo "${DEV_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/user ; \
+    fi

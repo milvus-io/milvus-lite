@@ -91,7 +91,7 @@ jobs:
           retention-days: 5
   build_macos:
     name: Build Wheel - macOS
-    runs-on: macos-11
+    runs-on: macos-12
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPILERCHECK: content
@@ -131,9 +131,9 @@ jobs:
           cache: false
       - name: Build Wheel
         run: |
-          python3 -m pip install --user build wheel 'setuptools>64.0'
-          brew install coreutils
-          timeout 10800 python3 -m build -w -n
+          brew install coreutils python@3.8
+          python3.8 -m pip install --user build wheel 'setuptools>64.0'
+          timeout 10800 python3.8 -m build -w -n
       - uses: actions/cache/save@v3
         if: always()
         with:
@@ -272,7 +272,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["macos-11", "macos-12"]
+        os: ["macos-12", "macos-13"]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
