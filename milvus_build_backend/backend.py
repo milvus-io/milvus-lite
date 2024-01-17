@@ -33,9 +33,9 @@ def _get_platform():
     machine_text = platform.machine().lower()
     if sys.platform.lower() == 'darwin':
         if machine_text == 'x86_64':
-            return 'macosx_10_9_x86_64'
+            return 'macosx_12_0_x86_64'
         elif machine_text == 'arm64':
-            return 'macosx_11_0_arm64'
+            return 'macosx_12_0_arm64'
     if sys.platform.lower() == 'linux':
         return f'manylinux2014_{machine_text}'
     if sys.platform.lower() == 'win32':

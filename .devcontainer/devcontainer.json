@@ -15,6 +15,8 @@
         }
     },
     "mounts": [
-        "source=${localWorkspaceFolder}/.conan,target=/home/${localEnv:USER}/.conan,type=bind,consistency=cached"
+        "source=${localWorkspaceFolder}/.conan,target=/home/${localEnv:USER}/.conan,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/.gitconfig,target=/home/${localEnv:USER}/.gitconfig,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind,consistency=cached"
     ]
 }
