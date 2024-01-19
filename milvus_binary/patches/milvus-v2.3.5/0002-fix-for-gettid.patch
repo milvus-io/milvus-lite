@@ -1,0 +1,25 @@
+From 55c8bb41d2900be71befdc161ea304dd483e1a19 Mon Sep 17 00:00:00 2001
+From: Ji Bin <matrixji@live.com>
+Date: Sun, 5 Nov 2023 18:49:29 +0800
+Subject: [PATCH 2/2] fix for gettid
+
+Signed-off-by: Ji Bin <matrixji@live.com>
+---
+ internal/core/thirdparty/knowhere/CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
+index 80781717c..c46b50783 100644
+--- a/internal/core/thirdparty/knowhere/CMakeLists.txt
++++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
+@@ -41,6 +41,7 @@ FetchContent_Declare(
+         GIT_TAG         ${KNOWHERE_VERSION}
+         SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
+         BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
++        PATCH_COMMAND   patch -p1 < ${CMAKE_SOURCE_DIR}/../../../patches/knowhere-v2.2.2.patch
+         DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH} )
+ 
+ FetchContent_GetProperties( knowhere )
+-- 
+2.43.0
+
