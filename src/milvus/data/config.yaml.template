@@ -177,9 +177,10 @@ rootCoord:
   port: {{ root_coord_port(int): 53100 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
+  maxGeneralCapacity: 65536
 
 # Related configuration of proxy, used to validate client requests and reduce the returned results.
 proxy:
@@ -197,7 +198,8 @@ proxy:
   maxDimension: 32768 # Maximum dimension of a vector
   # Whether to produce gin logs.\n
   # please adjust in embedded Milvus: false
-  ginLogging: false
+  ginLogging: true
+  ginLogSkipPaths: "/" # skipped url path for gin log split by comma
   maxTaskNum: 1024 # max task number of proxy task queue
   accessLog:
     enable: false
@@ -235,15 +237,15 @@ proxy:
   port: {{ proxy_port(int): 19530 }}
   internalPort: {{ proxy_internal_port(int): 19529 }}
   grpc:
-    serverMaxSendSize: 67108864
+    serverMaxSendSize: 268435456
     serverMaxRecvSize: 67108864
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 67108864
 
 # Related configuration of queryCoord, used to manage topology and load balancing for the query nodes, and handoff from growing segments to sealed segments.
 queryCoord:
   autoHandoff: true # Enable auto handoff
-  autoBalance: false # Enable auto balance
+  autoBalance: true # Enable auto balance
   balancer: ScoreBasedBalancer # Balancer to use
   globalRowCountFactor: 0.1 # expert parameters, only used by scoreBasedBalancer
   scoreUnbalanceTolerationFactor: 0.05 # expert parameters, only used by scoreBasedBalancer
@@ -258,15 +260,16 @@ queryCoord:
   heartbeatAvailableInterval: 10000 # 10s, Only QueryNodes which fetched heartbeats within the duration are available
   loadTimeoutSeconds: 600
   checkHandoffInterval: 5000
+  growingRowCountWeight: 4.0
   # can specify ip for example
   # ip: 127.0.0.1
   ip: # if not specify address, will use the first unicastable address as local ip
   port: {{ query_coord_port(int): 19531 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
   taskMergeCap: 1
   taskExecutionCap: 256
   enableActiveStandby: false # Enable active-standby
@@ -299,6 +302,16 @@ queryNode:
     enabled: true # deprecated, TODO: remove it
     memoryLimit: 2147483648 # 2 GB, 2 * 1024 *1024 *1024 # deprecated, TODO: remove it
     readAheadPolicy: willneed # The read ahead policy of chunk cache, options: `normal, random, sequential, willneed, dontneed`
+    # Specifies the necessity for warming up the chunk cache.
+    # 1. If set to "sync" or "async," the original vector data
+    # will be synchronously/asynchronously loaded into the
+    # chunk cache during the load process. This approach has
+    # the potential to substantially reduce query/search latency
+    # for a specific duration post-load, albeit accompanied
+    # by a concurrent increase in disk usage;
+    # 2. If set to "off," original vector data will only
+    # be loaded into the chunk cache during search/query.
+    warmup: async # options: `sync, async, off`
   grouping:
     enabled: true
     maxNQ: 1000
@@ -336,9 +349,9 @@ queryNode:
   port: {{ query_node_port(int): 21123 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
 
 indexCoord:
   bindIndexNodeMode:
@@ -360,9 +373,9 @@ indexNode:
   port: {{ index_node_port(int): 21121 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
 
 dataCoord:
   channel:
@@ -415,9 +428,9 @@ dataCoord:
   port: {{ data_coord_port(int): 13333 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
 
 dataNode:
   dataSync:
@@ -441,9 +454,9 @@ dataNode:
   port: {{ data_node_port(int): 21124 }}
   grpc:
     serverMaxSendSize: 536870912
-    serverMaxRecvSize: 536870912
+    serverMaxRecvSize: 268435456
     clientMaxSendSize: 268435456
-    clientMaxRecvSize: 268435456
+    clientMaxRecvSize: 536870912
   memory:
     forceSyncEnable: true # `true` to force sync if memory usage is too high
     forceSyncSegmentNum: 1 # number of segments to sync, segments with top largest buffer will be synced.
@@ -475,8 +488,10 @@ log:
 grpc:
   log:
     level: WARNING
-  serverMaxSendSize: 536870912
-  serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    serverMaxRecvSize: 268435456
+    clientMaxSendSize: 268435456
+    clientMaxRecvSize: 536870912
   client:
     compressionEnabled: false
     dialTimeout: 200
@@ -486,8 +501,6 @@ grpc:
     initialBackOff: 0.2 # seconds
     maxBackoff: 10 # seconds
     backoffMultiplier: 2.0 # deprecated
-  clientMaxSendSize: 268435456
-  clientMaxRecvSize: 268435456
 
 # Configure the proxy tls enable.
 tls:
@@ -531,6 +544,7 @@ common:
     SearchCacheBudgetGBRatio: 0.1
     LoadNumThreadRatio: 8
     BeamWidthRatio: 4
+  consistencyLevelUsedInDelete: "Bounded"
   gracefulTime: 5000 # milliseconds. it represents the interval (in ms) by which the request arrival time needs to be subtracted in the case of Bounded Consistency.
   gracefulStopTimeout: 1800 # seconds. it will force quit the server if the graceful stop process is not completed during this time.
   storageType: local # please adjust in embedded Milvus: local

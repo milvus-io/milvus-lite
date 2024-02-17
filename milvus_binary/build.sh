@@ -147,6 +147,7 @@ function install_deps_for_macosx() {
     bash milvus/scripts/install_deps.sh
     # need this for cache binary
     brew install coreutils
+    pip3 install --user "conan<2.0"
 }
 
 # build for macos arm64/x86_64
