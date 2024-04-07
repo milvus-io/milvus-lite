@@ -93,9 +93,9 @@ fi
 function build_linux_x86_64() {
     cd milvus
     # conan need for milvus 2.3
-    pip3 install --user "conan<2.0"
+    pip3 install --user -U "conan<2.0"
     export PATH=${HOME}/.local/bin:${PATH}
-    make -j $(nproc) milvus
+    make -j $(nproc) ENABLE_AZURE=false milvus
     cd bin
     rm -fr lib*
 
@@ -147,12 +147,13 @@ function install_deps_for_macosx() {
     bash milvus/scripts/install_deps.sh
     # need this for cache binary
     brew install coreutils
+    pip3 install --user -U "conan<2.0"
 }
 
 # build for macos arm64/x86_64
 build_macosx_common() {
     cd milvus
-    make -j $(sysctl -n hw.physicalcpu) milvus
+    make -j $(sysctl -n hw.physicalcpu) ENABLE_AZURE=false milvus
 
     # resolve dependencies for milvus
     cd bin
@@ -207,7 +208,7 @@ function build_msys() {
     export GOROOT=/mingw64/lib/go
     go version
 
-    make -j $(nproc) milvus
+    make -j $(nproc) ENABLE_AZURE=false milvus
 
     cd bin
     mv milvus milvus.exe

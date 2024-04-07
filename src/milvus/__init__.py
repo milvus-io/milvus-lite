@@ -21,7 +21,7 @@ import urllib.request
 import json
 import hashlib
 
-__version__ = '2.3.5'
+__version__ = '2.3.13'
 
 LOGGERS = {}
 
