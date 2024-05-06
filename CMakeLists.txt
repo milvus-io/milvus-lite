@@ -1,0 +1,259 @@
+cmake_minimum_required(VERSION 3.20)
+project(milvus-lite)
+
+option(ENABLE_UNIT_TESTS "Enable unit tests" ON)
+message(STATUS "Enable testing: ${ENABLE_UNIT_TESTS}")
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_CXX_FLAGS "-g  -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+else()
+    set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+endif()
+
+if(APPLE)
+    include_directories(/opt/homebrew/opt/libomp/include)
+    link_directories(/opt/homebrew/opt/libomp/lib)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lomp")
+endif()
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+include(FetchContent)
+
+set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;google-cloud-cpp::rest_internal;AWS::aws-sdk-cpp-identity-management")
+
+find_package(SQLiteCpp REQUIRED)
+include_directories(${SQLiteCpp_INCLUDE_DIRS})
+
+find_package(antlr4-runtime REQUIRED)
+include_directories(${antlr4-cppruntime_INCLUDES})
+
+find_package(Protobuf REQUIRED)
+include_directories(${protobuf_INCLUDE_DIRS})
+
+find_package(gRPC REQUIRED)
+include_directories(${gRPC_INCLUDE_DIRS})
+
+find_package(TBB REQUIRED)
+include_directories(${TBB_tbb_INCLUDE_DIRS})
+
+find_package(nlohmann_json REQUIRED)
+include_directories(${nlohmann_json_INCLUDE_DIRS})
+
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
+find_package(folly REQUIRED)
+include_directories(${Folly_INCLUDE_DIRS})
+
+find_package(fmt REQUIRED)
+include_directories(${fmt_INCLUDE_DIRS})
+
+find_package(opentelemetry-cpp REQUIRED)
+include_directories(${opentelemetry-cpp_INCLUDE_DIRS})
+
+find_package(glog REQUIRED)
+include_directories(${glog_INCLUDE_DIRS})
+
+find_package(gflags REQUIRED)
+include_directories(${gflags_INCLUDE_DIRS})
+
+find_package(Arrow REQUIRED)
+include_directories(${arrow_INCLUDE_DIRS})
+
+find_package(re2 REQUIRED)
+include_directories(${re2_INCLUDE_DIRS})
+link_directories(${re2_LIB_DIRS})
+
+find_package(double-conversion REQUIRED)
+include_directories(${double-conversion_INCLUDE_DIRS})
+
+find_package(prometheus-cpp REQUIRED)
+include_directories(${prometheus-cpp_INCLUDE_DIRS})
+
+find_package(marisa REQUIRED)
+include_directories(${marisa_INCLUDE_DIRS})
+
+find_package(yaml-cpp REQUIRED)
+include_directories(${yaml-cpp_INCLUDE_DIRS})
+
+find_package(google-cloud-cpp REQUIRED)
+include_directories(${google-cloud-cpp_INCLUDE_DIRS})
+
+find_package(absl REQUIRED)
+include_directories(${absl_type_traits_INCLUDE_DIRS})
+
+find_package(AWSSDK REQUIRED)
+
+add_definitions(-DANTLR4CPP_STATIC)
+add_definitions(-DHAVE_CPP_STDLIB)
+
+IF(APPLE)
+    add_definitions("-D_GNU_SOURCE")
+endif()
+
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pb)
+
+add_library(milvus_proto STATIC "${CMAKE_SOURCE_DIR}/src/proto/plan.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/schema.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/common.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/segcore.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/msg.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/feder.proto"
+    "${CMAKE_SOURCE_DIR}/src/proto/rg.proto"
+)
+
+set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/pb")
+
+protobuf_generate(
+    TARGET milvus_proto
+    IMPORT_DIRS "${CMAKE_SOURCE_DIR}/src/proto"
+    PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
+
+
+add_library(milvus_grpc_service STATIC
+  "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
+)
+
+target_link_libraries(milvus_grpc_service milvus_proto)
+
+protobuf_generate(  
+  TARGET milvus_grpc_service
+  # OUT_VAR PROTO_GENERATED_FILES
+  LANGUAGE grpc
+  GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+  PLUGIN "protoc-gen-grpc=\$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
+  IMPORT_DIRS  "${CMAKE_SOURCE_DIR}/src/proto"
+  PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
+
+include_directories("${CMAKE_SOURCE_DIR}/src/parser/")
+include_directories("${CMAKE_SOURCE_DIR}/src/parser/antlr/")
+include_directories("${CMAKE_BINARY_DIR}/pb")
+include_directories("${CMAKE_BINARY_DIR}")
+
+add_library(parser STATIC "${CMAKE_SOURCE_DIR}/src/parser/parser.cc"
+    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanBaseVisitor.cpp"
+    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanLexer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanParser.cpp"
+    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanVisitor.cpp"
+  )
+
+
+target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})  
+
+add_subdirectory(thirdparty/milvus/internal/core/thirdparty/knowhere)
+
+include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/")
+include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/")
+include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/")
+
+include_directories("${knowhere_SOURCE_DIR}/include")
+function(MILVUS_ADD_PKG_CONFIG MODULE)
+    configure_file(${MODULE}.pc.in "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc" @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
+          DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig/")
+endfunction()
+
+
+include(cmake/milvus-storage.cmake)
+
+include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src/")
+add_library(boost_bitset_ext 
+ thirdparty/milvus/internal/core/thirdparty/boost_ext/dynamic_bitset_ext.cpp)
+
+
+FetchContent_Declare(
+    simdjson
+    GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+    GIT_TAG        v3.1.7
+)
+FetchContent_MakeAvailable(simdjson)
+
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD cargo build)
+else ()
+    set(CARGO_CMD cargo build --release)
+endif ()
+
+set(HOME_VAR $ENV{HOME})
+
+add_custom_command(OUTPUT ls_cargo
+        COMMENT "ls cargo"
+        COMMAND ls ${HOME_VAR}/.cargo/bin/
+        )
+
+add_custom_target(ls_cargo_target DEPENDS ls_cargo)
+
+add_custom_command(OUTPUT compile_tantivy
+        COMMENT "Compiling tantivy binding"
+        COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} ${CARGO_CMD}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding
+        DEPENDS ls_cargo_target
+    )
+
+add_custom_target(tantivy_binding_target DEPENDS compile_tantivy)
+
+add_library(tantivy_binding STATIC IMPORTED)
+set_target_properties(tantivy_binding 
+    PROPERTIES
+    IMPORTED_GLOBAL TRUE
+    IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/release/libtantivy_binding.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/"
+)
+
+add_dependencies(tantivy_binding tantivy_binding_target)
+
+FetchContent_Declare(clone_opendal
+  GIT_REPOSITORY "https://github.com/apache/incubator-opendal.git"
+  GIT_TAG "v0.43.0-rc.2"   # it's much better to use a specific Git revision or Git tag for reproducibility
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal"
+  GIT_SHALLOW 1
+)
+
+FetchContent_MakeAvailable(clone_opendal)
+
+add_custom_command(OUTPUT compile_opendal
+    COMMENT "Compiling opendal"
+    COMMAND bash -c "cargo build --release --verbose"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/bindings/c
+)
+add_custom_target(compile_opendal_target DEPENDS compile_opendal)
+
+add_library(opendal STATIC IMPORTED)
+set_target_properties(opendal
+    PROPERTIES
+    IMPORTED_GLOBAL TRUE
+    IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/target/release/libopendal_c.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/bindings/c/include/")
+
+add_dependencies(opendal compile_opendal_target clone_opendal_target)
+
+set(MILVUS_ENGINE_SRC
+    "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
+add_subdirectory(thirdparty/milvus/internal/core/src/log)
+add_subdirectory(thirdparty/milvus/internal/core/src/config)
+add_subdirectory(thirdparty/milvus/internal/core/src/common)
+add_subdirectory(thirdparty/milvus/internal/core/src/storage)
+add_subdirectory(thirdparty/milvus/internal/core/src/query)
+add_subdirectory(thirdparty/milvus/internal/core/src/exec)
+add_subdirectory(thirdparty/milvus/internal/core/src/index)
+add_subdirectory(thirdparty/milvus/internal/core/src/segcore)
+add_subdirectory(thirdparty/milvus/internal/core/src/bitset)
+
+if(ENABLE_UNIT_TESTS)
+  include(CTest)
+  enable_testing()
+endif()
+
+add_subdirectory(src)
+
+find_program(MEMORYCHECK_COMMAND NAMES valgrind)
+set(MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --track-origins=yes --leak-check=full --show-leak-kinds=all")
