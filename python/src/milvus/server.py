@@ -1,3 +1,16 @@
+# Copyright (C) 2019-2024 Zilliz. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+
+from typing import List, Optional
 import os
 import subprocess
 import pathlib
@@ -14,11 +27,20 @@ logger = logging.getLogger()
 
 class Server:
     """
+    The milvus-lite server
     """
-    MILVUS_BIN = 'milvus'
-    
 
-    def __init__(self, db_file: str, args=None):
+    MILVUS_BIN = 'milvus'
+
+    def __init__(self, db_file: str, address: Optional[str] = None):
+        """
+        Args:
+            db_file (str):
+               The local file to store data.
+            address (address, optional):
+               grpc server address, example: localhost:19530,
+               if not set, the MilvusLite service will use UDS.
+        """
         if os.environ.get('BIN_PATH') is not None:
             self._bin_path = pathlib.Path(os.environ['BIN_PATH']).absolute()
         else:
@@ -27,7 +49,7 @@ class Server:
         if not re.match(r'^[a-zA-Z0-9.\-_]+$', self._db_file.name):
             raise RuntimeError(f"Unsupport db name {self._db_file.name}, the name must match ^[a-zA-Z0-9.\-_]+$")
         self._work_dir = self._db_file.parent
-        self._args = args
+        self._address= address
         self._p = None
         self._uds_path = str(self._db_file.parent / f'.{self._db_file.name}.sock')
         self._lock_path = str(self._db_file.parent / f'.{self._db_file.name}.lock')
@@ -55,8 +77,8 @@ class Server:
 
     @property
     def args(self):
-        if self._args is not None:
-            return self._args
+        if self._address is not None:
+            return [self.milvus_bin, self._db_file, self._address, self.log_level] 
         return [self.milvus_bin, self._db_file, self.uds_path, self.log_level, self._lock_path]
 
     def start(self) -> bool:
@@ -90,3 +112,6 @@ class Server:
             self._lock_fd = None
         pathlib.Path(self._uds_path).unlink(missing_ok=True)
         pathlib.Path(self._lock_path).unlink(missing_ok=True)
+
+    def __del__(self):
+        self.stop()
