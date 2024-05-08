@@ -121,7 +121,7 @@ def parse_requirements(file_name: str) -> List[str]:
 
 setup(name='milvus-lite',
       version='2.4.1',
-      description='',
+      description='A lightweight version of Milvus wrapped with Python.',
       author='Milvus Team',
       author_email='milvus-team@zilliz.com',
       url='https://github.com/milvus-io/milvus-lite.git',
@@ -132,5 +132,6 @@ setup(name='milvus-lite',
       include_package_data=True,
       python_requires='>=3.7',
       cmdclass={"bdist_wheel": CMakeBuild},
+      long_description=open("../README.md", "r", encoding="utf-8").read(),
       long_description_content_type='text/markdown'
       )
