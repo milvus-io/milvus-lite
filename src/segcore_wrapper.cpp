@@ -194,7 +194,7 @@ SegcoreWrapper::Retrieve(const std::string& plan, RetrieveResult* result) {
                                     retrieve_plan.plan_,
                                     GetTimestamp(),
                                     &(result->retrieve_result_),
-                                    DEFAULT_MAX_OUTPUT_SIZE));
+                                    DEFAULT_MAX_OUTPUT_SIZE, false));
         CHECK_STATUS(rs, "Retrieve failed, errs:");
         return Status::Ok();
     } catch (std::exception& e) {

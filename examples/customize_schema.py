@@ -61,6 +61,10 @@ print(fmt.format("Start query by specifying primary keys"))
 query_results = milvus_client.query(collection_name, ids=[2])
 print(query_results[0])
 
+print(fmt.format("Start get by specifying primary keys"))
+get_results = milvus_client.get(collection_name, ids=[2])
+print(get_results[0])
+
 print(fmt.format("Start query by specifying filtering expression"))
 query_results = milvus_client.query(collection_name, filter= "f == 600 or title == 't2'")
 for ret in query_results: 
