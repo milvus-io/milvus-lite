@@ -1,7 +1,7 @@
 import numpy as np
 from pymilvus import MilvusClient, DataType
 
-from milvus.server_manager import server_manager_instance
+from milvus_lite.server_manager import server_manager_instance
 uri = server_manager_instance.start_and_get_uri("./local_test.db")
 if uri is None:
     print("Start milvus failed")

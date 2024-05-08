@@ -15,7 +15,7 @@ import threading
 import logging
 import pathlib
 
-from milvus.server import Server
+from milvus_lite.server import Server
 
 
 logger = logging.getLogger()

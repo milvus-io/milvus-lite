@@ -1,4 +1,4 @@
-from milvus.server_manager import server_manager_instance
+from milvus_lite.server_manager import server_manager_instance
 import time
 import numpy as np
 from pymilvus import (
