@@ -92,7 +92,7 @@ class CMakeBuild(_bdist_wheel):
                               cwd=build_temp,
                               env=env,
                               )
-        dst_lib_path = os.path.join(build_lib, 'milvus/lib')
+        dst_lib_path = os.path.join(build_lib, 'milvus_lite/lib')
         shutil.rmtree(dst_lib_path, ignore_errors=True)
         os.makedirs(dst_lib_path)
         shutil.copy(os.path.join(build_temp, 'lib', MILVUS_BIN), os.path.join(dst_lib_path, MILVUS_BIN))
