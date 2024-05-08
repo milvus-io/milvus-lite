@@ -120,7 +120,7 @@ def parse_requirements(file_name: str) -> List[str]:
         ]
 
 setup(name='milvus',
-      version='2.4.0',
+      version='2.4.1',
       description='',
       author='Milvus Team',
       author_email='milvus-team@zilliz.com',
