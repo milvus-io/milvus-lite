@@ -119,7 +119,7 @@ def parse_requirements(file_name: str) -> List[str]:
             if require.strip() and not require.startswith('#')
         ]
 
-setup(name='milvus',
+setup(name='milvus-lite',
       version='2.4.1',
       description='',
       author='Milvus Team',
