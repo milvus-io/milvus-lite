@@ -11,6 +11,7 @@
 # the License.
 
 from typing import List, Optional
+import tempfile
 import os
 import subprocess
 import pathlib
@@ -48,10 +49,12 @@ class Server:
         self._db_file = pathlib.Path(db_file).absolute()
         if not re.match(r'^[a-zA-Z0-9.\-_]+$', self._db_file.name):
             raise RuntimeError(f"Unsupport db name {self._db_file.name}, the name must match ^[a-zA-Z0-9.\-_]+$")
+        if len(self._db_file.name) > 36:
+            raise RuntimeError(f"Db name {self._db_file.name} is too long, should be less than 36")
         self._work_dir = self._db_file.parent
         self._address= address
         self._p = None
-        self._uds_path = str(self._db_file.parent / f'.{self._db_file.name}.sock')
+        self._uds_path = f"{tempfile.mktemp()}_{self._db_file.name}.sock"
         self._lock_path = str(self._db_file.parent / f'.{self._db_file.name}.lock')
         self._lock_fd = None
 
