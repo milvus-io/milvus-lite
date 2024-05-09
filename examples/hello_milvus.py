@@ -15,6 +15,7 @@ from pymilvus import (
     FieldSchema, CollectionSchema, DataType,
     Collection,
 )
+from pymilvus.client.types import LoadState
 
 from milvus_lite.server_manager import server_manager_instance
 uri = server_manager_instance.start_and_get_uri("./110.db")
@@ -114,6 +115,7 @@ hello_milvus.create_index("embeddings", index)
 # Before conducting a search or a query, you need to load the data in `hello_milvus` into memory.
 print(fmt.format("Start loading"))
 hello_milvus.load()
+assert utility.load_state("hello_milvus") == LoadState.Loaded
 
 # -----------------------------------------------------------------------------
 # search based on vector similarity

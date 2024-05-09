@@ -34,7 +34,6 @@ namespace milvus::local {
         CHECK_STATUS(CheckCollectionName(string_util::Trim(collection_name)), \
                      "");                                                     \
         if (!storage_.CollectionExist(collection_name)) {                     \
-            LOG_ERROR("Collecton {} not existed", collection_name);           \
             return Status::CollectionNotFound();                              \
         }                                                                     \
     } while (0)
@@ -44,7 +43,6 @@ namespace milvus::local {
         CHECK_STATUS(CheckCollectionName(string_util::Trim(collection_name)), \
                      "");                                                     \
         if (storage_.CollectionExist(collection_name)) {                      \
-            LOG_ERROR("Collecton {} already existed", collection_name);       \
             return Status::CollectionAlreadExist();                           \
         }                                                                     \
     } while (0)
@@ -151,6 +149,16 @@ MilvusLocal::ReleaseCollection(const std::string& collection_name) {
         return Status::Ok();
     }
     return Status::SegcoreErr();
+}
+
+Status
+MilvusLocal::GetLoadState(const std::string &collection_name) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    CHECK_COLLECTION_EXIST(collection_name);
+    if (!index_.HasLoaded(collection_name)) {
+        return Status::CollectionNotLoaded();
+    }
+    return Status::CollectionLoaded();
 }
 
 Status

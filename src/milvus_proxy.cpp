@@ -56,6 +56,28 @@ MilvusProxy::LoadCollection(const std::string& collection_name) {
 }
 
 Status
+MilvusProxy::GetLoadState(
+    const std::string& collection_name,
+    ::milvus::proto::milvus::GetLoadStateResponse* response) {
+    auto s = milvus_local_.GetLoadState(collection_name);
+    if (s.Code() == ErrCollectionNotFound) {
+        response->set_state(::milvus::proto::common::LoadState::LoadStateNotExist);
+        return Status::Ok();
+    }
+
+    if (s.Code() == ErrCollectionNotLoaded) {
+        response->set_state(::milvus::proto::common::LoadState::LoadStateNotLoad);
+        return Status::Ok();        
+    }
+
+    if (s.Code() == ErrCollectionLoaded) {
+        response->set_state(::milvus::proto::common::LoadState::LoadStateLoaded);
+        return Status::Ok();
+    }
+    return s;
+}
+
+Status
 MilvusProxy::ReleaseCollection(const std::string& collection_name) {
     // Alignment error code with milvus
     auto s = milvus_local_.ReleaseCollection(collection_name);

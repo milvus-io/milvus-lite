@@ -263,4 +263,13 @@ MilvusServiceImpl::GetCollectionStatistics(
     return ::grpc::Status::OK;
 }
 
+::grpc::Status
+MilvusServiceImpl::GetLoadState(::grpc::ServerContext *context,
+             const ::milvus::proto::milvus::GetLoadStateRequest *request,
+             ::milvus::proto::milvus::GetLoadStateResponse *response) {
+    auto s = proxy_.GetLoadState(request->collection_name(), response);
+    Status2Response(s, response->mutable_status());
+    return ::grpc::Status::OK;
+}
+
 }  // namespace milvus::local
