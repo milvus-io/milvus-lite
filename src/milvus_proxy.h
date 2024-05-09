@@ -45,6 +45,9 @@ class MilvusProxy : NonCopyableNonMovable {
     Status
     HasCollection(const std::string& collection_name);
 
+    Status
+    GetLoadState(const std::string& collection_name, ::milvus::proto::milvus::GetLoadStateResponse* response);
+
     bool
     DropCollection(const std::string& collection_name);
 

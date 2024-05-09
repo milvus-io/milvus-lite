@@ -50,6 +50,9 @@ class MilvusLocal final : NonCopyableNonMovable {
                      const std::string& schema_proto);
 
     Status
+    GetLoadState(const std::string& collection_name);
+
+    Status
     GetCollection(const std::string& collection_name,
                   std::string* schema_proto);
 

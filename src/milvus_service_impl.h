@@ -146,6 +146,8 @@ class MilvusServiceImpl final
         ::milvus::proto::milvus::GetCollectionStatisticsResponse* response)
         override;
 
+    ::grpc::Status GetLoadState(::grpc::ServerContext* context, const ::milvus::proto::milvus::GetLoadStateRequest* request, ::milvus::proto::milvus::GetLoadStateResponse* response) override;
+
  private:
     ::milvus::local::MilvusProxy proxy_;
 };
