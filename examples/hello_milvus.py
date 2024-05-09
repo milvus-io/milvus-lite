@@ -55,8 +55,8 @@ print(f"Does collection hello_milvus exist in Milvus: {has}")
 # |3|"embeddings"| FloatVector|     dim=8        |  "float vector with dim 8"   |
 # +-+------------+------------+------------------+------------------------------+
 fields = [
-    FieldSchema(name="pk", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=100),
     FieldSchema(name="random", dtype=DataType.DOUBLE),
+    FieldSchema(name="pk", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=100),
     FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=dim)
 ]
 
@@ -80,8 +80,8 @@ print(fmt.format("Start inserting entities"))
 rng = np.random.default_rng(seed=19530)
 entities = [
     # provide the pk field because `auto_id` is set to False
-    [str(i) for i in range(num_entities)],
     rng.random(num_entities).tolist(),  # field random, only supports list
+    [str(i) for i in range(num_entities)],
     rng.random((num_entities, dim)),    # field embeddings, supports numpy.ndarray and list
 ]
 

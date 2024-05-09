@@ -242,10 +242,10 @@ CreateCollectionTask::ValidateSchema(
                     "there are more than one primary key, field_name = {}, {}",
                     pk_name,
                     field_schema.name());
+            } else {
+                pk_name = field_schema.name();
             }
-        } else {
-            pk_name = field_schema.name();
-        }
+        } 
         if (field_schema.is_dynamic()) {
             return Status::ParameterInvalid(
                 "cannot explicitly set a field as a dynamic field");
