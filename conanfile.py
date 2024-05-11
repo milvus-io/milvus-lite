@@ -10,7 +10,6 @@ class MilvusLiteConan(ConanFile):
         # glog
         "xz_utils/5.4.5",
         "zlib/1.2.13",
-        "libunwind/1.7.2",
         "glog/0.6.0",
         # protobuf
         "protobuf/3.21.4",
@@ -68,5 +67,18 @@ class MilvusLiteConan(ConanFile):
         "aws-sdk-cpp:transfer": False,
     }
 
+    def configure(self):
+        if self.settings.os == "Macos":
+            self.options["arrow"].with_jemalloc = False
+
+    def requirements(self):
+        if self.settings.os != "Macos":
+            self.requires("libunwind/1.7.2")
+
     def imports(self):
         self.copy("*.so*", "./lib", "lib")
+        self.copy("*.dylib", "./lib", "lib")
+
+    def build(self):
+        target = "11.0"
+        self.run("export MACOSX_DEPLOYMENT_TARGET={}".format(target))
