@@ -25,6 +25,9 @@ import shutil
 
 
 MILVUS_BIN = 'milvus'
+KNOWHERE_BIN = 'libknowhere.dylib'
+MILVUS_PATCH = str(pathlib.Path(__file__).parent.parent / 'thirdparty' / 'milvus.patch')
+MILVUS_ROOT = str(pathlib.Path(__file__).parent.parent / 'thirdparty' / 'milvus')
 
 
 class CMakeBuild(_bdist_wheel):
@@ -52,8 +55,10 @@ class CMakeBuild(_bdist_wheel):
                    'libtbb', 'libomp',
                    'libdouble-conversion']
         milvus_bin = pathlib.Path(src_dir) / MILVUS_BIN
+        knowhere = pathlib.Path(src_dir) / KNOWHERE_BIN
         out_str = subprocess.check_output(['otool', '-L', str(milvus_bin)])
         subprocess.check_output(['install_name_tool', '-add_rpath', '@executable_path/.', str(milvus_bin)])
+        subprocess.check_output(['install_name_tool', '-add_rpath', '@executable_path/.', str(knowhere)])
         lines = out_str.decode('utf-8').split('\n')
         for line in lines[1:]:
             r = line.split(' ')
@@ -93,6 +98,9 @@ class CMakeBuild(_bdist_wheel):
         env = os.environ
         env['LD_LIBRARY_PATH'] = os.path.join(build_temp, 'lib')
         subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
+        # apply patch
+        subprocess.check_call(['git', 'apply', MILVUS_PATCH], cwd=MILVUS_ROOT)
+        # build
         subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF'], cwd=build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.', '--', '-j48'],
                               cwd=build_temp,
