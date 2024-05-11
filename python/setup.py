@@ -26,8 +26,8 @@ import shutil
 
 MILVUS_BIN = 'milvus'
 KNOWHERE_BIN = 'libknowhere.dylib'
-MILVUS_PATCH = str(pathlib.Path(__file__).parent.parent / 'thirdparty' / 'milvus.patch')
-MILVUS_ROOT = str(pathlib.Path(__file__).parent.parent / 'thirdparty' / 'milvus')
+MILVUS_PATCH = str(pathlib.Path(__file__).absolute().parent.parent / 'thirdparty' / 'milvus.patch')
+MILVUS_ROOT = str(pathlib.Path(__file__).absolute().parent.parent / 'thirdparty' / 'milvus')
 
 
 class CMakeBuild(_bdist_wheel):
@@ -99,6 +99,7 @@ class CMakeBuild(_bdist_wheel):
         env['LD_LIBRARY_PATH'] = os.path.join(build_temp, 'lib')
         subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
         # apply patch
+        subprocess.check_call(['git', 'restore', '.'], cwd=MILVUS_ROOT)
         subprocess.check_call(['git', 'apply', MILVUS_PATCH], cwd=MILVUS_ROOT)
         # build
         subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF'], cwd=build_temp, env=env)
@@ -106,9 +107,13 @@ class CMakeBuild(_bdist_wheel):
                               cwd=build_temp,
                               env=env,
                               )
+        # rm patch
+        subprocess.check_call(['git', 'restore', '.'], cwd=MILVUS_ROOT)
+
         dst_lib_path = os.path.join(build_lib, 'milvus_lite/lib')
         shutil.rmtree(dst_lib_path, ignore_errors=True)
         os.makedirs(dst_lib_path)
+
         shutil.copy(os.path.join(build_temp, 'lib', MILVUS_BIN), os.path.join(dst_lib_path, MILVUS_BIN))
         if sys.platform.lower() == 'linux':
             self._pack_linux(os.path.join(build_temp, 'lib'), dst_lib_path)
