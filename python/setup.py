@@ -32,7 +32,10 @@ class CMakeBuild(_bdist_wheel):
         if sys.platform.lower() == 'linux':
             self.plat_name = f"manylinux2014_{platform.machine().lower()}"
         elif sys.platform.lower() == 'darwin':
-            self.plat_name = f"macosx_{platform.machine().lower()}"
+            if platform.machine().lower() == 'arm':
+                self.plat_name = f"macosx_11_0_{platform.machine().lower()}"
+            else:
+                self.plat_name = f"macosx_10_9_{platform.machine().lower()}"
         return super().finalize_options()
 
     def copy_lib(self, lib_path, dst_dir, pick_libs):
@@ -46,17 +49,21 @@ class CMakeBuild(_bdist_wheel):
     def _pack_macos(self, src_dir: str, dst_dir: str):
         mac_pkg = ['libknowhere', 'libmilvus',
                    'libgflags_nothreads', 'libglog',
-                   'libtbb', 'libgomp',
+                   'libtbb', 'libomp',
                    'libdouble-conversion']
         milvus_bin = pathlib.Path(src_dir) / MILVUS_BIN
         out_str = subprocess.check_output(['otool', '-L', str(milvus_bin)])
+        subprocess.check_output(['install_name_tool', '-add_rpath', '@executable_path/.', str(milvus_bin)])
         lines = out_str.decode('utf-8').split('\n')
-        all_files = []
         for line in lines[1:]:
             r = line.split(' ')
             if not r[0].endswith('dylib'):
                 continue
-            self.copy_lib(r[1].strip().split(' ')[0].strip(), dst_dir, mac_pkg)
+            if r[0].strip().startswith("@rpath"):
+                real_path = pathlib.Path(src_dir) / r[0].strip()[len("@rpath/"):]
+            else:
+                real_path = r[0].strip()
+            self.copy_lib(real_path, dst_dir, mac_pkg)
 
     def _pack_linux(self, src_dir: str, dst_dir: str):
         linux_pkg = ['libknowhere', 'libmilvus',
@@ -68,7 +75,6 @@ class CMakeBuild(_bdist_wheel):
         milvus_bin = pathlib.Path(src_dir) / MILVUS_BIN
         out_str = subprocess.check_output(['ldd', str(milvus_bin)])
         lines = out_str.decode('utf-8').split('\n')
-        all_files = []
         for line in lines:
             r = line.split("=>")
             if len(r) != 2:
