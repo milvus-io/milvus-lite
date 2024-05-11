@@ -22,6 +22,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(COMPILER_SUPPORTS_CXX17 True)
 if(APPLE)
     SET(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 endif()
@@ -31,6 +32,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
     set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 endif()
+
 
 if(APPLE)
     if(DEFINED ENV{HOMEBREW_PREFIX})
@@ -218,7 +220,7 @@ add_custom_target(ls_cargo_target DEPENDS ls_cargo)
 
 add_custom_command(OUTPUT compile_tantivy
         COMMENT "Compiling tantivy binding"
-        COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} ${CARGO_CMD}
+        COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} MACOSX_DEPLOYMENT_TARGET=11.0 ${CARGO_CMD}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding
         DEPENDS ls_cargo_target
     )
