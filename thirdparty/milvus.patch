@@ -1,0 +1,52 @@
+diff --git a/internal/core/src/common/CMakeLists.txt b/internal/core/src/common/CMakeLists.txt
+index 4330b43f8..255a4c63c 100644
+--- a/internal/core/src/common/CMakeLists.txt
++++ b/internal/core/src/common/CMakeLists.txt
+@@ -26,7 +26,7 @@ set(COMMON_SRC
+         RegexQuery.cpp
+         )
+ 
+-add_library(milvus_common SHARED ${COMMON_SRC})
++add_library(milvus_common ${COMMON_SRC})
+ 
+ target_link_libraries(milvus_common
+         milvus_bitset
+diff --git a/internal/core/src/index/CMakeLists.txt b/internal/core/src/index/CMakeLists.txt
+index c49e9477f..2280a84bc 100644
+--- a/internal/core/src/index/CMakeLists.txt
++++ b/internal/core/src/index/CMakeLists.txt
+@@ -22,7 +22,7 @@ set(INDEX_FILES
+         )
+ 
+ milvus_add_pkg_config("milvus_index")
+-add_library(milvus_index SHARED ${INDEX_FILES})
++add_library(milvus_index ${INDEX_FILES})
+ 
+ target_link_libraries(milvus_index milvus_storage milvus-storage tantivy_binding)
+ 
+diff --git a/internal/core/src/segcore/CMakeLists.txt b/internal/core/src/segcore/CMakeLists.txt
+index eb92f5657..ea5ca2b51 100644
+--- a/internal/core/src/segcore/CMakeLists.txt
++++ b/internal/core/src/segcore/CMakeLists.txt
+@@ -37,7 +37,7 @@ set(SEGCORE_FILES
+         TimestampIndex.cpp
+         Utils.cpp
+         ConcurrentVector.cpp)
+-add_library(milvus_segcore SHARED ${SEGCORE_FILES})
++add_library(milvus_segcore ${SEGCORE_FILES})
+ 
+ target_link_libraries(milvus_segcore milvus_query milvus_bitset milvus_exec ${OpenMP_CXX_FLAGS} milvus-storage)
+ 
+diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
+index ac600d945..0fd9953f0 100644
+--- a/internal/core/src/storage/CMakeLists.txt
++++ b/internal/core/src/storage/CMakeLists.txt
+@@ -62,7 +62,7 @@ if(USE_OPENDAL)
+     list(APPEND STORAGE_FILES OpenDALChunkManager.cpp)
+ endif()
+ 
+-add_library(milvus_storage SHARED ${STORAGE_FILES})
++add_library(milvus_storage ${STORAGE_FILES})
+ 
+ if (DEFINED AZURE_BUILD_DIR)
+     target_link_libraries(milvus_storage PUBLIC
