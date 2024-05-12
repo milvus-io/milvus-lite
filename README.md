@@ -13,8 +13,9 @@ Here's also a list of verified OS types where Milvus Lite can successfully build
 - MacOS >= 11.0 (Apple Silicon)
 
 # Installation
+Note that milvus-lite is included in pymilvus since version 2.4.2.
 ```shell
-pip install pymilvus
+pip install pymilvus>=2.4.2
 ```
 
 # Usage
