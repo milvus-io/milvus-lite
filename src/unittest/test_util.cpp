@@ -192,6 +192,47 @@ GetInsertRequestProto(const std::string& collection_name, int64_t row_num) {
     return r;
 }
 
+::milvus::proto::milvus::UpsertRequest
+GetUpsertRequestProto(const std::string& collection_name, int64_t row_num) {
+    ::milvus::proto::milvus::UpsertRequest r;
+    r.set_collection_name(collection_name);
+    r.set_num_rows(row_num);
+
+    // set pk
+    ::milvus::proto::schema::FieldData* pk = r.add_fields_data();
+    pk->set_field_id(PK_ID);
+    pk->set_field_name(PK_NAME);
+    pk->set_type(::milvus::proto::schema::Int64);
+    for (int64_t i = 0; i < row_num; ++i) {
+        pk->mutable_scalars()->mutable_long_data()->add_data(i);
+    }
+
+    // set vec
+    ::milvus::proto::schema::FieldData* vec = r.add_fields_data();
+    vec->set_field_id(VEC_ID);
+    vec->set_field_name(VEC_NAME);
+    vec->set_type(::milvus::proto::schema::FloatVector);
+    auto v = vec->mutable_vectors();
+    v->set_dim(VEC_DIM);
+    auto vd = v->mutable_float_vector();
+    for (int64_t i = 0; i < row_num; ++i) {
+        vd->add_data(0.1 * i);
+        vd->add_data(0.5 * i);
+        vd->add_data(0.4 * i);
+    }
+
+    // set scalar
+    ::milvus::proto::schema::FieldData* sc = r.add_fields_data();
+    sc->set_field_id(SCALAR_ID);
+    sc->set_field_name(SCALAR_NAME);
+    sc->set_type(::milvus::proto::schema::Int32);
+    for (int64_t i = 0; i < row_num; ++i) {
+        sc->mutable_scalars()->mutable_int_data()->add_data(i);
+    }
+
+    return r;
+}
+
 ::milvus::proto::milvus::SearchRequest
 GetSearchRequestProto(const std::string& collection_name,
                       const std::string& expr,

@@ -152,7 +152,7 @@ MilvusLocal::ReleaseCollection(const std::string& collection_name) {
 }
 
 Status
-MilvusLocal::GetLoadState(const std::string &collection_name) {
+MilvusLocal::GetLoadState(const std::string& collection_name) {
     std::lock_guard<std::mutex> lock(mutex_);
     CHECK_COLLECTION_EXIST(collection_name);
     if (!index_.HasLoaded(collection_name)) {
@@ -286,6 +286,15 @@ MilvusLocal::Insert(const std::string& collection_name,
 }
 
 Status
+MilvusLocal::Upsert(const std::string& collection_name,
+                    const Rows& rows,
+                    std::vector<std::string>* ids) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    CHECK_COLLECTION_EXIST(collection_name);
+    return Status::Ok();
+}
+
+Status
 MilvusLocal::Retrieve(const std::string& collection_name,
                       const std::string& plan,
                       RetrieveResult* result) {
@@ -311,7 +320,7 @@ MilvusLocal::DeleteByIds(const std::string& collection_name,
                          const std::vector<std::string>& storage_ids) {
     std::lock_guard<std::mutex> lock(mutex_);
     CHECK_COLLECTION_EXIST(collection_name);
-    if (!storage_.Delete(collection_name, storage_ids)) {
+    if (storage_.Delete(collection_name, storage_ids) == -1) {
         return Status::ServiceInternal();
     }
     CHECK_STATUS(index_.DeleteByIds(collection_name, ids, size), "");

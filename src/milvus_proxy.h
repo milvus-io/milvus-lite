@@ -46,7 +46,8 @@ class MilvusProxy : NonCopyableNonMovable {
     HasCollection(const std::string& collection_name);
 
     Status
-    GetLoadState(const std::string& collection_name, ::milvus::proto::milvus::GetLoadStateResponse* response);
+    GetLoadState(const std::string& collection_name,
+                 ::milvus::proto::milvus::GetLoadStateResponse* response);
 
     bool
     DropCollection(const std::string& collection_name);
@@ -70,6 +71,10 @@ class MilvusProxy : NonCopyableNonMovable {
 
     Status
     Insert(const ::milvus::proto::milvus::InsertRequest* request,
+           ::milvus::proto::schema::IDs* ids);
+
+    Status
+    Upsert(const ::milvus::proto::milvus::UpsertRequest* request,
            ::milvus::proto::schema::IDs* ids);
 
     Status

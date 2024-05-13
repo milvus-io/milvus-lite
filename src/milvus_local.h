@@ -87,6 +87,12 @@ class MilvusLocal final : NonCopyableNonMovable {
     Insert(const std::string& collection_name,
            const Rows& rows,
            std::vector<std::string>* ids);
+
+    Status
+    Upsert(const std::string& collection_name,
+           const Rows& rows,
+           std::vector<std::string>* ids);
+
     Status
     Retrieve(const std::string& collection_name,
              const std::string& expr,

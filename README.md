@@ -15,7 +15,7 @@ Here's also a list of verified OS types where Milvus Lite can successfully build
 # Installation
 Note that milvus-lite is included in pymilvus since version 2.4.2.
 ```shell
-pip install pymilvus>=2.4.2
+pip install "pymilvus>=2.4.2"
 ```
 
 # Usage

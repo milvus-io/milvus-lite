@@ -46,8 +46,8 @@ print(fmt.format("Start query by specifying primary keys"))
 query_results = milvus_client.query(collection_name, ids=[2])
 print(query_results[0])
 
-# upsert_ret = milvus_client.upsert(collection_name, {"id": 2 , "vector": rng.random((1, dim))[0], "g": 100})
-# print(upsert_ret)
+upsert_ret = milvus_client.upsert(collection_name, {"id": 2 , "vector": rng.random((1, dim))[0], "g": 100})
+print(upsert_ret)
 
 print(fmt.format("Start query by specifying primary keys"))
 query_results = milvus_client.query(collection_name, ids=[2])

@@ -56,6 +56,9 @@ GetCreateIndexRequestProto(const std::string& collection_name,
 ::milvus::proto::milvus::InsertRequest
 GetInsertRequestProto(const std::string& collection_name, int64_t row_num);
 
+::milvus::proto::milvus::UpsertRequest
+GetUpsertRequestProto(const std::string& collection_name, int64_t row_num);
+
 ::milvus::proto::milvus::SearchRequest
 GetSearchRequestProto(const std::string& collection_name,
                       const std::string& expr,
