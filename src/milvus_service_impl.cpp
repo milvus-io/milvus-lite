@@ -89,6 +89,28 @@ MilvusServiceImpl::Insert(::grpc::ServerContext* context,
 }
 
 ::grpc::Status
+MilvusServiceImpl::Upsert(::grpc::ServerContext* context,
+                          const ::milvus::proto::milvus::UpsertRequest* request,
+                          ::milvus::proto::milvus::MutationResult* response) {
+    Status s = proxy_.Upsert(request, response->mutable_ids());
+    Status2Response(s, response->mutable_status());
+    auto num_rows = request->num_rows();
+    auto succ_size = std::max(response->ids().int_id().data_size(),
+                              response->ids().str_id().data_size());
+    response->set_insert_cnt(succ_size);
+    response->set_upsert_cnt(succ_size);
+    response->set_delete_cnt(num_rows);
+    for (int64_t i = 0; i < succ_size; ++i) {
+        response->mutable_succ_index()->Add(i);
+    }
+
+    for (int64_t i = succ_size; i < num_rows; ++i) {
+        response->mutable_err_index()->Add(i);
+    }
+    return ::grpc::Status::OK;
+}
+
+::grpc::Status
 MilvusServiceImpl::Search(::grpc::ServerContext* context,
                           const ::milvus::proto::milvus::SearchRequest* request,
                           ::milvus::proto::milvus::SearchResults* response) {
@@ -264,9 +286,10 @@ MilvusServiceImpl::GetCollectionStatistics(
 }
 
 ::grpc::Status
-MilvusServiceImpl::GetLoadState(::grpc::ServerContext *context,
-             const ::milvus::proto::milvus::GetLoadStateRequest *request,
-             ::milvus::proto::milvus::GetLoadStateResponse *response) {
+MilvusServiceImpl::GetLoadState(
+    ::grpc::ServerContext* context,
+    const ::milvus::proto::milvus::GetLoadStateRequest* request,
+    ::milvus::proto::milvus::GetLoadStateResponse* response) {
     auto s = proxy_.GetLoadState(request->collection_name(), response);
     Status2Response(s, response->mutable_status());
     return ::grpc::Status::OK;

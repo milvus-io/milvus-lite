@@ -12,6 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+#include "log/Log.h"
 #include "milvus_service_impl.h"
 #include "pb/milvus.pb.h"
 #include "test_util.h"
@@ -112,6 +113,47 @@ TEST(MilvusServiceImplTest, Insert) {
         service.Insert(&server_context, &insert_requst, &insert_response);
         EXPECT_EQ(insert_response.insert_cnt(), 3);
         EXPECT_EQ(insert_response.status().code(), 0);
+    }
+}
+
+TEST(MilvusServiceImplTest, Upsert) {
+    const char* collection_name = "test_collection";
+    ::milvus::local::MilvusServiceImpl service(tmp_db_name);
+    EXPECT_TRUE(service.Init());
+    ::grpc::ServerContext server_context;
+    ::milvus::proto::common::Status response;
+    auto drop_r = GetDropCollectionRequest(collection_name);
+    service.DropCollection(&server_context, &drop_r, &response);
+    auto r = GetCreateCollectionRequestProto(collection_name);
+    service.CreateCollection(&server_context, &r, &response);
+    EXPECT_EQ(response.code(), 0);
+
+    {
+        auto upsert_requst = GetUpsertRequestProto(collection_name, 3);
+        ::milvus::proto::milvus::MutationResult upsert_response;
+        service.Upsert(&server_context, &upsert_requst, &upsert_response);
+        EXPECT_EQ(upsert_response.upsert_cnt(), 3);
+        EXPECT_EQ(upsert_response.status().code(), 0);
+    }
+
+    {
+        auto upsert_requst = GetUpsertRequestProto(collection_name, 5);
+        ::milvus::proto::milvus::MutationResult upsert_response;
+        service.Upsert(&server_context, &upsert_requst, &upsert_response);
+        EXPECT_EQ(upsert_response.upsert_cnt(), 5);
+        EXPECT_EQ(upsert_response.status().code(), 0);
+    }
+
+    {
+        auto query_req = GetQueryRequestProto(collection_name,
+                                              "id in [1, 2, 3, 4, 5, 6, 7]",
+                                              "10",
+                                              "0",
+                                              std::vector<std::string>{"id"});
+        ::milvus::proto::milvus::QueryResults query_result;
+        service.Query(&server_context, &query_req, &query_result);
+        EXPECT_EQ(
+            query_result.fields_data()[0].scalars().long_data().data_size(), 4);
     }
 }
 

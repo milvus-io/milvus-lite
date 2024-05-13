@@ -56,6 +56,11 @@ class MilvusServiceImpl final
            ::milvus::proto::milvus::MutationResult* response) override;
 
     ::grpc::Status
+    Upsert(::grpc::ServerContext* context,
+           const ::milvus::proto::milvus::UpsertRequest* request,
+           ::milvus::proto::milvus::MutationResult* response) override;
+
+    ::grpc::Status
     Search(::grpc::ServerContext* context,
            const ::milvus::proto::milvus::SearchRequest* request,
            ::milvus::proto::milvus::SearchResults* response) override;
@@ -146,7 +151,11 @@ class MilvusServiceImpl final
         ::milvus::proto::milvus::GetCollectionStatisticsResponse* response)
         override;
 
-    ::grpc::Status GetLoadState(::grpc::ServerContext* context, const ::milvus::proto::milvus::GetLoadStateRequest* request, ::milvus::proto::milvus::GetLoadStateResponse* response) override;
+    ::grpc::Status
+    GetLoadState(
+        ::grpc::ServerContext* context,
+        const ::milvus::proto::milvus::GetLoadStateRequest* request,
+        ::milvus::proto::milvus::GetLoadStateResponse* response) override;
 
  private:
     ::milvus::local::MilvusProxy proxy_;

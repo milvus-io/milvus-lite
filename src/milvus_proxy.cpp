@@ -36,6 +36,7 @@
 #include "status.h"
 #include "string_util.hpp"
 #include "type.h"
+#include "upsert_task.h"
 
 namespace milvus::local {
 
@@ -61,17 +62,20 @@ MilvusProxy::GetLoadState(
     ::milvus::proto::milvus::GetLoadStateResponse* response) {
     auto s = milvus_local_.GetLoadState(collection_name);
     if (s.Code() == ErrCollectionNotFound) {
-        response->set_state(::milvus::proto::common::LoadState::LoadStateNotExist);
+        response->set_state(
+            ::milvus::proto::common::LoadState::LoadStateNotExist);
         return Status::Ok();
     }
 
     if (s.Code() == ErrCollectionNotLoaded) {
-        response->set_state(::milvus::proto::common::LoadState::LoadStateNotLoad);
-        return Status::Ok();        
+        response->set_state(
+            ::milvus::proto::common::LoadState::LoadStateNotLoad);
+        return Status::Ok();
     }
 
     if (s.Code() == ErrCollectionLoaded) {
-        response->set_state(::milvus::proto::common::LoadState::LoadStateLoaded);
+        response->set_state(
+            ::milvus::proto::common::LoadState::LoadStateLoaded);
         return Status::Ok();
     }
     return s;
@@ -156,6 +160,39 @@ MilvusProxy::Insert(const ::milvus::proto::milvus::InsertRequest* r,
         }
     }
     return Status::Ok();
+}
+
+Status
+MilvusProxy::Upsert(const ::milvus::proto::milvus::UpsertRequest* r,
+                    ::milvus::proto::schema::IDs* ids) {
+    ::milvus::proto::schema::CollectionSchema schema;
+    if (!GetSchemaInfo(r->collection_name(), &schema).IsOk()) {
+        auto err = string_util::SFormat("Collection {} not found",
+                                        r->collection_name());
+        return Status::CollectionNotFound();
+    }
+    CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
+    auto task = UpsertTask(r, &schema);
+    ::milvus::proto::milvus::InsertRequest insert_q;
+    ::milvus::proto::schema::IDs delete_ids;
+    CHECK_STATUS(task.Process(&insert_q, &delete_ids), "");
+    std::vector<std::string> storage_ids;
+    if (delete_ids.has_int_id()) {
+        for (const auto& id : delete_ids.int_id().data()) {
+            storage_ids.push_back(std::to_string(id));
+        }
+
+    } else {
+        for (const auto& id : delete_ids.str_id().data()) {
+            storage_ids.push_back(id);
+        }
+    }
+    CHECK_STATUS(milvus_local_.DeleteByIds(r->collection_name(),
+                                           delete_ids.SerializeAsString(),
+                                           storage_ids.size(),
+                                           storage_ids),
+                 "");
+    return Insert(&insert_q, ids);
 }
 
 Status
