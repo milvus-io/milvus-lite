@@ -10,7 +10,7 @@ Milvus Lite is available in:
 
 Here's also a list of verified OS types where Milvus Lite can successfully build and run:
 - Ubuntu >= 20.04 (x86_64)
-- MacOS >= 11.0 (Apple Silicon)
+- MacOS >= 11.0 (Apple Silicon and x86_64)
 
 # Installation
 Note that milvus-lite is included in pymilvus since version 2.4.2.
