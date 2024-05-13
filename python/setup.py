@@ -35,7 +35,7 @@ class CMakeBuild(_bdist_wheel):
         if sys.platform.lower() == 'linux':
             self.plat_name = f"manylinux2014_{platform.machine().lower()}"
         elif sys.platform.lower() == 'darwin':
-            if platform.machine().lower() == 'arm':
+            if platform.machine().lower() == 'arm64':
                 self.plat_name = f"macosx_11_0_{platform.machine().lower()}"
             else:
                 self.plat_name = f"macosx_10_9_{platform.machine().lower()}"
@@ -114,13 +114,13 @@ class CMakeBuild(_bdist_wheel):
         shutil.rmtree(dst_lib_path, ignore_errors=True)
         os.makedirs(dst_lib_path)
 
-        shutil.copy(os.path.join(build_temp, 'lib', MILVUS_BIN), os.path.join(dst_lib_path, MILVUS_BIN))
         if sys.platform.lower() == 'linux':
             self._pack_linux(os.path.join(build_temp, 'lib'), dst_lib_path)
         elif sys.platform.lower() == 'darwin':
             self._pack_macos(os.path.join(build_temp, 'lib'), dst_lib_path)
         else:
             raise RuntimeError('Unsupport platform: %s', sys.platform)
+        shutil.copy(os.path.join(build_temp, 'lib', MILVUS_BIN), os.path.join(dst_lib_path, MILVUS_BIN))
         
         super().run()
 
