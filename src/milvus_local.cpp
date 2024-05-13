@@ -286,15 +286,6 @@ MilvusLocal::Insert(const std::string& collection_name,
 }
 
 Status
-MilvusLocal::Upsert(const std::string& collection_name,
-                    const Rows& rows,
-                    std::vector<std::string>* ids) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    CHECK_COLLECTION_EXIST(collection_name);
-    return Status::Ok();
-}
-
-Status
 MilvusLocal::Retrieve(const std::string& collection_name,
                       const std::string& plan,
                       RetrieveResult* result) {

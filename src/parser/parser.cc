@@ -39,7 +39,6 @@ ParseIdentifier(milvus::local::SchemaHelper helper,
     auto expr =
         google::protobuf::Arena::CreateMessage<milvus::proto::plan::Expr>(NULL);
 
-    assert(expr->column_expr().has_info());
     expr->ParseFromString(ParserToMessage(*(helper.schema), identifier));
 
     auto ret = std::make_shared<milvus::proto::plan::Expr>();
