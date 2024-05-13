@@ -56,7 +56,7 @@ class PlanCCVisitor : public PlanVisitor {
     // ok
     virtual std::any
     visitParens(PlanParser::ParensContext* ctx) override {
-        return visitChildren(ctx);
+        return ctx->expr()->accept(this);
     }
     // ok
     virtual std::any
