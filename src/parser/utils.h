@@ -326,11 +326,11 @@ CreateSchemaHelper(proto::schema::CollectionSchema* schema) {
         schema_helper.name_offset[field.name()] = i;
         schema_helper.id_offset[field.fieldid()] = i;
         if (field.is_primary_key()) {
-            assert(schema_helper.primary_key_offset != -1);
+            assert(schema_helper.primary_key_offset == -1);
             schema_helper.primary_key_offset = i;
         }
         if (field.is_partition_key()) {
-            assert(schema_helper.primary_key_offset != -1);
+            assert(schema_helper.primary_key_offset == -1);
             schema_helper.partition_key_offset = i;
         }
     }
