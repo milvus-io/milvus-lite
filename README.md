@@ -1,19 +1,26 @@
 # Introduction
-Milvus is an open-source vector database built to power embedding similarity search and AI applications. Milvus makes unstructured data search more accessible, and provides a consistent user experience regardless of the deployment environment.
-Milvus Lite is a lightweight version of Milvus that can be embedded into your Python application, integrating the core vector search functionality of Milvus.
-Please note that it is not suggested to use Milvus Lite in a production environment. Consider using Milvus clustered or the fully managed Milvus on Cloud.
+Milvus Lite is the lightweight version of [Milvus](https://github.com/milvus-io/milvus), an open-source vector database that powers AI applications with vector embeddings and similarity search.
+
+Milvus Lite can be imported into your Python application, providing the core vector search functionality of Milvus. Milvus Lite is included in the [Python SDK of Milvus](https://github.com/milvus-io/pymilvus), thus it can be simply deployed with `pip install pymilvus`. This repo contains the core components of Milvus Lite.
+
+Milvus Lite shares the same API and covers most of the features of Milvus. Together, they provide a consistent user experience across different types of environments, fitting use cases of different size. With the same client-side code, you can run a quick demo of less than a million vectors with Milvus Lite, or a small scale app with Milvus Docker container hosted on a single machine, and eventually to a large scale production deployment on Kubenetes serving billions of vectors at thousands of QPS. 
+
+With Milvus Lite, you can start building an AI application with vector similarity search within minutes, all with `pip install`.
+
+Milvus Lite is good for running in the following environment:
+- Jupyter Notebook / Google Colab
+- Laptops
+- Edge Devices
 
 # Requirements
-Milvus Lite is available in:
-- Google Colab
-- Jupyter Notebook
-
-Here's also a list of verified OS types where Milvus Lite can successfully build and run:
+Milvus Lite supports the following OS distributions and sillicon types:
 - Ubuntu >= 20.04 (x86_64)
 - MacOS >= 11.0 (Apple Silicon and x86_64)
 
+Please note that Milvus Lite is good for getting started with vector search or building demos and prototypes. For a production use case, we recommend using Milvus on [Docker](https://milvus.io/docs/install_standalone-docker.md) or [Kubenetes](https://milvus.io/docs/install_cluster-milvusoperator.md), or considering the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
+
 # Installation
-Note that milvus-lite is included in pymilvus since version 2.4.2.
+Note that milvus-lite is included in `pymilvus` since version 2.4.2, so you can install with `pymilvus`
 ```shell
 pip install "pymilvus>=2.4.2"
 ```
