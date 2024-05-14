@@ -91,7 +91,10 @@ class Server:
             fcntl.lockf(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._p = subprocess.Popen(
                 args=self.args,
-                env={"LD_LIBRARY_PATH": str(self._bin_path)},
+                env={
+                    "LD_LIBRARY_PATH": str(self._bin_path),
+                    "DYLD_LIBRARY_PATH": str(self._bin_path)
+                },
                 cwd=str(self._work_dir),
             )
             return True
