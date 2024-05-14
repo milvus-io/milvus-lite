@@ -5,9 +5,7 @@ Milvus Lite can be imported into your Python application, providing the core vec
 
 Milvus Lite shares the same API and covers most of the features of Milvus. Together, they provide a consistent user experience across different types of environments, fitting use cases of different size. With the same client-side code, you can run a quick demo of less than a million vectors with Milvus Lite, or a small scale app with Milvus Docker container hosted on a single machine, and eventually to a large scale production deployment on Kubenetes serving billions of vectors at thousands of QPS. 
 
-With Milvus Lite, you can start building an AI application with vector similarity search within minutes, all with `pip install`.
-
-Milvus Lite is good for running in the following environment:
+With Milvus Lite, you can start building an AI application with vector similarity search within minutes! Milvus Lite is good for running in the following environment:
 - Jupyter Notebook / Google Colab
 - Laptops
 - Edge Devices
