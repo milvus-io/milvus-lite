@@ -307,6 +307,28 @@ MergeIndexs(std::vector<std::string>& indexs) {
     return index_meta.SerializeAsString();
 }
 
+std::string
+GetIndexMetricType(const milvus::proto::segcore::FieldIndexMeta& field_index) {
+    for (int i = 0; i < field_index.type_params_size(); i++) {
+        if (field_index.type_params(i).key() == kMetricTypeKey) {
+            return field_index.type_params(i).value();
+        }
+    }
+
+    for (int i = 0; i < field_index.index_params_size(); i++) {
+        if (field_index.index_params(i).key() == kMetricTypeKey) {
+            return field_index.index_params(i).value();
+        }
+    }
+
+    for (int i = 0; i < field_index.user_index_params_size(); i++) {
+        if (field_index.user_index_params(i).key() == kMetricTypeKey) {
+            return field_index.user_index_params(i).value();
+        }
+    }
+    return "";
+}
+
 std::optional<int64_t>
 GetPkId(const ::milvus::proto::schema::CollectionSchema& schema) {
     for (const auto& field : schema.fields()) {

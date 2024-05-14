@@ -207,12 +207,18 @@ MilvusProxy::Search(const ::milvus::proto::milvus::SearchRequest* r,
     }
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
 
+    // get index
+    std::vector<std::string> all_index;
+    CHECK_STATUS(milvus_local_.GetAllIndexs(r->collection_name(), &all_index),
+                 "");
+
     std::string placeholder_group;
     ::milvus::proto::plan::PlanNode plan;
     std::vector<int64_t> nqs, topks;
 
     SearchTask task(const_cast<::milvus::proto::milvus::SearchRequest*>(r),
-                    &schema);
+                    &schema,
+                    all_index);
     CHECK_STATUS(task.Process(&plan, &placeholder_group, &nqs, &topks), "");
     SearchResult result(nqs, topks);
     CHECK_STATUS(milvus_local_.Search(r->collection_name(),

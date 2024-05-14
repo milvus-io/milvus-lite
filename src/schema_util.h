@@ -21,6 +21,7 @@
 #include "common.h"
 #include "common.pb.h"
 #include "pb/plan.pb.h"
+#include "pb/segcore.pb.h"
 #include "status.h"
 #include "string_util.hpp"
 #include "pb/schema.pb.h"
@@ -108,6 +109,9 @@ PositivelyRelated(const std::string& metrics_type) {
     auto upper_str = string_util::ToUpper(metrics_type);
     return upper_str == KMetricsIPName || upper_str == kMetricsCosineName;
 }
+
+std::string
+GetIndexMetricType(const milvus::proto::segcore::FieldIndexMeta& field_index);
 
 Status
 ParseExpr(const std::string& expr_str,

@@ -31,9 +31,11 @@
 namespace milvus::local {
 
 SearchTask::SearchTask(::milvus::proto::milvus::SearchRequest* search_reques,
-                       const ::milvus::proto::schema::CollectionSchema* schema)
+                       const ::milvus::proto::schema::CollectionSchema* schema,
+                       std::vector<std::string> all_index)
     : search_request_(search_reques),
       schema_(schema),
+      all_index_(all_index),
       topk_(-1),
       offset_(0),
       ann_field_(""),
@@ -132,7 +134,6 @@ SearchTask::ParseSearchInfo(::milvus::proto::plan::QueryInfo* info) {
         }
     }
     info->set_topk(topk_ + offset_);
-    info->set_metric_type(metric_);
     info->set_search_params(search_param_str);
     info->set_round_decimal(round_decimal);
     info->set_group_by_field_id(groupby_field_id);
@@ -204,6 +205,31 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
     vector_anns->set_field_id(field->fieldid());
     auto vtype = schema_util::DataTypeToVectorType(field->data_type());
     vector_anns->set_vector_type(*vtype);
+
+    // check metrics
+    std::string index_metric;
+    for (const auto& index_str : all_index_) {
+        milvus::proto::segcore::FieldIndexMeta field_index;
+        if (!field_index.ParseFromString(index_str)) {
+            return Status::ServiceInternal("Error index info in db");
+        }
+        if (field_index.fieldid() == field->fieldid()) {
+            index_metric = schema_util::GetIndexMetricType(field_index);
+        }
+    }
+
+    if (metric_.empty())
+        metric_ = index_metric;
+
+    if (metric_.empty() || metric_ != index_metric) {
+        return Status::ParameterInvalid(
+            "fail to search: metric type not match: invalid "
+            "[expected={}][actual={}]",
+            index_metric,
+            metric_);
+    }
+
+    plan->mutable_vector_anns()->mutable_query_info()->set_metric_type(metric_);
 
     if (!search_request_->dsl().empty()) {
         CHECK_STATUS(schema_util::ParseExpr(
