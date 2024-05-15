@@ -1,20 +1,13 @@
-from milvus_lite.server_manager import server_manager_instance
-import time
 import numpy as np
 from pymilvus import (
     MilvusClient,
 )
 
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 fmt = "\n=== {:30} ===\n"
 dim = 8
 collection_name = "hello_milvus"
 
-milvus_client = MilvusClient(uri)
+milvus_client = MilvusClient("./local_test.db")
 
 has_collection = milvus_client.has_collection(collection_name, timeout=5)
 if has_collection:

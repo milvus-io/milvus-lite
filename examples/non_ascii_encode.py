@@ -1,15 +1,9 @@
 import numpy as np
 from pymilvus import MilvusClient, DataType
 
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 dimension = 128
 collection_name = "books"
-client = MilvusClient(uri=uri)
+client = MilvusClient(uri="./local_test.db")
 client.drop_collection(collection_name)
 
 schema = client.create_schema(auto_id=True)

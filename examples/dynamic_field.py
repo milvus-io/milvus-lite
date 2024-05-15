@@ -11,7 +11,7 @@ fmt = "\n=== {:30} ===\n"
 dim = 8
 
 print(fmt.format("start connecting to Milvus"))
-connections.connect("default", host="localhost", port="19530")
+connections.connect("default", uri='./local_test.db')
 
 has = utility.has_collection("hello_milvus")
 print(f"Does collection hello_milvus exist in Milvus: {has}")

@@ -6,12 +6,8 @@ import pandas as pd
 # connections.connect()
 
 from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
 
-connections.connect(uri=uri)
+connections.connect(uri="./local_test.db")
 
 dim = 128
 collection_name = "test_array"

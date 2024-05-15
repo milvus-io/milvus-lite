@@ -17,12 +17,6 @@ from pymilvus import (
 )
 from pymilvus.client.types import LoadState
 
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./110.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 fmt = "\n=== {:30} ===\n"
 search_latency_fmt = "search latency = {:.4f}s"
 num_entities, dim = 3000, 8
@@ -36,7 +30,7 @@ num_entities, dim = 3000, 8
 #
 # Note: the `using` parameter of the following methods is default to "default".
 print(fmt.format("start connecting to Milvus"))
-connections.connect("default", uri=uri)
+connections.connect("default", uri="./local_test.db")
 # connections.connect("default", host="localhost", port="19530")
 
 has = utility.has_collection("hello_milvus")
