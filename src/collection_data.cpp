@@ -114,7 +114,7 @@ CollectionData::Delete(SQLite::Database* db,
                        const std::vector<std::string>& milvus_ids) {
     // DELETE FROM {collection_name_} WHERE {col_milvus_id} in ({})
     std::string delete_sql =
-        string_util::SFormat("DELETE FROM {} WHERE {} IN ({})",
+        string_util::SFormat("DELETE FROM {} WHERE {} IN (\"{}\")",
                              collection_name_,
                              col_milvus_id_,
                              string_util::Join(",", milvus_ids));
