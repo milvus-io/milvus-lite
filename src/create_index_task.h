@@ -51,7 +51,7 @@ class CreateIndexTask final : NonCopyableNonMovable {
     WrapUserIndexParams(const std::string& metrics_type);
 
     bool
-    AddAutoIndexParams(size_t numberParams, KVMap* index_params);
+    AddAutoIndexParams(KVMap* index_params);
 
     Status
     CheckTrain(const ::milvus::proto::schema::FieldSchema& field,

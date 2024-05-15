@@ -249,28 +249,17 @@ CreateIndexTask::WrapUserIndexParams(const std::string& metrics_type) {
 }
 
 bool
-CreateIndexTask::AddAutoIndexParams(size_t number_params, KVMap* index_params) {
+CreateIndexTask::AddAutoIndexParams(KVMap* index_params) {
     is_auto_index_ = true;
-    if (index_params->size() == number_params) {
-        const auto metrics_type =
-            kAutoIndexConfig.index_param.at(kMetricTypeKey);
+    if (index_params->find(kMetricTypeKey) != index_params->end()) {
+        const auto metrics_type = index_params->at(kMetricTypeKey);
         WrapUserIndexParams(metrics_type);
         index_params->insert(kAutoIndexConfig.index_param.begin(),
                              kAutoIndexConfig.index_param.end());
+        (*index_params)[kMetricTypeKey] = metrics_type;
         return true;
-    }
-
-    if (index_params->size() > number_params + 1) {
-        LOG_ERROR("Only metric type can be passed when use AutoIndex");
-        return false;
-    }
-
-    if (index_params->size() == (number_params + 1)) {
+    } else {
         auto it = kAutoIndexConfig.index_param.find(kMetricTypeKey);
-        if (it == kAutoIndexConfig.index_param.end()) {
-            LOG_ERROR("Only metric type can be passed when use AutoIndex");
-            return false;
-        }
         WrapUserIndexParams(it->second);
         index_params->insert(kAutoIndexConfig.index_param.begin(),
                              kAutoIndexConfig.index_param.end());
@@ -349,10 +338,11 @@ CreateIndexTask::ParseIndexParams() {
 
     if (IsVectorIndex(field_ptr->data_type())) {
         auto it = index_params.find(kIndexTypeKey);
-        if (it == index_params.end() && !AddAutoIndexParams(0, &index_params)) {
+        if (it == index_params.end() && !AddAutoIndexParams(&index_params)) {
+            // no index type, use default
             return Status::SegcoreErr();
         } else if (it->second == kAutoIndex &&
-                   !AddAutoIndexParams(1, &index_params)) {
+                   !AddAutoIndexParams(&index_params)) {
             return Status::SegcoreErr();
         }
 
