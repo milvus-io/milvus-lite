@@ -1,4 +1,3 @@
-import time
 import random
 import numpy as np
 from pymilvus import (
@@ -7,13 +6,6 @@ from pymilvus import (
      FieldSchema, CollectionSchema, DataType,
      Collection,
  )
-
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 
 bin_index_types = ["BIN_FLAT"]
 
@@ -31,7 +23,7 @@ def gen_binary_vectors(num, dim):
 
 
 def binary_vector_search():
-    connections.connect(uri=uri)
+    connections.connect(uri='./local_test.db')
     
     int64_field = FieldSchema(name="int64", dtype=DataType.INT64, is_primary=True, auto_id=True)
     dim = 128

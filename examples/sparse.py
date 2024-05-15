@@ -4,12 +4,6 @@ from pymilvus import (
 )
 import random
 
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 def generate_sparse_vector(dimension: int, non_zero_count: int) -> dict:
     indices = random.sample(range(dimension), non_zero_count)
     values = [random.random() for _ in range(non_zero_count)]
@@ -21,7 +15,7 @@ fmt = "\n=== {:30} ===\n"
 dim = 100
 non_zero_count = 20
 collection_name = "hello_sparse"
-milvus_client = MilvusClient(uri)
+milvus_client = MilvusClient("./local_test.db")
 
 has_collection = milvus_client.has_collection(collection_name, timeout=5)
 if has_collection:

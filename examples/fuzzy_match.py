@@ -4,15 +4,9 @@ from pymilvus import (
     Collection,
 )
 
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 DIMENSION = 8
 COLLECTION_NAME = "books2"
-connections.connect(uri=uri)
+connections.connect(uri="./local_test.db")
 
 fields = [
     FieldSchema(name='id', dtype=DataType.INT64, is_primary=True),

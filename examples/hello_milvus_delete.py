@@ -5,16 +5,10 @@ from pymilvus import (
     exceptions
 )
 
-from milvus_lite.server_manager import server_manager_instance
-uri = server_manager_instance.start_and_get_uri("./local_test.db")
-if uri is None:
-    print("Start milvus failed")
-    exit()
-
 fmt = "\n=== {:30} ===\n"
 dim = 8
 collection_name = "hello_milvus"
-milvus_client = MilvusClient(uri)
+milvus_client = MilvusClient("./local_test.db")
 milvus_client.drop_collection(collection_name)
 milvus_client.create_collection(collection_name, dim, consistency_level="Strong", metric_type="L2")
 
