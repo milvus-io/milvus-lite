@@ -109,12 +109,17 @@ TEST(MilvusProxyTest, search) {
         auto search_req = GetSearchRequestProto(
             collection_name,
             "id in [1, 2, 3]",
-            std::vector<std::vector<float>>{{0.1, 0.3, 0.6}, {0.3, 0.3, 0.4}},
+            std::vector<std::vector<float>>{{-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}},
             "2",
-            "COSINE",
+            "IP",
             "1");
         ::milvus::proto::milvus::SearchResults search_result;
         EXPECT_TRUE(proxy.Search(&search_req, &search_result).IsOk());
+        // return ids: 2, 3, 2, 1
+        EXPECT_EQ(search_result.results().ids().int_id().data(0), 2);
+        EXPECT_EQ(search_result.results().ids().int_id().data(1), 3);
+        EXPECT_EQ(search_result.results().ids().int_id().data(2), 2);
+        EXPECT_EQ(search_result.results().ids().int_id().data(3), 1);
     }
 
     {
@@ -123,13 +128,33 @@ TEST(MilvusProxyTest, search) {
         EXPECT_TRUE(proxy.LoadCollection(collection_name).IsOk());
         auto search_req = GetSearchRequestProto(
             collection_name,
-            "id in [1, 2, 3]",
-            std::vector<std::vector<float>>{{0.1, 0.3, 0.6}, {0.3, 0.3, 0.4}},
+            "id in [1, 2, 3, 4]",
+            std::vector<std::vector<float>>{{-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}},
             "2",
-            "COSINE",
-            "1");
+            "IP",
+            "0");
         ::milvus::proto::milvus::SearchResults search_result;
         EXPECT_TRUE(proxy.Search(&search_req, &search_result).IsOk());
+        // return ids: 1,2,4,3
+        EXPECT_EQ(search_result.results().ids().int_id().data(0), 1);
+        EXPECT_EQ(search_result.results().ids().int_id().data(1), 2);
+        EXPECT_EQ(search_result.results().ids().int_id().data(2), 4);
+        EXPECT_EQ(search_result.results().ids().int_id().data(3), 3);
+    }
+    {
+        ::milvus::local::MilvusProxy proxy(tmp_db_name);
+        EXPECT_TRUE(proxy.Init());
+        EXPECT_TRUE(proxy.LoadCollection(collection_name).IsOk());
+        auto search_req = GetSearchRequestProto(
+            collection_name,
+            "id in [1, 2, 3, 4]",
+            std::vector<std::vector<float>>{{-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}},
+            "2",
+            "IP",
+            "20");
+        ::milvus::proto::milvus::SearchResults search_result;
+        EXPECT_TRUE(proxy.Search(&search_req, &search_result).IsOk());
+        EXPECT_FALSE(search_result.results().has_ids());
     }
 }
 

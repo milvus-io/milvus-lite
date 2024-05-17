@@ -248,7 +248,6 @@ SearchTask::PostProcess(
     ::milvus::proto::schema::SearchResultData tmp_ret;
     tmp_ret.ParseFromArray(segcore_reault.result_[0].proto_blob,
                            segcore_reault.result_[0].proto_size);
-
     search_results->mutable_results()->set_num_queries(tmp_ret.num_queries());
     auto ret_size = tmp_ret.scores_size();
     auto nq = tmp_ret.num_queries();
@@ -263,9 +262,12 @@ SearchTask::PostProcess(
         std::vector<std::tuple<int64_t, int64_t>> ranges;
         for (int i = 0; i < nq; i++) {
             search_results->mutable_results()->mutable_topks()->Add(limit);
-            ranges.push_back(std::make_tuple(offset_ * i, limit));
+            ranges.push_back(
+                std::make_tuple((offset_ + limit) * i + offset_, limit));
             // copy topks and scores
-            for (int j = offset_ * i; j < (offset_ * i) + limit; j++) {
+            for (int j = (offset_ + limit) * i + offset_;
+                 j < (offset_ + limit) * (i + 1);
+                 j++) {
                 search_results->mutable_results()->mutable_scores()->Add(
                     tmp_ret.scores(j) * score_coefficient);
 

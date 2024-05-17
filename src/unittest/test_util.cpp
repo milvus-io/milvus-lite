@@ -276,13 +276,13 @@ GetSearchRequestProto(const std::string& collection_name,
     p4->set_key("topk");
     p4->set_value(topk);
 
-    // auto p5 = r.mutable_search_params()->Add();
-    // p5->set_key("metric_type");
-    // p5->set_value(metric_type);
+    auto p5 = r.mutable_search_params()->Add();
+    p5->set_key("metric_type");
+    p5->set_value(metric_type);
 
-    // auto p6 = r.mutable_search_params()->Add();
-    // p6->set_key("offset");
-    // p6->set_value(offset);
+    auto p6 = r.mutable_search_params()->Add();
+    p6->set_key("offset");
+    p6->set_value(offset);
     return r;
 }
 
