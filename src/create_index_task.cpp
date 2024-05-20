@@ -67,7 +67,7 @@ class AutoIndexConfig final : NonCopyableNonMovable {
     AutoIndexConfig()
         : index_param({{"M", "18"},
                        {"efConstruction", "240"},
-                       {"index_type", kHNSW},
+                       {"index_type", kAutoIndex},
                        {"metric_type", kIP}}) {
     }
     ~AutoIndexConfig() = default;
@@ -338,12 +338,10 @@ CreateIndexTask::ParseIndexParams() {
 
     if (IsVectorIndex(field_ptr->data_type())) {
         auto it = index_params.find(kIndexTypeKey);
-        if (it == index_params.end() && !AddAutoIndexParams(&index_params)) {
-            // no index type, use default
-            return Status::SegcoreErr();
-        } else if (it->second == kAutoIndex &&
-                   !AddAutoIndexParams(&index_params)) {
-            return Status::SegcoreErr();
+        if (it == index_params.end() || it->second == kAutoIndex) {
+            // default index and auto index only support floatvector type
+            if (!AddAutoIndexParams(&index_params))
+                return Status::SegcoreErr();
         }
 
         auto metric_it = index_params.find(kMetricTypeKey);

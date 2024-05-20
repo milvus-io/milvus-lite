@@ -10,14 +10,13 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-import os
 import sys
 import pathlib
 import subprocess
 
 
-def run_all_examples():
-    examples_dir = pathlib.Path(__file__).absolute().parent.parent.parent / 'examples'
+def run_all(py_path):
+    
     for f in examples_dir.glob('*.py'):
         if str(f).endswith('bfloat16_example.py') or str(f).endswith('dynamic_field.py'):
             continue
@@ -30,8 +29,12 @@ def run_all_examples():
 
 
 if __name__ == '__main__':
-    if not run_all_examples():
+    examples_dir = pathlib.Path(__file__).absolute().parent.parent.parent / 'examples'
+    if not run_all(examples_dir):
         exit(-1)
+    pytest = pathlib.Path(__file__).absolute().parent.parent.parent / 'tests'
+    if not run_all(pytest):
+        exit(-1)    
     exit(0)
 
 
