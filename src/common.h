@@ -58,6 +58,8 @@ const std::string kMetaFieldName("$meta");
 const std::string kPlaceholderTag("$0");
 
 const int64_t kTopkLimit = 16384;
+const int64_t kSchemaFieldLimit = 64;
+const int64_t kMaxLengthLimit = 65535;
 
 // scalar index type
 const std::string kDefaultStringIndexType("Trie");

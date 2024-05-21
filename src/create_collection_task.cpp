@@ -55,7 +55,7 @@ CreateCollectionTask::GetVarcharFieldMaxLength(
         if (kv_pair.key() == kMaxLengthKey) {
             try {
                 auto length = std::stoll(kv_pair.value());
-                if (length <= 0) {
+                if (length <= 0 || length > kMaxLengthLimit) {
                     return Status::ParameterInvalid(
                         "the maximum length specified for a VarChar should be "
                         "in (0, 65535])");
@@ -73,8 +73,17 @@ CreateCollectionTask::GetVarcharFieldMaxLength(
     for (const auto& kv_pair : field.index_params()) {
         if (kv_pair.key() == kMaxLengthKey) {
             try {
-                *max_len = std::stoll(kv_pair.value());
-                return Status::Ok();
+                auto length = std::stoll(kv_pair.value());
+                if (length <= 0 || length > kMaxLengthLimit) {
+                    return Status::ParameterInvalid(
+                        "the maximum length specified for a VarChar should be "
+                        "in (0, 65535])");
+
+                    return Status::Ok();
+                } else {
+                    *max_len = static_cast<uint64_t>(length);
+                    return Status::Ok();
+                }
             } catch (std::exception& e) {
                 return Status::ParameterInvalid("Invalid max length {}",
                                                 kv_pair.value());
@@ -142,7 +151,8 @@ CreateCollectionTask::CheckDefaultValue(
             case DCase::kFloatData:
                 if (f.data_type() != DType::Float) {
                     LOG_ERROR(
-                        "{} field's default value is Float type, mismatches "
+                        "{} field's default value is Float type, "
+                        "mismatches "
                         "field type",
                         f.name());
                     return false;
@@ -151,7 +161,8 @@ CreateCollectionTask::CheckDefaultValue(
             case DCase::kDoubleData:
                 if (f.data_type() != DType::Double) {
                     LOG_ERROR(
-                        "{} field's default value is Double type, mismatches "
+                        "{} field's default value is Double type, "
+                        "mismatches "
                         "field type",
                         f.name());
                     return false;
@@ -229,6 +240,11 @@ CreateCollectionTask::AppendSysFields(
 Status
 CreateCollectionTask::ValidateSchema(
     const ::milvus::proto::schema::CollectionSchema& schema) {
+    if (schema.fields_size() > kSchemaFieldLimit)
+        return Status::ParameterInvalid(
+            "maximum field's number should be limited to {}",
+            kSchemaFieldLimit);
+
     std::set<std::string> field_names;
     std::string pk_name;
     for (const auto& field_schema : schema.fields()) {
@@ -239,13 +255,14 @@ CreateCollectionTask::ValidateSchema(
         if (field_schema.is_primary_key()) {
             if (!pk_name.empty()) {
                 return Status::ParameterInvalid(
-                    "there are more than one primary key, field_name = {}, {}",
+                    "there are more than one primary key, field_name = {}, "
+                    "{}",
                     pk_name,
                     field_schema.name());
             } else {
                 pk_name = field_schema.name();
             }
-        } 
+        }
         if (field_schema.is_dynamic()) {
             return Status::ParameterInvalid(
                 "cannot explicitly set a field as a dynamic field");
