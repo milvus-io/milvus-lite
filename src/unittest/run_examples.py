@@ -16,8 +16,7 @@ import subprocess
 
 
 def run_all(py_path):
-    
-    for f in examples_dir.glob('*.py'):
+    for f in py_path.glob('*.py'):
         if str(f).endswith('bfloat16_example.py') or str(f).endswith('dynamic_field.py'):
             continue
         print(str(f))

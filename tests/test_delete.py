@@ -40,6 +40,7 @@ class TestDefaultSearch(unittest.TestCase):
         result = milvus_client.delete(collection_name, ids=['-xf%^@#$%^&***)(*/.', '中文id'])
         result = milvus_client.search(collection_name, [[0.0, 1.0]], limit=3)
         self.assertEqual([item['id']for item in result[0]], ['Título', 'Cien años de soledad'])
+        milvus_client.release_collection(collection_name)        
         del milvus_client
 
         local_client = MilvusClient('./local_test.db')
@@ -77,6 +78,7 @@ class TestDefaultSearch(unittest.TestCase):
         result = milvus_client.delete(collection_name, filter='(a==100) && (b==300)')
         result = milvus_client.search(collection_name, [[0.0, 1.0]], limit=3)
         self.assertEqual([item['id']for item in result[0]], ['中文id', 'Título', 'Cien años de soledad'])
+        milvus_client.release_collection(collection_name)
         del milvus_client
 
         local_client = MilvusClient('./local_test.db')
