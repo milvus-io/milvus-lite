@@ -8,7 +8,7 @@ Milvus Lite shares the same API and covers most of the features of Milvus. Toget
 With Milvus Lite, you can start building an AI application with vector similarity search within minutes! Milvus Lite is good for running in the following environment:
 - Jupyter Notebook / Google Colab
 - Laptops
-- Edge Devices
+- Edge Devices that runs Linux
 
 # Requirements
 Milvus Lite supports the following OS distributions and sillicon types:
@@ -36,6 +36,8 @@ connections.connect(uri="./milvus_demo.db")
 ```
 
 # Examples
+Following is a simple demo showing the idea of using Milvus Lite for text search. There are more comprehensive [examples](https://github.com/milvus-io/bootcamp/tree/master/bootcamp/tutorials) for using Milvus Lite to build applications
+such as [RAG](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/build_RAG_with_milvus.ipynb), [image search](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/image_search_with_milvus.ipynb), and used with popular framework such as [LangChain](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_langchain.ipynb), [LlamaIndex](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_llamaindex.ipynb) and more!
 
 ```python
 from pymilvus import MilvusClient
