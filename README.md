@@ -73,6 +73,14 @@ res = client.search(
     output_fields=["text", "subject"],
 )
 print(res)
+# Expect Output:
+# data: 
+# ["
+#   [
+#       {'id': 0, 'distance': 0.9999998211860657, 'entity': {'text': 'Artificial intelligence was founded as an academic discipline in 1956.', 'subject': 'history'}}, 
+#       {'id': 1, 'distance': 0.008319644257426262, 'entity': {'text': 'Alan Turing was the first person to conduct substantial research in AI.', 'subject': 'history'}}
+#   ]
+# "] , extra_info: {'cost': 0}
 
 # a query that retrieves all entities matching filter expressions.
 res = client.query(
@@ -81,6 +89,13 @@ res = client.query(
     output_fields=["text", "subject"],
 )
 print(res)
+# Expect Output:
+# data: 
+# [
+#   "{'id': 0, 'text': 'Artificial intelligence was founded as an academic discipline in 1956.', 'subject': 'history'}", 
+#   "{'id': 1, 'text': 'Alan Turing was the first person to conduct substantial research in AI.', 'subject': 'history'}", 
+#   "{'id': 2, 'text': 'Born in Maida Vale, London, Turing was raised in southern England.', 'subject': 'history'}"
+# ] , extra_info: {'cost': 0}
 
 # delete
 res = client.delete(
@@ -88,6 +103,8 @@ res = client.delete(
     filter="subject == 'history'",
 )
 print(res)
+# Expect Output:
+# [0, 1, 2]
 ```
 
 # Contributing
