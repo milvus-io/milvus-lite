@@ -94,7 +94,10 @@ GetField(const ::milvus::proto::schema::FieldData& field_data,
         return field_data.scalars().json_data().data(field_index);
     } else if (field_data.type() == DType::SparseFloatVector) {
         ::milvus::proto::schema::SparseFloatArray sp;
-        sp.CopyFrom(field_data.vectors().sparse_float_vector());
+        sp.set_dim(field_data.vectors().sparse_float_vector().dim());
+        auto content =
+            field_data.vectors().sparse_float_vector().contents(field_index);
+        sp.add_contents(content);
         return sp;
     } else {
         LOG_ERROR("Unkown data type: {}", field_data.type());
@@ -446,8 +449,10 @@ PickFieldDataByIndex(const ::milvus::proto::schema::FieldData& src_data,
                 auto data =
                     std::any_cast<::milvus::proto::schema::SparseFloatArray>(
                         GetField(src_data, i));
-                dst->mutable_vectors()->mutable_sparse_float_vector()->CopyFrom(
-                    data);
+                auto mutable_sp =
+                    dst->mutable_vectors()->mutable_sparse_float_vector();
+                mutable_sp->set_dim(data.dim());
+                mutable_sp->add_contents(data.contents(0));
             } break;
 
             default:
