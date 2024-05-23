@@ -74,6 +74,8 @@ main(int argc, char** argv) {
         return -1;
     }
     ::grpc::ServerBuilder builder;
+    builder.SetMaxReceiveMessageSize(268435456);
+    builder.SetMaxSendMessageSize(536870912);
     builder.AddListeningPort(address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);
     std::unique_ptr<::grpc::Server> server(builder.BuildAndStart());
