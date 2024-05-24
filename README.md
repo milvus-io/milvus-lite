@@ -53,7 +53,7 @@ client.create_collection(
     dimension=384  # The vectors we will use in this demo has 384 dimensions
 )
 ```
-## Step 2: Ingest data
+## Step 2: Ingest Data
 After creating the collection using Milvus Lite, we can now perform data ingestion. 
 In this case, we use random vectors instead of using embedding models to perform vector embeddings on the text.
 Later on, you can use the embedding function to replace the random vectors here.  
@@ -73,7 +73,7 @@ res = client.insert(
     data=data
 )
 ```
-## Step 3.1: Perform similarity search
+## Step 3.1: Perform Similarity Search
 After ingesting data, we can perform similarity search using `search()`. 
 In this case, we aim to search data that similar to `vectors[0]` that in `histroy subject`.
 The output will generate 2 closest results with their text and subject.
@@ -97,7 +97,7 @@ print(res)
 #   ]
 # "] , extra_info: {'cost': 0}
 ```
-## Step 3.2: Perform scaler search
+## Step 3.2: Perform Scaler Search
 Besides similarity search, Milvus Lite support scaler search as well, which enables searching base on scaler data.
 Access [Boolean Expression Rule](https://milvus.io/docs/boolean.md) for more about how to construct a proper filter.
 ```python
