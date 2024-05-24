@@ -71,6 +71,10 @@ class MilvusLiteConan(ConanFile):
         if self.settings.os == "Macos":
             self.options["arrow"].with_jemalloc = False
 
+        if self.settings.compiler == "gcc":
+            if self.settings.compiler.libcxx == "libstdc++":
+                raise Exception("This package is only compatible with libstdc++11")
+
     def requirements(self):
         if self.settings.os != "Macos":
             self.requires("libunwind/1.7.2")
@@ -82,3 +86,4 @@ class MilvusLiteConan(ConanFile):
     def build(self):
         target = "11.0"
         self.run("export MACOSX_DEPLOYMENT_TARGET={}".format(target))
+
