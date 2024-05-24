@@ -39,6 +39,10 @@ connections.connect(uri="./milvus_demo.db")
 Following is a simple demo showing the idea of using Milvus Lite for text search. There are more comprehensive [examples](https://github.com/milvus-io/bootcamp/tree/master/bootcamp/tutorials) for using Milvus Lite to build applications
 such as [RAG](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/build_RAG_with_milvus.ipynb), [image search](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/image_search_with_milvus.ipynb), and used with popular framework such as [LangChain](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_langchain.ipynb), [LlamaIndex](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_llamaindex.ipynb) and more!
 
+## Step 1: Creat Collection:
+First of all, we use the local path file to connect with Milvus Client and initiate a collection by passing 
+the collection name and vector dimension(note: dimension depends on the size of you vector embeddings). 
+This is a simply way of creating collection, visiting [here](https://milvus.io/api-reference/pymilvus/v2.4.x/MilvusClient/Collections/create_collection.md) for more!
 ```python
 from pymilvus import MilvusClient
 import numpy as np
@@ -48,22 +52,33 @@ client.create_collection(
     collection_name="demo_collection",
     dimension=384  # The vectors we will use in this demo has 384 dimensions
 )
-
+```
+## Step 2: Ingest data
+After creating the collection using Milvus Lite, we can now perform data ingestion. 
+In this case, we use random vectors instead of using embedding models to perform vector embeddings on the text.
+Later on, you can use the embedding function to replace the random vectors here.  
+```python
 # Text strings to search from.
 docs = [
     "Artificial intelligence was founded as an academic discipline in 1956.",
     "Alan Turing was the first person to conduct substantial research in AI.",
     "Born in Maida Vale, London, Turing was raised in southern England.",
 ]
-# For illustration, here we use fake vectors with random numbers (384 dimension).
 
-vectors = [[ np.random.uniform(-1, 1) for _ in range(384) ] for _ in range(len(docs)) ]
-data = [ {"id": i, "vector": vectors[i], "text": docs[i], "subject": "history"} for i in range(len(vectors)) ]
+# For illustration, here we use fake vectors with random numbers (384 dimension).
+vectors = [[np.random.uniform(-1, 1) for _ in range(384)] for _ in range(len(docs))]
+data = [{"id": i, "vector": vectors[i], "text": docs[i], "subject": "history"} for i in range(len(vectors))]
 res = client.insert(
     collection_name="demo_collection",
     data=data
 )
-
+```
+## Step 3.1: Perform similarity search
+After ingesting data, we can perform similarity search using `search()`. 
+In this case, we aim to search data that similar to `vectors[0]` that in `histroy subject`.
+The output will generate 2 closest results with their text and subject.
+To learn more about the parameters please visit [here](https://milvus.io/api-reference/pymilvus/v2.4.x/MilvusClient/Vector/search.md).
+```python
 # This will exclude any text in "history" subject despite close to the query vector.
 res = client.search(
     collection_name="demo_collection",
@@ -81,7 +96,11 @@ print(res)
 #       {'id': 1, 'distance': 0.008319644257426262, 'entity': {'text': 'Alan Turing was the first person to conduct substantial research in AI.', 'subject': 'history'}}
 #   ]
 # "] , extra_info: {'cost': 0}
-
+```
+## Step 3.2: Perform scaler search
+Besides similarity search, Milvus Lite support scaler search as well, which enables searching base on scaler data.
+Access [Boolean Expression Rule](https://milvus.io/docs/boolean.md) for more about how to construct a proper filter.
+```python
 # a query that retrieves all entities matching filter expressions.
 res = client.query(
     collection_name="demo_collection",
@@ -96,7 +115,10 @@ print(res)
 #   "{'id': 1, 'text': 'Alan Turing was the first person to conduct substantial research in AI.', 'subject': 'history'}", 
 #   "{'id': 2, 'text': 'Born in Maida Vale, London, Turing was raised in southern England.', 'subject': 'history'}"
 # ] , extra_info: {'cost': 0}
-
+```
+## Step 4: Deletion
+At last, Milvus Lite also support deletion. For information about parameters please visit [here](https://milvus.io/api-reference/pymilvus/v2.4.x/MilvusClient/Vector/delete.md).
+```python
 # delete
 res = client.delete(
     collection_name="demo_collection",
