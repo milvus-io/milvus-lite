@@ -252,21 +252,26 @@ SearchTask::PostProcess(
     auto ret_size = tmp_ret.scores_size();
     auto nq = tmp_ret.num_queries();
     int score_coefficient = schema_util::PositivelyRelated(metric_) ? 1 : -1;
+    search_results->mutable_results()->set_top_k(0);
 
+    int64_t cur_index = 0;
     if (nq * offset_ < ret_size) {
         for (const auto& name : user_output_fields_) {
             search_results->mutable_results()->add_output_fields(name);
         }
-        int64_t limit = std::min(topk_, ret_size / nq - offset_);
-        search_results->mutable_results()->set_top_k(limit);
+
         std::vector<std::tuple<int64_t, int64_t>> ranges;
         for (int i = 0; i < nq; i++) {
+            int64_t limit = 0;
+            if (tmp_ret.topks(i) - offset_ > 0)
+                limit = tmp_ret.topks(i) - offset_;
+            if (search_results->results().top_k() < limit)
+                search_results->mutable_results()->set_top_k(limit);
+
             search_results->mutable_results()->mutable_topks()->Add(limit);
-            ranges.push_back(
-                std::make_tuple((offset_ + limit) * i + offset_, limit));
+            ranges.push_back(std::make_tuple(cur_index + offset_, limit));
             // copy topks and scores
-            for (int j = (offset_ + limit) * i + offset_;
-                 j < (offset_ + limit) * (i + 1);
+            for (int j = cur_index + offset_; j < cur_index + tmp_ret.topks(i);
                  j++) {
                 search_results->mutable_results()->mutable_scores()->Add(
                     tmp_ret.scores(j) * score_coefficient);
@@ -284,6 +289,7 @@ SearchTask::PostProcess(
                         ->add_data(tmp_ret.ids().str_id().data(j));
                 }
             }
+            cur_index += tmp_ret.topks(i);
         }
         // copy fields_data
         for (const auto& field_data : tmp_ret.fields_data()) {
@@ -301,7 +307,6 @@ SearchTask::PostProcess(
             search_results->mutable_results()->mutable_topks()->Add(0);
         }
     }
-
     return true;
 }
 

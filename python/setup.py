@@ -97,7 +97,12 @@ class CMakeBuild(_bdist_wheel):
         extdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env = os.environ
         env['LD_LIBRARY_PATH'] = os.path.join(build_temp, 'lib')
-        subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
+        if sys.platform.lower() == 'linux':
+            subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release', '-s', 'compiler.libcxx=libstdc++11'],
+                                  cwd=build_temp, env=env)
+        else:
+            # macos
+            subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
         # apply patch
         subprocess.check_call(['git', 'restore', '.'], cwd=MILVUS_ROOT)
         subprocess.check_call(['git', 'apply', MILVUS_PATCH], cwd=MILVUS_ROOT)
@@ -139,7 +144,7 @@ def parse_requirements(file_name: str) -> List[str]:
         ]
 
 setup(name='milvus-lite',
-      version='2.4.5',
+      version='2.4.6',
       description='A lightweight version of Milvus wrapped with Python.',
       author='Milvus Team',
       author_email='milvus-team@zilliz.com',
