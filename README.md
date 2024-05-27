@@ -1,7 +1,7 @@
 # Introduction
 Milvus Lite is the lightweight version of [Milvus](https://github.com/milvus-io/milvus), an open-source vector database that powers AI applications with vector embeddings and similarity search.
 
-Milvus Lite can be imported into your Python application, providing the core vector search functionality of Milvus. Milvus Lite is included in the [Python SDK of Milvus](https://github.com/milvus-io/pymilvus), thus it can be simply deployed with `pip install pymilvus`. This repo contains the core components of Milvus Lite.
+Milvus Lite can be imported into your Python application, providing the core vector search functionality of Milvus. Milvus Lite is included in the [Python SDK of Milvus](https://github.com/milvus-io/pymilvus), thus it can be simply deployed with `pip install -U pymilvus`. This repo contains the core components of Milvus Lite.
 
 Milvus Lite shares the same API and covers most of the features of Milvus. Together, they provide a consistent user experience across different types of environments, fitting use cases of different size. With the same client-side code, you can run a quick demo of less than a million vectors with Milvus Lite, or a small scale app with Milvus Docker container hosted on a single machine, and eventually to a large scale production deployment on Kubenetes serving billions of vectors at thousands of QPS. 
 
@@ -18,21 +18,20 @@ Milvus Lite supports the following OS distributions and sillicon types:
 Please note that Milvus Lite is good for getting started with vector search or building demos and prototypes. For a production use case, we recommend using Milvus on [Docker](https://milvus.io/docs/install_standalone-docker.md) or [Kubenetes](https://milvus.io/docs/install_cluster-milvusoperator.md), or considering the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
 
 # Installation
-Note that milvus-lite is included in `pymilvus` since version 2.4.2, so you can install with `pymilvus`
+Note that milvus-lite is included in `pymilvus` since version 2.4.2, so you can install with the latest `pymilvus`
 ```shell
-pip install "pymilvus>=2.4.2"
+pip install -U pymilvus
 ```
-
 # Usage
 In `pymilvus`, specify a local file name as uri parameter of MilvusClient to use Milvus Lite.
 ```python
 from pymilvus import MilvusClient
-client = MilvusClient("./milvus_demo.db")
+client = MilvusClient("milvus_demo.db")
 ```
 Or with old `connections.connect` API (not recommended):
 ```python
 from pymilvus import connections
-connections.connect(uri="./milvus_demo.db")
+connections.connect(uri="milvus_demo.db")
 ```
 
 # Examples
@@ -43,7 +42,7 @@ such as [RAG](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutoria
 from pymilvus import MilvusClient
 import numpy as np
 
-client = MilvusClient("./milvus_demo.db")
+client = MilvusClient("milvus_demo.db")
 client.create_collection(
     collection_name="demo_collection",
     dimension=384  # The vectors we will use in this demo has 384 dimensions
