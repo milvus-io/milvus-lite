@@ -90,6 +90,10 @@ class PlanCCVisitor : public PlanVisitor {
     visitBoolean(PlanParser::BooleanContext* ctx) override {
         auto text = ctx->getText();
         bool val;
+        std::transform(
+            text.begin(), text.end(), text.begin(), [](unsigned char c) {
+                return std::tolower(c);
+            });
         std::istringstream(text) >> std::boolalpha >> val;
         return ExprWithDtype(createValueExpr<bool>(val, this->arena.get()),
                              proto::schema::DataType::Bool,
