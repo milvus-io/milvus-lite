@@ -37,7 +37,7 @@ CollectionData::~CollectionData() {
 std::string
 CollectionData::GetTableCreateSql() {
     return string_util::SFormat(
-        "CREATE TABLE IF NOT EXISTS {} ({} INTEGER PRIMARY KEY, {} "
+        "CREATE TABLE IF NOT EXISTS \"{}\" ({} INTEGER PRIMARY KEY, {} "
         "VARCHAR(1024), {} BLOB);",
         collection_name_,
         col_id_,
