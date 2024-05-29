@@ -597,6 +597,12 @@ ParseExpr(const std::string& expr_str,
           const ::milvus::proto::schema::CollectionSchema& schema,
           ::milvus::proto::plan::Expr* expr_out) {
     try {
+        if (expr_str.empty()) {
+            expr_out->mutable_always_true_expr()->CopyFrom(
+                ::milvus::proto::plan::AlwaysTrueExpr());
+            return Status::Ok();
+        }
+
         antlr4::ANTLRInputStream input(expr_str);
         PlanLexer lexer(&input);
         antlr4::CommonTokenStream tokens(&lexer);
