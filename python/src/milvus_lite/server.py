@@ -104,7 +104,6 @@ class Server:
 
     def stop(self):
         if self._p is not None:
-            logger.info("Stop milvus...")
             try:
                 self._p.terminate()
                 self._p.wait(timeout=2)

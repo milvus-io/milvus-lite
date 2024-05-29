@@ -148,13 +148,12 @@ QueryTask::Process(::milvus::proto::plan::PlanNode* plan) {
         ParseQueryParams(plan, string_util::Trim(query_request_->expr()) == ""),
         "");
 
-    if (query_request_->expr() != "") {
-        CHECK_STATUS(
-            schema_util::ParseExpr(query_request_->expr(),
-                                   *schema_,
-                                   plan->mutable_query()->mutable_predicates()),
-            "");
-    }
+    CHECK_STATUS(
+        schema_util::ParseExpr(string_util::Trim(query_request_->expr()),
+                               *schema_,
+                               plan->mutable_query()->mutable_predicates()),
+        "");
+
     if (is_count_) {
         user_output_fields_.push_back(kCountStr);
     } else {
