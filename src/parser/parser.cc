@@ -19,6 +19,16 @@ namespace milvus::local {
 std::string
 ParserToMessage(milvus::proto::schema::CollectionSchema& schema,
                 const std::string& exprstr) {
+    if (exprstr.empty()) {
+        google::protobuf::Arena arena;
+        auto alway_true_expr =
+            google::protobuf::Arena::CreateMessage<proto::plan::AlwaysTrueExpr>(
+                &arena);
+        auto expr =
+            google::protobuf::Arena::CreateMessage<proto::plan::Expr>(&arena);
+        expr->unsafe_arena_set_allocated_always_true_expr(alway_true_expr);
+        return expr->SerializeAsString();
+    }
     antlr4::ANTLRInputStream input(exprstr);
     PlanLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
