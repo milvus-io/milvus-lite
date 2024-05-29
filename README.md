@@ -3,36 +3,31 @@ Milvus Lite is the lightweight version of [Milvus](https://github.com/milvus-io/
 
 Milvus Lite can be imported into your Python application, providing the core vector search functionality of Milvus. Milvus Lite is included in the [Python SDK of Milvus](https://github.com/milvus-io/pymilvus), thus it can be simply deployed with `pip install pymilvus`. This repo contains the core components of Milvus Lite.
 
-Milvus Lite shares the same API and covers most of the features of Milvus. Together, they provide a consistent user experience across different types of environments, fitting use cases of different size. With the same client-side code, you can run a quick demo of less than a million vectors with Milvus Lite, or a small scale app with Milvus Docker container hosted on a single machine, and eventually to a large scale production deployment on Kubenetes serving billions of vectors at thousands of QPS. 
+Milvus Lite shares the same API and covers most of the features of Milvus. Together, they provide a consistent user experience across different types of environments, fitting use cases of different size. With the same client-side code, you can run your GenAI app with Milvus Lite on a laptop or Jupyter Notebook, or Milvus on Docker container hosted on a single machine, or a large scale production deployment on Kubenetes serving billions of vectors at thousands of QPS. 
 
 With Milvus Lite, you can start building an AI application with vector similarity search within minutes! Milvus Lite is good for running in the following environment:
 - Jupyter Notebook / Google Colab
 - Laptops
-- Edge Devices that runs Linux
+- Edge Devices
 
 # Requirements
-Milvus Lite supports the following OS distributions and sillicon types:
+Milvus Lite supports the following OS distributions and sillicons:
 - Ubuntu >= 20.04 (x86_64)
 - MacOS >= 11.0 (Apple Silicon and x86_64)
 
-Please note that Milvus Lite is good for getting started with vector search or building demos and prototypes. For a production use case, we recommend using Milvus on [Docker](https://milvus.io/docs/install_standalone-docker.md) or [Kubenetes](https://milvus.io/docs/install_cluster-milvusoperator.md), or considering the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
+Please note that Milvus Lite is good for small scale vector search use cases. For a large scale use case, we recommend using Milvus on [Docker](https://milvus.io/docs/install_standalone-docker.md) or [Kubenetes](https://milvus.io/docs/install_cluster-milvusoperator.md), or considering the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
 
 # Installation
-Note that milvus-lite is included in `pymilvus` since version 2.4.2, so you can install with `pymilvus`
+Note that milvus-lite is included in `pymilvus` since version 2.4.2, so you can install with `pymilvus` with `-U` to make sure the latest version is installed.
 ```shell
-pip install "pymilvus>=2.4.2"
+pip install -U pymilvus
 ```
 
 # Usage
 In `pymilvus`, specify a local file name as uri parameter of MilvusClient to use Milvus Lite.
 ```python
 from pymilvus import MilvusClient
-client = MilvusClient("./milvus_demo.db")
-```
-Or with old `connections.connect` API (not recommended):
-```python
-from pymilvus import connections
-connections.connect(uri="./milvus_demo.db")
+client = MilvusClient("milvus_demo.db")
 ```
 
 # Examples
@@ -94,7 +89,7 @@ print(res)
 If you want to contribute to Milvus Lite, please read the [Contributing Guide](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md) first.
 
 # Report a bug
-When you use or develop milvus-lite, if you find any bug, please report it to us. You could submit an issue in [milvus-lite](https://github.com/milvus-io/milvus-lite/issues/new/choose) or report you [milvus](https://github.com/milvus-io/milvus/issues/new/choose) repo if you think it is a Milvus issue.
+For any bug or feature request, please report it by submitting an issue in [milvus-lite](https://github.com/milvus-io/milvus-lite/issues/new/choose) repo.
 
 # License
 Milvus Lite is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/milvus-lite/blob/main/LICENSE) file for details.
