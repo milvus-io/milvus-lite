@@ -594,30 +594,11 @@ ReduceFieldByIDs(const ::milvus::proto::schema::IDs& ids,
 
 Status
 ParseExpr(const std::string& expr_str,
-          const ::milvus::proto::schema::CollectionSchema& schema,
+          ::milvus::proto::schema::CollectionSchema schema,
           ::milvus::proto::plan::Expr* expr_out) {
     try {
-        if (expr_str.empty()) {
-            expr_out->mutable_always_true_expr()->CopyFrom(
-                ::milvus::proto::plan::AlwaysTrueExpr());
-            return Status::Ok();
-        }
-
-        antlr4::ANTLRInputStream input(expr_str);
-        PlanLexer lexer(&input);
-        antlr4::CommonTokenStream tokens(&lexer);
-        PlanParser parser(&tokens);
-        PlanParser::ExprContext* tree = parser.expr();
-        auto helper = milvus::local::CreateSchemaHelper(
-            const_cast<milvus::proto::schema::CollectionSchema*>(&schema));
-        milvus::local::PlanCCVisitor visitor(&helper);
-        auto ret = visitor.visit(tree);
-        if (!ret.has_value()) {
-            return Status::ParameterInvalid(
-                string_util::SFormat("Invalid expr: {}", expr_str));
-        }
-        auto expr = std::any_cast<milvus::local::ExprWithDtype>(ret);
-        expr_out->CopyFrom(*(expr.expr));
+        auto buf = milvus::local::ParserToMessage(schema, expr_str);
+        expr_out->ParseFromString(buf);
         return Status::Ok();
     } catch (std::exception& e) {
         return Status::ParameterInvalid(

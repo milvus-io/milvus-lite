@@ -25,6 +25,27 @@
 
 namespace milvus::local {
 
+class Exception : public std::exception {
+ public:
+    explicit Exception(const std::string& msg) : msg_(msg) {
+    }
+
+    const char*
+    what() const noexcept override {
+        return msg_.c_str();
+    }
+
+ private:
+    std::string msg_;
+};
+
+#define TRY_WITH_EXCEPTION(call)    \
+    do {                            \
+        if (!(call)) {              \
+            throw Exception(#call); \
+        }                           \
+    } while (0)
+
 template <typename T>
 inline T*
 CreateMessageWithCopy(google::protobuf::Arena* arena, const T& val) {
@@ -88,7 +109,7 @@ createValueExpr(const T val, google::protobuf::Arena* arena = nullptr) {
     else if constexpr (std::is_same_v<T, bool>)
         value->set_bool_val(val);
     else
-        assert(false);
+        TRY_WITH_EXCEPTION(false);
 
     val_expr->unsafe_arena_set_allocated_value(value);
     expr->unsafe_arena_set_allocated_value_expr(val_expr);
@@ -235,7 +256,7 @@ calDataType(ExprWithDtype* a, ExprWithDtype* b) {
             b_dtype == proto::schema::DataType::JSON)
             return proto::schema::DataType::Int64;
     }
-    assert(false);
+    TRY_WITH_EXCEPTION(false);
 }
 
 struct SchemaHelper {
@@ -250,20 +271,20 @@ struct SchemaHelper {
 
     const proto::schema::FieldSchema&
     GetPrimaryKeyField() {
-        assert(primary_key_offset != -1);
+        TRY_WITH_EXCEPTION(primary_key_offset != -1);
         return schema->fields(primary_key_offset);
     }
 
     const proto::schema::FieldSchema&
     GetPartitionKeyField() {
-        assert(partition_key_offset != -1);
+        TRY_WITH_EXCEPTION(partition_key_offset != -1);
         return schema->fields(partition_key_offset);
     }
 
     const proto::schema::FieldSchema&
     GetFieldFromName(const std::string& name) {
         auto it = name_offset.find(name);
-        assert(it != name_offset.end());
+        TRY_WITH_EXCEPTION(it != name_offset.end());
         return schema->fields(it->second);
     }
 
@@ -285,13 +306,13 @@ struct SchemaHelper {
                 return field;
         }
 
-        assert(false);
+        TRY_WITH_EXCEPTION(false);
     }
 
     const proto::schema::FieldSchema&
     GetFieldFromID(int64_t id) {
         auto it = id_offset.find(id);
-        assert(it != id_offset.end());
+        TRY_WITH_EXCEPTION(it != id_offset.end());
         return schema->fields(it->second);
     }
 
@@ -302,35 +323,35 @@ struct SchemaHelper {
             field.data_type() != proto::schema::DataType::Float16Vector &&
             field.data_type() != proto::schema::DataType::BinaryVector &&
             field.data_type() != proto::schema::DataType::BFloat16Vector) {
-            assert(false);
+            TRY_WITH_EXCEPTION(false);
         }
         for (int i = 0; i < field.type_params_size(); ++i) {
             if (field.type_params(i).key() == "dim")
                 return std::stoi(
                     field.type_params(i).value().c_str(), NULL, 10);
         }
-        assert(false);
+        TRY_WITH_EXCEPTION(false);
     }
 };
 
 inline SchemaHelper
 CreateSchemaHelper(proto::schema::CollectionSchema* schema) {
-    assert(schema);
+    TRY_WITH_EXCEPTION(schema);
     SchemaHelper schema_helper;
     schema_helper.schema = schema;
     for (int i = 0; i < schema->fields_size(); ++i) {
         auto field = schema->fields(i);
         auto it = schema_helper.name_offset.find(field.name());
         if (it != schema_helper.name_offset.end())
-            assert(false);
+            TRY_WITH_EXCEPTION(false);
         schema_helper.name_offset[field.name()] = i;
         schema_helper.id_offset[field.fieldid()] = i;
         if (field.is_primary_key()) {
-            assert(schema_helper.primary_key_offset == -1);
+            TRY_WITH_EXCEPTION(schema_helper.primary_key_offset == -1);
             schema_helper.primary_key_offset = i;
         }
         if (field.is_partition_key()) {
-            assert(schema_helper.primary_key_offset == -1);
+            TRY_WITH_EXCEPTION(schema_helper.primary_key_offset == -1);
             schema_helper.partition_key_offset = i;
         }
     }
@@ -514,7 +535,7 @@ toValueExpr(proto::plan::GenericValue* value,
     if (value->has_array_val()) {
         return ExprWithDtype(expr, proto::schema::DataType::Array, false);
     }
-    assert(false);
+    TRY_WITH_EXCEPTION(false);
 }
 
 inline proto::plan::GenericValue*
@@ -554,7 +575,7 @@ castValue(proto::schema::DataType dtype,
                                                                     *value);
     }
 
-    assert(false);
+    TRY_WITH_EXCEPTION(false);
 }
 
 inline proto::plan::Expr*
@@ -623,7 +644,7 @@ handleBinaryArithExpr(proto::plan::OpType op,
         case proto::plan::OpType::NotEqual:
             break;
         default:
-            assert(false);
+            TRY_WITH_EXCEPTION(false);
     }
 
     auto left_expr = arith_expr->left().column_expr();
@@ -639,11 +660,11 @@ handleBinaryArithExpr(proto::plan::OpType op,
     }
     if (arith_expr->left().has_column_expr() &&
         arith_expr->right().has_column_expr()) {
-        assert(false);
+        TRY_WITH_EXCEPTION(false);
     }
     if (arith_expr->left().has_value_expr() &&
         arith_expr->right().has_value_expr()) {
-        assert(false);
+        TRY_WITH_EXCEPTION(false);
     }
     if (arith_expr->left().has_column_expr() &&
         arith_expr->right().has_value_expr()) {
@@ -672,10 +693,10 @@ handleBinaryArithExpr(proto::plan::OpType op,
                                               value_expr->value(),
                                               arena);
             default:
-                assert(false);
+                TRY_WITH_EXCEPTION(false);
         }
     }
-    assert(false);
+    TRY_WITH_EXCEPTION(false);
 }
 
 inline proto::plan::Expr*
@@ -703,7 +724,7 @@ handleCompareRightValue(proto::plan::OpType op,
             arena);
     }
 
-    assert(a.expr->has_column_expr());
+    TRY_WITH_EXCEPTION(a.expr->has_column_expr());
     auto info = a.expr->column_expr().info();
 
     auto expr =
@@ -728,7 +749,7 @@ HandleCompare(proto::plan::OpType op,
               ExprWithDtype a,
               ExprWithDtype b,
               google::protobuf::Arena* arena = nullptr) {
-    assert(a.expr->has_column_expr() && b.expr->has_column_expr());
+    TRY_WITH_EXCEPTION(a.expr->has_column_expr() && b.expr->has_column_expr());
 
     auto a_info = a.expr->column_expr().info();
 
@@ -773,7 +794,7 @@ HandleCompare(int op,
               ExprWithDtype a,
               ExprWithDtype b,
               google::protobuf::Arena* arena = nullptr) {
-    assert(canBeCompared(a, b));
+    TRY_WITH_EXCEPTION(canBeCompared(a, b));
     std::map<int, proto::plan::OpType> cmpOpMap{
         {PlanParser::LT, proto::plan::OpType::LessThan},
         {PlanParser::LE, proto::plan::OpType::LessEqual},

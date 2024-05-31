@@ -129,4 +129,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.db
 compile_commands.json
