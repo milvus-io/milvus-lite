@@ -287,7 +287,7 @@ class TestMilvusClientCollectionValid(TestcaseBase):
         client_w.release_collection(client, collection_name)
         client_w.drop_collection(client, collection_name)
 
-    @pytest.mark.tags(CaseLabel.L0)
+    @pytest.mark.tags(CaseLabel.L2)
     def test_milvus_client_collection_self_creation_default(self, enable_milvus_local_api):
         """
         target: test fast create collection normal case
