@@ -46,7 +46,8 @@ pipeline {
                         sh '''
                          docker run --net=host  \
                             -e CONAN_USER_HOME=/root/  -v \$PWD:/root/milvus-lite -v /root/.conan:/root/.conan -w /root/milvus-lite  \
-                            milvusdb/milvus-env:lite-main bash ci/entrypoint.sh
+                            milvusdb/milvus-env:lite-manylinux2014 bash ci/entrypoint.sh
+                            # the image milvusdb/milvus-env:lite-manylinux2014 is from scripts/Dockerfile
                          '''
                     }
                 }
