@@ -17,7 +17,7 @@ import subprocess
 
 def run_all(py_path):
     for f in py_path.glob('*.py'):
-        if str(f).endswith('bfloat16_example.py') or str(f).endswith('dynamic_field.py'):
+        if str(f).endswith('bfloat16_example.py') or str(f).endswith('dynamic_field.py') or str(f).endswith('conftest.py'):
             continue
         print(str(f))
         p = subprocess.Popen(args=[sys.executable, str(f)])

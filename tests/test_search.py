@@ -17,7 +17,7 @@ from pymilvus import MilvusClient, MilvusException
 class TestDefaultSearch(unittest.TestCase):
     def setUp(self):
         self.dim = 2
-        self.collection_name = 'hello_milvus'
+        self.collection_name = 'default'
         self.milvus_client = MilvusClient('./local_test.db')
         has_collection = self.milvus_client.has_collection(self.collection_name, timeout=5)
         if has_collection:

@@ -115,7 +115,7 @@ GetIndexMetricType(const milvus::proto::segcore::FieldIndexMeta& field_index);
 
 Status
 ParseExpr(const std::string& expr_str,
-          const ::milvus::proto::schema::CollectionSchema& schema,
+          ::milvus::proto::schema::CollectionSchema schema,
           ::milvus::proto::plan::Expr* expr_out);
 
 bool

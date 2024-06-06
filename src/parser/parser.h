@@ -25,7 +25,6 @@
 #include "utils.h"
 
 namespace milvus::local {
-
 class PlanCCVisitor : public PlanVisitor {
  public:
     // ok
@@ -110,10 +109,12 @@ class PlanCCVisitor : public PlanVisitor {
         auto left = extractValue(left_expr);
         auto right = extractValue(right_expr);
 
-        assert(left.has_value() && right.has_value());
-        assert(left.type() == typeid(double) || left.type() == typeid(int64_t));
-        assert(right.type() == typeid(double) ||
-               right.type() == typeid(int64_t));
+        TRY_WITH_EXCEPTION(left.has_value() && right.has_value());
+
+        TRY_WITH_EXCEPTION(left.type() == typeid(double) ||
+                           left.type() == typeid(int64_t));
+        TRY_WITH_EXCEPTION(right.type() == typeid(double) ||
+                           right.type() == typeid(int64_t));
         float left_value, right_value;
         if (left.type() == typeid(int64_t))
             left_value = float(std::any_cast<int64_t>(left));
@@ -150,19 +151,19 @@ class PlanCCVisitor : public PlanVisitor {
             return ExprWithDtype(
                 createValueExpr<bool>(std::any_cast<bool>(left_value) ||
                                           std::any_cast<bool>(right_value),
-                                      this->arena.get()
-
-                                          ),
+                                      this->arena.get()),
                 proto::schema::DataType::Bool,
                 false
 
             );
         }
 
-        assert(!left_expr_with_type.dependent);
-        assert(!right_expr_with_type.dependent);
-        assert(left_expr_with_type.dtype == proto::schema::DataType::Bool);
-        assert(right_expr_with_type.dtype == proto::schema::DataType::Bool);
+        TRY_WITH_EXCEPTION(!left_expr_with_type.dependent);
+        TRY_WITH_EXCEPTION(!right_expr_with_type.dependent);
+        TRY_WITH_EXCEPTION(left_expr_with_type.dtype ==
+                           proto::schema::DataType::Bool);
+        TRY_WITH_EXCEPTION(right_expr_with_type.dtype ==
+                           proto::schema::DataType::Bool);
         return ExprWithDtype(
             createBinExpr<proto::plan::BinaryExpr_BinaryOp_LogicalOr>(
                 left_expr, right_expr),
@@ -198,10 +199,12 @@ class PlanCCVisitor : public PlanVisitor {
             );
         }
 
-        assert(!left_expr_with_type.dependent);
-        assert(!right_expr_with_type.dependent);
-        assert(left_expr_with_type.dtype == proto::schema::DataType::Bool);
-        assert(right_expr_with_type.dtype == proto::schema::DataType::Bool);
+        TRY_WITH_EXCEPTION(!left_expr_with_type.dependent);
+        TRY_WITH_EXCEPTION(!right_expr_with_type.dependent);
+        TRY_WITH_EXCEPTION(left_expr_with_type.dtype ==
+                           proto::schema::DataType::Bool);
+        TRY_WITH_EXCEPTION(right_expr_with_type.dtype ==
+                           proto::schema::DataType::Bool);
         return ExprWithDtype(
             createBinExpr<proto::plan::BinaryExpr_BinaryOp_LogicalAnd>(
                 left_expr, right_expr, this->arena.get()),
@@ -213,7 +216,7 @@ class PlanCCVisitor : public PlanVisitor {
     visitJSONIdentifier(PlanParser::JSONIdentifierContext* ctx) override {
         auto info = getChildColumnInfo(nullptr, ctx->JSONIdentifier());
 
-        assert(info);
+        TRY_WITH_EXCEPTION(info);
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             this->arena.get());
@@ -231,13 +234,14 @@ class PlanCCVisitor : public PlanVisitor {
     visitJSONContainsAll(PlanParser::JSONContainsAllContext* ctx) override {
         auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
         auto info = field.expr->column_expr().info();
-        assert(info.data_type() == proto::schema::DataType::Array ||
-               info.data_type() == proto::schema::DataType::JSON);
+        TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
+                           info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
-            assert(canBeCompared(field, toValueExpr(&expr, this->arena.get())));
+            TRY_WITH_EXCEPTION(
+                canBeCompared(field, toValueExpr(&expr, this->arena.get())));
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
@@ -293,7 +297,7 @@ class PlanCCVisitor : public PlanVisitor {
                             proto::schema::DataType::Double,
                             false);
                     default:
-                        assert(false);
+                        TRY_WITH_EXCEPTION(false);
                 }
             }
 
@@ -325,7 +329,7 @@ class PlanCCVisitor : public PlanVisitor {
                             proto::schema::DataType::Int64,
                             false);
                     default:
-                        assert(false);
+                        TRY_WITH_EXCEPTION(false);
                 }
             }
 
@@ -349,7 +353,7 @@ class PlanCCVisitor : public PlanVisitor {
                             proto::schema::DataType::Double,
                             false);
                     default:
-                        assert(false);
+                        TRY_WITH_EXCEPTION(false);
                 }
             }
 
@@ -373,49 +377,55 @@ class PlanCCVisitor : public PlanVisitor {
                             proto::schema::DataType::Double,
                             false);
                     default:
-                        assert(false);
+                        TRY_WITH_EXCEPTION(false);
                 }
             }
 
             if (left_expr->has_column_expr()) {
-                assert(left_expr->column_expr().info().data_type() !=
-                       proto::schema::DataType::Array);
-                assert(left_expr->column_expr().info().nested_path_size() == 0);
+                TRY_WITH_EXCEPTION(
+                    left_expr->column_expr().info().data_type() !=
+                    proto::schema::DataType::Array);
+                TRY_WITH_EXCEPTION(
+                    left_expr->column_expr().info().nested_path_size() == 0);
             }
 
             if (right_expr->has_column_expr()) {
-                assert(right_expr->column_expr().info().data_type() !=
-                       proto::schema::DataType::Array);
-                assert(right_expr->column_expr().info().nested_path_size() ==
-                       0);
+                TRY_WITH_EXCEPTION(
+                    right_expr->column_expr().info().data_type() !=
+                    proto::schema::DataType::Array);
+                TRY_WITH_EXCEPTION(
+                    right_expr->column_expr().info().nested_path_size() == 0);
             }
 
             if (left_expr_with_type.dtype == proto::schema::DataType::Array) {
                 if (right_expr_with_type.dtype ==
                     proto::schema::DataType::Array)
-                    assert(canArithmeticDtype(getArrayElementType(left_expr),
-                                              getArrayElementType(right_expr)));
+                    TRY_WITH_EXCEPTION(
+                        canArithmeticDtype(getArrayElementType(left_expr),
+                                           getArrayElementType(right_expr)));
                 else if (arithmeticDtype(left_expr_with_type.dtype))
-                    assert(canArithmeticDtype(getArrayElementType(left_expr),
-                                              right_expr_with_type.dtype));
+                    TRY_WITH_EXCEPTION(
+                        canArithmeticDtype(getArrayElementType(left_expr),
+                                           right_expr_with_type.dtype));
                 else
-                    assert(false);
+                    TRY_WITH_EXCEPTION(false);
             }
 
             if (right_expr_with_type.dtype == proto::schema::DataType::Array) {
                 if (arithmeticDtype(left_expr_with_type.dtype))
-                    assert(canArithmeticDtype(left_expr_with_type.dtype,
-                                              getArrayElementType(right_expr)));
+                    TRY_WITH_EXCEPTION(
+                        canArithmeticDtype(left_expr_with_type.dtype,
+                                           getArrayElementType(right_expr)));
                 else
-                    assert(false);
+                    TRY_WITH_EXCEPTION(false);
             }
 
             if (arithmeticDtype(left_expr_with_type.dtype) &&
                 arithmeticDtype(right_expr_with_type.dtype)) {
-                assert(canArithmeticDtype(left_expr_with_type.dtype,
-                                          right_expr_with_type.dtype));
+                TRY_WITH_EXCEPTION(canArithmeticDtype(
+                    left_expr_with_type.dtype, right_expr_with_type.dtype));
             } else {
-                assert(false);
+                TRY_WITH_EXCEPTION(false);
             }
 
             switch (ctx->op->getType()) {
@@ -442,7 +452,7 @@ class PlanCCVisitor : public PlanVisitor {
                         false);
 
                 default:
-                    assert(false);
+                    TRY_WITH_EXCEPTION(false);
             }
         }
         return nullptr;
@@ -456,8 +466,9 @@ class PlanCCVisitor : public PlanVisitor {
         if (field.name() != identifier) {
             nested_path.push_back(identifier);
         }
-        assert(!(field.data_type() == proto::schema::DataType::JSON &&
-                 nested_path.empty()));
+        TRY_WITH_EXCEPTION(
+            !(field.data_type() == proto::schema::DataType::JSON &&
+              nested_path.empty()));
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             arena.get());
         auto col_expr =
@@ -486,11 +497,12 @@ class PlanCCVisitor : public PlanVisitor {
         auto child_expr_with_type =
             std::any_cast<ExprWithDtype>(ctx->expr()->accept(this));
         auto child_expr = child_expr_with_type.expr;
-        assert(child_expr);
+        TRY_WITH_EXCEPTION(child_expr);
         auto info = child_expr->column_expr().info();
-        assert(!(info.data_type() == proto::schema::DataType::JSON &&
-                 info.nested_path_size() == 0));
-        assert(
+        TRY_WITH_EXCEPTION(
+            !(info.data_type() == proto::schema::DataType::JSON &&
+              info.nested_path_size() == 0));
+        TRY_WITH_EXCEPTION(
             (child_expr_with_type.dtype == proto::schema::DataType::VarChar ||
              child_expr_with_type.dtype == proto::schema::DataType::JSON) ||
             (child_expr_with_type.dtype == proto::schema::DataType::Array &&
@@ -624,8 +636,9 @@ class PlanCCVisitor : public PlanVisitor {
             if (field.name() != text) {
                 nested_path.push_back(text);
             }
-            assert(!(field.data_type() == proto::schema::DataType::JSON &&
-                     nested_path.empty()));
+            TRY_WITH_EXCEPTION(
+                !(field.data_type() == proto::schema::DataType::JSON &&
+                  nested_path.empty()));
             auto info =
                 google::protobuf::Arena::CreateMessage<proto::plan::ColumnInfo>(
                     this->arena.get());
@@ -647,8 +660,8 @@ class PlanCCVisitor : public PlanVisitor {
 
         std::vector<std::string> nested_path;
         auto field = helper->GetFieldFromNameDefaultJSON(fieldname);
-        assert(field.data_type() == proto::schema::DataType::JSON ||
-               field.data_type() == proto::schema::DataType::Array);
+        TRY_WITH_EXCEPTION(field.data_type() == proto::schema::DataType::JSON ||
+                           field.data_type() == proto::schema::DataType::Array);
         if (fieldname != field.name())
             nested_path.push_back(fieldname);
         auto jsonkey = childtext.substr(
@@ -662,12 +675,12 @@ class PlanCCVisitor : public PlanVisitor {
 
             if (path_[path_.length() - 1] == ']')
                 path_ = path_.substr(0, path_.length() - 1);
-            assert(path_ != "");
+            TRY_WITH_EXCEPTION(path_ != "");
 
             if ((path_[0] == '\"' && path_[path_.length() - 1] == '\"') ||
                 (path_[0] == '\'' && path_[path_.length() - 1] == '\'')) {
                 path_ = path_.substr(1, path_.length() - 2);
-                assert(path_ != "");
+                TRY_WITH_EXCEPTION(path_ != "");
             }
             nested_path.push_back(path_);
         }
@@ -693,8 +706,8 @@ class PlanCCVisitor : public PlanVisitor {
     visitReverseRange(PlanParser::ReverseRangeContext* ctx) override {
         auto info =
             getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
-        assert(info != nullptr);
-        assert(checkDirectComparisonBinaryField(info));
+        TRY_WITH_EXCEPTION(info != nullptr);
+        TRY_WITH_EXCEPTION(checkDirectComparisonBinaryField(info));
         auto lower = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
         auto upper = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
 
@@ -804,7 +817,7 @@ class PlanCCVisitor : public PlanVisitor {
                     datatype,                                        \
                     false);                                          \
             default:                                                 \
-                assert(false);                                       \
+                TRY_WITH_EXCEPTION(false);                           \
         }                                                            \
     }
 
@@ -825,42 +838,47 @@ class PlanCCVisitor : public PlanVisitor {
         auto left_expr = left_expr_with_type.expr;
         auto right_expr = right_expr_with_type.expr;
         if (left_expr->has_column_expr()) {
-            assert(left_expr->column_expr().info().data_type() !=
-                   proto::schema::DataType::Array);
-            assert(left_expr->column_expr().info().nested_path_size() == 0);
+            TRY_WITH_EXCEPTION(left_expr->column_expr().info().data_type() !=
+                               proto::schema::DataType::Array);
+            TRY_WITH_EXCEPTION(
+                left_expr->column_expr().info().nested_path_size() == 0);
         }
 
         if (right_expr->has_column_expr()) {
-            assert(right_expr->column_expr().info().data_type() !=
-                   proto::schema::DataType::Array);
-            assert(right_expr->column_expr().info().nested_path_size() == 0);
+            TRY_WITH_EXCEPTION(right_expr->column_expr().info().data_type() !=
+                               proto::schema::DataType::Array);
+            TRY_WITH_EXCEPTION(
+                right_expr->column_expr().info().nested_path_size() == 0);
         }
 
         if (left_expr_with_type.dtype == proto::schema::DataType::Array) {
             if (right_expr_with_type.dtype == proto::schema::DataType::Array)
-                assert(canArithmeticDtype(getArrayElementType(left_expr),
-                                          getArrayElementType(right_expr)));
+                TRY_WITH_EXCEPTION(
+                    canArithmeticDtype(getArrayElementType(left_expr),
+                                       getArrayElementType(right_expr)));
             else if (arithmeticDtype(right_expr_with_type.dtype))
-                assert(canArithmeticDtype(getArrayElementType(left_expr),
-                                          right_expr_with_type.dtype));
+                TRY_WITH_EXCEPTION(
+                    canArithmeticDtype(getArrayElementType(left_expr),
+                                       right_expr_with_type.dtype));
             else
-                assert(false);
+                TRY_WITH_EXCEPTION(false);
         }
 
         if (right_expr_with_type.dtype == proto::schema::DataType::Array) {
             if (arithmeticDtype(left_expr_with_type.dtype))
-                assert(canArithmeticDtype(left_expr_with_type.dtype,
-                                          getArrayElementType(right_expr)));
+                TRY_WITH_EXCEPTION(
+                    canArithmeticDtype(left_expr_with_type.dtype,
+                                       getArrayElementType(right_expr)));
             else
-                assert(false);
+                TRY_WITH_EXCEPTION(false);
         }
 
         if (arithmeticDtype(left_expr_with_type.dtype) &&
             arithmeticDtype(right_expr_with_type.dtype)) {
-            assert(canArithmeticDtype(left_expr_with_type.dtype,
-                                      right_expr_with_type.dtype));
+            TRY_WITH_EXCEPTION(canArithmeticDtype(left_expr_with_type.dtype,
+                                                  right_expr_with_type.dtype));
         } else {
-            assert(false);
+            TRY_WITH_EXCEPTION(false);
         }
 
         switch (ctx->op->getType()) {
@@ -878,7 +896,7 @@ class PlanCCVisitor : public PlanVisitor {
                     false);
 
             default:
-                assert(false);
+                TRY_WITH_EXCEPTION(false);
         }
     }
 
@@ -928,7 +946,7 @@ class PlanCCVisitor : public PlanVisitor {
                     proto::schema::DataType::Bool,                  \
                     false);                                         \
             default:                                                \
-                assert(false);                                      \
+                TRY_WITH_EXCEPTION(false);                          \
         }                                                           \
     }
 
@@ -988,9 +1006,9 @@ class PlanCCVisitor : public PlanVisitor {
     visitArrayLength(PlanParser::ArrayLengthContext* ctx) override {
         auto info =
             getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
-        assert(info);
-        assert(info->data_type() == proto::schema::Array ||
-               info->data_type() == proto::schema::JSON);
+        TRY_WITH_EXCEPTION(info);
+        TRY_WITH_EXCEPTION(info->data_type() == proto::schema::Array ||
+                           info->data_type() == proto::schema::JSON);
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             this->arena.get());
         auto bin_arith_expr = google::protobuf::Arena::CreateMessage<
@@ -1068,7 +1086,7 @@ class PlanCCVisitor : public PlanVisitor {
                 continue;
             }
 
-            assert(false);
+            TRY_WITH_EXCEPTION(false);
         }
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             arena.get());
@@ -1094,13 +1112,14 @@ class PlanCCVisitor : public PlanVisitor {
     visitJSONContains(PlanParser::JSONContainsContext* ctx) override {
         auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
         auto info = field.expr->column_expr().info();
-        assert(info.data_type() == proto::schema::DataType::Array ||
-               info.data_type() == proto::schema::DataType::JSON);
+        TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
+                           info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
-            assert(canBeCompared(field, toValueExpr(&expr, this->arena.get())));
+            TRY_WITH_EXCEPTION(
+                canBeCompared(field, toValueExpr(&expr, this->arena.get())));
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
@@ -1128,8 +1147,8 @@ class PlanCCVisitor : public PlanVisitor {
     visitRange(PlanParser::RangeContext* ctx) override {
         auto info =
             getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
-        assert(info != nullptr);
-        assert(checkDirectComparisonBinaryField(info));
+        TRY_WITH_EXCEPTION(info != nullptr);
+        TRY_WITH_EXCEPTION(checkDirectComparisonBinaryField(info));
         auto lower = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
         auto upper = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
 
@@ -1232,7 +1251,7 @@ class PlanCCVisitor : public PlanVisitor {
                     proto::schema::DataType::Bool,                       \
                     false);                                              \
             default:                                                     \
-                assert(false);                                           \
+                TRY_WITH_EXCEPTION(false);                               \
         }                                                                \
     }
 
@@ -1244,7 +1263,7 @@ class PlanCCVisitor : public PlanVisitor {
             PROCESS_UNARY(bool, proto::schema::DataType::Bool);
         }
 
-        assert(checkDirectComparisonBinaryField(
+        TRY_WITH_EXCEPTION(checkDirectComparisonBinaryField(
             CreateMessageWithCopy<proto::plan::ColumnInfo>(
                 this->arena.get(),
                 expr_with_dtype.expr->column_expr().info())));
@@ -1253,8 +1272,9 @@ class PlanCCVisitor : public PlanVisitor {
             case PlanParser::ADD:
                 return expr_with_dtype.expr;
             case PlanParser::NOT:
-                assert(!expr_with_dtype.dependent &&
-                       expr_with_dtype.dtype == proto::schema::DataType::Bool);
+                TRY_WITH_EXCEPTION(!expr_with_dtype.dependent &&
+                                   expr_with_dtype.dtype ==
+                                       proto::schema::DataType::Bool);
                 auto expr =
                     google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
                         this->arena.get());
@@ -1373,13 +1393,14 @@ class PlanCCVisitor : public PlanVisitor {
     visitJSONContainsAny(PlanParser::JSONContainsAnyContext* ctx) override {
         auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
         auto info = field.expr->column_expr().info();
-        assert(info.data_type() == proto::schema::DataType::Array ||
-               info.data_type() == proto::schema::DataType::JSON);
+        TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
+                           info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
-            assert(canBeCompared(field, toValueExpr(&expr, this->arena.get())));
+            TRY_WITH_EXCEPTION(
+                canBeCompared(field, toValueExpr(&expr, this->arena.get())));
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
@@ -1408,7 +1429,7 @@ class PlanCCVisitor : public PlanVisitor {
     visitExists(PlanParser::ExistsContext* ctx) override {
         auto a = std::any_cast<ExprWithDtype>(ctx->expr());
         auto info = a.expr->column_expr().info();
-        assert(info.data_type() == proto::schema::DataType::Array);
+        TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array);
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             this->arena.get());
 

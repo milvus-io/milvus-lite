@@ -97,6 +97,8 @@ class CMakeBuild(_bdist_wheel):
         extdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env = os.environ
         env['LD_LIBRARY_PATH'] = os.path.join(build_temp, 'lib')
+        subprocess.call(['conan', 'remote', 'add', 'default-conan-local', 'https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local'],
+                              cwd=build_temp, env=env)
         if sys.platform.lower() == 'linux':
             subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release', '-s', 'compiler.libcxx=libstdc++11'],
                                   cwd=build_temp, env=env)

@@ -60,7 +60,7 @@ bool
 CollectionData::DropCollection(SQLite::Database* db) {
     // DROP TABLE {collection_name_}
     std::string drop_sql =
-        string_util::SFormat("DROP TABLE {}", collection_name_);
+        string_util::SFormat("DROP TABLE \"{}\"", collection_name_);
 
     if (db->tryExec(drop_sql) != 0) {
         const char* err = db->getErrorMsg();
@@ -75,7 +75,7 @@ CollectionData::Insert(SQLite::Database* db,
                        const std::string& milvus_id,
                        const std::string& data) {
     std::string insert_sql = string_util::SFormat(
-        "INSERT INTO {} VALUES (NULL, ?, ?)", collection_name_);
+        "INSERT INTO \"{}\" VALUES (NULL, ?, ?)", collection_name_);
     try {
         SQLite::Statement query(*db, insert_sql);
         SQLite::bind(query, milvus_id, data);
@@ -93,7 +93,7 @@ CollectionData::Load(SQLite::Database* db,
                      std::vector<std::string>* output_rows) {
     // SELECT {col_data_} from {collection_name_} LIMIT {limit} OFFSET {start}
     std::string select_sql =
-        string_util::SFormat("SELECT {} from {} LIMIT {} OFFSET {}",
+        string_util::SFormat("SELECT {} from \"{}\" LIMIT {} OFFSET {}",
                              col_data_,
                              collection_name_,
                              limit,
@@ -121,7 +121,7 @@ CollectionData::Delete(SQLite::Database* db,
     }
 
     std::string delete_sql =
-        string_util::SFormat("DELETE FROM {} WHERE {} IN ({})",
+        string_util::SFormat("DELETE FROM \"{}\" WHERE {} IN ({})",
                              collection_name_,
                              col_milvus_id_,
                              ss.str());
@@ -139,7 +139,7 @@ int64_t
 CollectionData::Count(SQLite::Database* db) {
     // SELECT count(*) FROM {};
     std::string count_sql =
-        string_util::SFormat("SELECT count(*) FROM {}", collection_name_);
+        string_util::SFormat("SELECT count(*) FROM \"{}\"", collection_name_);
     try {
         SQLite::Statement query(*db, count_sql);
         query.executeStep();
