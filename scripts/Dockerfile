@@ -22,8 +22,3 @@ RUN mkdir -p /workspace
 WORKDIR  /workspace
 
 RUN conan remote add default-conan-local https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local
-
-COPY build_milvus_lite.sh /workspace/build_milvus_lite.sh
-RUN chmod +x /workspace/build_milvus_lite.sh
-
-ENTRYPOINT ["/workspace/build_milvus_lite.sh"]
