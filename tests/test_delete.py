@@ -17,7 +17,7 @@ from pymilvus import MilvusClient
 class TestDefaultSearch(unittest.TestCase):
     def test_delete_by_ids(self):
         dim = 2
-        collection_name = 'hello_milvus'
+        collection_name = 'default'
         milvus_client = MilvusClient('./local_test.db')
         has_collection = milvus_client.has_collection(collection_name, timeout=5)
         if has_collection:
