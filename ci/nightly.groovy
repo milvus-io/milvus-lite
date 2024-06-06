@@ -2,7 +2,17 @@
 
 int total_timeout_minutes = 60 * 5
 
+
+// When scheduling a job that gets automatically triggered by changes,
+// you need to include a [cronjob] tag within the commit message.
+String cron_timezone = 'TZ=Asia/Shanghai'
+String cron_string = BRANCH_NAME == "2.4" ? "50 3 * * * " : ""
+
 pipeline {
+    triggers {
+        cron """${cron_timezone}
+            ${cron_string}"""
+    }
     options {
         timestamps()
         timeout(time: total_timeout_minutes, unit: 'MINUTES')
