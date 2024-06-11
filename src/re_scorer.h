@@ -15,8 +15,12 @@
 #pragma once
 
 #include "common.h"
+#include "common.pb.h"
 #include "milvus.pb.h"
+#include "status.h"
 #include <functional>
+#include <memory>
+#include <vector>
 
 namespace milvus::local {
 
@@ -27,10 +31,17 @@ const RankType rrfRankType = 1;
 const RankType weightedRankType = 2;
 const RankType udfExprRankType = 3;
 
+const std::string kRRFRankTypeName("rrf");
+const std::string kWeightedRankTypeName("weighted");
+
+const std::string kRankTypeKey("strategy");
+const std::string kRankParamsKey("params");
+const std::string kRRFParamsKey("k");
+const std::string kWeightsParamsKey("weights");
+
 class ReScorer : NonCopyableNonMovable {
  public:
-    ReScorer(const std::string& name, const std::string& metric_type)
-        : name_(name), metric_type_(metric_type) {
+    ReScorer(const std::string& name) : name_(name) {
     }
     virtual ~ReScorer() = default;
 
@@ -63,8 +74,7 @@ class ReScorer : NonCopyableNonMovable {
 
 class RRFScorer : public ReScorer {
  public:
-    RRFScorer(const std::string& name, const std::string& metric_type, float k)
-        : ReScorer(name, metric_type), k_(k) {
+    RRFScorer(const std::string& name, float k) : ReScorer(name), k_(k) {
     }
     virtual ~RRFScorer() = default;
 
@@ -82,10 +92,8 @@ class RRFScorer : public ReScorer {
 
 class WeightedScorer : public ReScorer {
  public:
-    WeightedScorer(const std::string& name,
-                   const std::string& metric_type,
-                   float weight)
-        : ReScorer(name, metric_type), weight_(weight) {
+    WeightedScorer(const std::string& name, float weight)
+        : ReScorer(name), weight_(weight) {
     }
     virtual ~WeightedScorer() = default;
 
@@ -105,5 +113,11 @@ class WeightedScorer : public ReScorer {
  private:
     float weight_;
 };
+
+Status
+NewReScorers(int req_cnt,
+             const ::google::protobuf::RepeatedPtrField<
+                 ::milvus::proto::common::KeyValuePair>& rank_params,
+             std::vector<std::unique_ptr<ReScorer>>* re_scorers);
 
 }  // namespace milvus::local
