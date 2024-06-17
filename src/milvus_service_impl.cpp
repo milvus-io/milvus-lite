@@ -15,6 +15,8 @@
 #include "milvus_service_impl.h"
 #include <grpcpp/support/status.h>
 #include <cstdint>
+#include <exception>
+#include "log/Log.h"
 #include "status.h"
 
 namespace milvus::local {
@@ -117,6 +119,21 @@ MilvusServiceImpl::Search(::grpc::ServerContext* context,
     Status s = proxy_.Search(request, response);
     Status2Response(s, response->mutable_status());
     return ::grpc::Status::OK;
+}
+
+::grpc::Status
+MilvusServiceImpl::HybridSearch(
+    ::grpc::ServerContext* context,
+    const ::milvus::proto::milvus::HybridSearchRequest* request,
+    ::milvus::proto::milvus::SearchResults* response) {
+    try {
+        Status s = proxy_.HybridSearch(request, response);
+        Status2Response(s, response->mutable_status());
+        return ::grpc::Status::OK;
+    } catch (std::exception& e) {
+        LOG_ERROR("{}", e.what());
+        return ::grpc::Status::OK;
+    }
 }
 
 ::grpc::Status

@@ -77,7 +77,7 @@ NewReScorers(int req_cnt,
     std::string rank_type, param_str;
     for (const auto& pair : rank_params) {
         if (pair.key() == kRankTypeKey) {
-            rank_type = pair.value();
+            rank_type = string_util::Trim(pair.value());
         } else if (pair.key() == kRankParamsKey) {
             param_str = pair.value();
         }
@@ -90,7 +90,7 @@ NewReScorers(int req_cnt,
         }
     }
 
-    if (rank_type != kRRFRankTypeName || rank_type != kWeightedRankTypeName) {
+    if (rank_type != kRRFRankTypeName && rank_type != kWeightedRankTypeName) {
         return Status::ParameterInvalid("unsupported rank type {}", rank_type);
     }
 
@@ -106,7 +106,7 @@ NewReScorers(int req_cnt,
                 return Status::ParameterInvalid("{} not found in rank_params",
                                                 kRRFParamsKey);
             }
-            if (data[kRRFParamsKey].is_number()) {
+            if (!data[kRRFParamsKey].is_number()) {
                 return Status::ParameterInvalid(
                     "The type of rank param k should be float");
             }

@@ -15,6 +15,7 @@
 #pragma once
 
 #include <any>
+#include <variant>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -22,9 +23,10 @@
 #include "common.pb.h"
 #include "pb/plan.pb.h"
 #include "pb/segcore.pb.h"
+#include "pb/milvus.pb.h"
+#include "pb/schema.pb.h"
 #include "status.h"
 #include "string_util.hpp"
-#include "pb/schema.pb.h"
 #include <google/protobuf/repeated_field.h>
 
 namespace milvus::local {
@@ -69,6 +71,11 @@ bool
 SliceFieldData(const ::milvus::proto::schema::FieldData& src_data,
                const std::vector<std::tuple<int64_t, int64_t>>& ranges,
                ::milvus::proto::schema::FieldData* dst);
+
+bool
+PickFieldDataByIndex(const ::milvus::proto::schema::FieldData& src_data,
+                     const std::vector<int64_t>& indexes,
+                     ::milvus::proto::schema::FieldData* dst);
 
 bool
 FillEmptyField(const ::milvus::proto::schema::FieldSchema& field_schema,
@@ -127,6 +134,27 @@ CheckParamsEqual(const ::google::protobuf::RepeatedPtrField<
 bool
 CheckValueFieldEqual(const ::milvus::proto::schema::ValueField& left,
                      const ::milvus::proto::schema::ValueField& right);
+
+inline int
+IDsSize(const ::milvus::proto::schema::IDs& ids) {
+    if (ids.has_int_id()) {
+        return ids.int_id().data_size();
+    } else {
+        return ids.str_id().data_size();
+    }
+}
+
+void
+FillInFieldInfo(
+    const std::vector<std::string>& output_fields,
+    const ::milvus::proto::schema::CollectionSchema& schema,
+    std::variant<::milvus::proto::schema::SearchResultData*,
+                 ::milvus::proto::milvus::QueryResults*> result_var);
+
+bool
+GetOutputFieldsIds(const std::vector<std::string>& output_fields,
+                   const ::milvus::proto::schema::CollectionSchema& schema,
+                   std::vector<int64_t>* ids);
 
 }  // namespace schema_util
 

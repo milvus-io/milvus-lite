@@ -14,22 +14,13 @@
 
 #include "schema_util.h"
 
-#include <any>
-#include <boost/concept/detail/has_constraints.hpp>
 #include <complex>
-#include <cstdint>
 #include <exception>
 #include <set>
 #include <stdexcept>
 #include <string>
-#include <vector>
 #include "common.h"
 #include "log/Log.h"
-#include "pb/plan.pb.h"
-#include "pb/segcore.pb.h"
-#include "schema.pb.h"
-#include "status.h"
-#include "string_util.hpp"
 #include "parser/utils.h"
 #include "parser/parser.h"
 
@@ -705,6 +696,67 @@ CheckValueFieldEqual(const ::milvus::proto::schema::ValueField& left,
         left.bytes_data() == right.bytes_data())
         return true;
     return false;
+}
+
+void
+FillInFieldInfo(
+    const std::vector<std::string>& output_fields,
+    const ::milvus::proto::schema::CollectionSchema& schema,
+    std::variant<::milvus::proto::schema::SearchResultData*,
+                 ::milvus::proto::milvus::QueryResults*> result_var) {
+    auto process = [](const auto& output_fields,
+                      const auto& schema,
+                      auto&&... args) {
+        return [&output_fields, &schema, args...](auto&& result_data) {
+            if (output_fields.size() == 0 ||
+                result_data->fields_data_size() == 0) {
+                return;
+            }
+            for (size_t i = 0; i < output_fields.size(); i++) {
+                const std::string& name = output_fields[i];
+                for (const auto& field : schema.fields()) {
+                    if (name == field.name()) {
+                        auto field_id = field.fieldid();
+                        for (int j = 0; j < result_data->fields_data().size();
+                             j++) {
+                            if (field_id ==
+                                result_data->fields_data(j).field_id()) {
+                                result_data->mutable_fields_data(j)
+                                    ->set_field_name(field.name());
+                                result_data->mutable_fields_data(j)
+                                    ->set_field_id(field.fieldid());
+                                result_data->mutable_fields_data(j)->set_type(
+                                    field.data_type());
+                                result_data->mutable_fields_data(j)
+                                    ->set_is_dynamic(field.is_dynamic());
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    };
+    std::visit(process(output_fields, schema), result_var);
+}
+
+bool
+GetOutputFieldsIds(const std::vector<std::string>& output_fields,
+                   const ::milvus::proto::schema::CollectionSchema& schema,
+                   std::vector<int64_t>* ids) {
+    std::map<std::string, int64_t> name_ids;
+    for (const auto& field : schema.fields()) {
+        name_ids[field.name()] = field.fieldid();
+    }
+
+    for (const auto& output_field : output_fields) {
+        auto it = name_ids.find(output_field);
+        if (it == name_ids.end()) {
+            LOG_ERROR("Can not find output field {} in schema", output_field);
+            return false;
+        }
+        ids->push_back(it->second);
+    }
+    return true;
 }
 
 }  // namespace schema_util

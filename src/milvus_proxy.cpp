@@ -14,6 +14,7 @@
 
 #include "milvus_proxy.h"
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 #include "common.h"
@@ -23,6 +24,7 @@
 #include "create_index_task.h"
 #include "delete_task.h"
 #include "insert_task.h"
+#include "milvus_id.hpp"
 #include "milvus_local.h"
 #include "pb/common.pb.h"
 #include "pb/milvus.pb.h"
@@ -31,6 +33,8 @@
 #include "pb/segcore.pb.h"
 #include "query_task.h"
 #include "retrieve_result.h"
+#include "hybrid_search_task.h"
+#include "schema_util.h"
 #include "search_result.h"
 #include "search_task.h"
 #include "status.h"
@@ -211,14 +215,21 @@ MilvusProxy::Search(const ::milvus::proto::milvus::SearchRequest* r,
     std::vector<std::string> all_index;
     CHECK_STATUS(milvus_local_.GetAllIndexs(r->collection_name(), &all_index),
                  "");
+    return DoSearch(r, schema, all_index, search_result);
+}
 
+Status
+MilvusProxy::DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
+                      const ::milvus::proto::schema::CollectionSchema& schema,
+                      const std::vector<std::string>& all_index,
+                      ::milvus::proto::milvus::SearchResults* search_result) {
     std::string placeholder_group;
     ::milvus::proto::plan::PlanNode plan;
     std::vector<int64_t> nqs, topks;
 
     SearchTask task(const_cast<::milvus::proto::milvus::SearchRequest*>(r),
                     &schema,
-                    all_index);
+                    &all_index);
     CHECK_STATUS(task.Process(&plan, &placeholder_group, &nqs, &topks), "");
     SearchResult result(nqs, topks);
     CHECK_STATUS(milvus_local_.Search(r->collection_name(),
@@ -236,6 +247,54 @@ MilvusProxy::Search(const ::milvus::proto::milvus::SearchRequest* r,
 }
 
 Status
+MilvusProxy::HybridSearch(
+    const ::milvus::proto::milvus::HybridSearchRequest* r,
+    ::milvus::proto::milvus::SearchResults* search_result) {
+    ::milvus::proto::schema::CollectionSchema schema;
+    if (!GetSchemaInfo(r->collection_name(), &schema).IsOk()) {
+        auto err = string_util::SFormat("Can not find {}'s schema",
+                                        r->collection_name());
+        LOG_ERROR(err);
+        return Status::CollectionNotFound(err);
+    }
+    CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
+
+    // get index
+    std::vector<std::string> all_index;
+    CHECK_STATUS(milvus_local_.GetAllIndexs(r->collection_name(), &all_index),
+                 "");
+    HyBridSearchTask task(&schema, &all_index);
+    std::vector<::milvus::proto::milvus::SearchRequest> search_requests;
+    CHECK_STATUS(task.ProcessSearch(r, &search_requests), "");
+
+    std::vector<::milvus::proto::milvus::SearchResults> search_results;
+    for (const auto& req : search_requests) {
+        ::milvus::proto::milvus::SearchResults ret;
+        CHECK_STATUS(DoSearch(&req, schema, all_index, &ret), "");
+        search_results.push_back(ret);
+    }
+    CHECK_STATUS(task.PostProcessSearch(search_results, search_result), "");
+    if (schema_util::IDsSize(search_result->results().ids()) == 0) {
+        return Status::Ok();
+    }
+
+    // requery, get output field data
+    ::milvus::proto::milvus::QueryRequest query_req;
+    task.ProcessQuery(r, search_result, &query_req);
+    ::milvus::proto::plan::PlanNode plan;
+    QueryTask qtask(&query_req, &schema);
+    CHECK_STATUS(qtask.Process(&plan), "");
+
+    RetrieveResult query_result;
+    CHECK_STATUS(
+        milvus_local_.Retrieve(
+            r->collection_name(), plan.SerializeAsString(), &query_result),
+        "");
+
+    return task.PostProcess(query_result, search_result);
+}
+
+Status
 MilvusProxy::Query(const ::milvus::proto::milvus::QueryRequest* r,
                    ::milvus::proto::milvus::QueryResults* query_result) {
     ::milvus::proto::schema::CollectionSchema schema;
@@ -243,7 +302,6 @@ MilvusProxy::Query(const ::milvus::proto::milvus::QueryRequest* r,
         return Status::CollectionNotFound();
     }
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
-
     ::milvus::proto::plan::PlanNode plan;
     QueryTask task(r, &schema);
     CHECK_STATUS(task.Process(&plan), "");
