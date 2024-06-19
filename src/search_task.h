@@ -29,7 +29,7 @@ class SearchTask final : NonCopyableNonMovable {
  public:
     SearchTask(::milvus::proto::milvus::SearchRequest* search_reques,
                const ::milvus::proto::schema::CollectionSchema* schema,
-               const std::vector<std::string>);
+               const std::vector<std::string>*);
     virtual ~SearchTask();
 
  public:
@@ -47,9 +47,6 @@ class SearchTask final : NonCopyableNonMovable {
     bool
     ParseSearchInfo(::milvus::proto::plan::QueryInfo* info);
 
-    bool
-    GetOutputFieldsIds(std::vector<int64_t>* ids);
-
     std::optional<std::tuple<std::string, int64_t>>
     GetVectorField();
 
@@ -59,7 +56,7 @@ class SearchTask final : NonCopyableNonMovable {
  private:
     ::milvus::proto::milvus::SearchRequest* search_request_;
     const ::milvus::proto::schema::CollectionSchema* schema_;
-    std::vector<std::string> all_index_;
+    const std::vector<std::string>* all_index_;
 
     std::vector<std::string> output_fields_;
     std::vector<std::string> user_output_fields_;

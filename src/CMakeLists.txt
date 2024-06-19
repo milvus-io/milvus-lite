@@ -29,7 +29,9 @@ add_library(milite STATIC
   ${CMAKE_CURRENT_LIST_DIR}/query_task.cpp
   ${CMAKE_CURRENT_LIST_DIR}/delete_task.cpp
   ${CMAKE_CURRENT_LIST_DIR}/upsert_task.cpp  
-  ${CMAKE_CURRENT_LIST_DIR}/schema_util.cpp    
+  ${CMAKE_CURRENT_LIST_DIR}/schema_util.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/re_scorer.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/hybrid_search_task.cpp  
 )
 
 

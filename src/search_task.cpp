@@ -32,7 +32,7 @@ namespace milvus::local {
 
 SearchTask::SearchTask(::milvus::proto::milvus::SearchRequest* search_reques,
                        const ::milvus::proto::schema::CollectionSchema* schema,
-                       std::vector<std::string> all_index)
+                       const std::vector<std::string>* all_index)
     : search_request_(search_reques),
       schema_(schema),
       all_index_(all_index),
@@ -75,9 +75,10 @@ SearchTask::ParseSearchInfo(::milvus::proto::plan::QueryInfo* info) {
             try {
                 round_decimal = std::stoll(param.value());
             } catch (std::exception& e) {
-                LOG_ERROR("Parse round_decimal failed, topk: {}, err: {}",
-                          param.value(),
-                          e.what());
+                LOG_ERROR(
+                    "Parse round_decimal failed, round_decimal: {}, err: {}",
+                    param.value(),
+                    e.what());
                 return false;
             }
         } else if (param.key() == kSearchParamKey) {
@@ -140,24 +141,6 @@ SearchTask::ParseSearchInfo(::milvus::proto::plan::QueryInfo* info) {
     return true;
 }
 
-bool
-SearchTask::GetOutputFieldsIds(std::vector<int64_t>* ids) {
-    std::map<std::string, int64_t> name_ids;
-    for (const auto& field : schema_->fields()) {
-        name_ids[field.name()] = field.fieldid();
-    }
-
-    for (const auto& output_field : output_fields_) {
-        auto it = name_ids.find(output_field);
-        if (it == name_ids.end()) {
-            LOG_ERROR("Can not find output field {} in schema", output_field);
-            return false;
-        }
-        ids->push_back(it->second);
-    }
-    return true;
-}
-
 std::optional<std::tuple<std::string, int64_t>>
 SearchTask::GetVectorField() {
     for (const auto& field : schema_->fields()) {
@@ -183,7 +166,7 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
     }
 
     std::vector<int64_t> ids;
-    if (!GetOutputFieldsIds(&ids)) {
+    if (!schema_util::GetOutputFieldsIds(output_fields_, *schema_, &ids)) {
         return Status::ParameterInvalid();
     }
     for (int64_t id : ids) {
@@ -208,7 +191,7 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
 
     // check metrics
     std::string index_metric;
-    for (const auto& index_str : all_index_) {
+    for (const auto& index_str : *all_index_) {
         milvus::proto::segcore::FieldIndexMeta field_index;
         if (!field_index.ParseFromString(index_str)) {
             return Status::ServiceInternal("Error index info in db");
@@ -313,29 +296,11 @@ SearchTask::PostProcess(
 void
 SearchTask::FillInFieldInfo(
     ::milvus::proto::schema::SearchResultData* result_data) {
-    if (output_fields_.size() == 0 || result_data->fields_data_size() == 0) {
-        return;
-    }
-    for (size_t i = 0; i < output_fields_.size(); i++) {
-        const std::string& name = output_fields_[i];
-        for (const auto& field : schema_->fields()) {
-            if (name == field.name()) {
-                auto field_id = field.fieldid();
-                for (int j = 0; j < result_data->fields_data().size(); j++) {
-                    if (field_id == result_data->fields_data(j).field_id()) {
-                        result_data->mutable_fields_data(j)->set_field_name(
-                            field.name());
-                        result_data->mutable_fields_data(j)->set_field_id(
-                            field.fieldid());
-                        result_data->mutable_fields_data(j)->set_type(
-                            field.data_type());
-                        result_data->mutable_fields_data(j)->set_is_dynamic(
-                            field.is_dynamic());
-                    }
-                }
-            }
-        }
-    }
+    std::variant<::milvus::proto::schema::SearchResultData*,
+                 ::milvus::proto::milvus::QueryResults*>
+        result_var;
+    result_var = result_data;
+    schema_util::FillInFieldInfo(output_fields_, *schema_, result_var);
 }
 
 }  // namespace milvus::local

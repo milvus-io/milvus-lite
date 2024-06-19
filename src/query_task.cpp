@@ -235,29 +235,11 @@ QueryTask::PostProcess(const RetrieveResult& rt,
 
 void
 QueryTask::FillInFieldInfo(::milvus::proto::milvus::QueryResults* result_data) {
-    if (output_fields_.size() == 0 || result_data->fields_data_size() == 0) {
-        return;
-    }
-    for (size_t i = 0; i < output_fields_.size(); i++) {
-        const std::string& name = output_fields_[i];
-        for (const auto& field : schema_->fields()) {
-            if (name == field.name()) {
-                auto field_id = field.fieldid();
-                for (int j = 0; j < result_data->fields_data().size(); j++) {
-                    if (field_id == result_data->fields_data(j).field_id()) {
-                        result_data->mutable_fields_data(j)->set_field_name(
-                            field.name());
-                        result_data->mutable_fields_data(j)->set_field_id(
-                            field.fieldid());
-                        result_data->mutable_fields_data(j)->set_type(
-                            field.data_type());
-                        result_data->mutable_fields_data(j)->set_is_dynamic(
-                            field.is_dynamic());
-                    }
-                }
-            }
-        }
-    }
+    std::variant<::milvus::proto::schema::SearchResultData*,
+                 ::milvus::proto::milvus::QueryResults*>
+        result_var;
+    result_var = result_data;
+    schema_util::FillInFieldInfo(output_fields_, *schema_, result_var);
 }
 
 }  // namespace milvus::local

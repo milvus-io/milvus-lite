@@ -66,6 +66,11 @@ class MilvusServiceImpl final
            ::milvus::proto::milvus::SearchResults* response) override;
 
     ::grpc::Status
+    HybridSearch(::grpc::ServerContext* context,
+                 const ::milvus::proto::milvus::HybridSearchRequest* request,
+                 ::milvus::proto::milvus::SearchResults* response) override;
+
+    ::grpc::Status
     Query(::grpc::ServerContext* context,
           const ::milvus::proto::milvus::QueryRequest* request,
           ::milvus::proto::milvus::QueryResults* response) override;

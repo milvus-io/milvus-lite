@@ -82,6 +82,10 @@ class MilvusProxy : NonCopyableNonMovable {
            ::milvus::proto::milvus::SearchResults* search_result);
 
     Status
+    HybridSearch(const ::milvus::proto::milvus::HybridSearchRequest* request,
+                 ::milvus::proto::milvus::SearchResults* search_result);
+
+    Status
     Query(const ::milvus::proto::milvus::QueryRequest* request,
           ::milvus::proto::milvus::QueryResults* response);
 
@@ -108,6 +112,12 @@ class MilvusProxy : NonCopyableNonMovable {
     ParseIndex(const std::string& index_proto,
                const ::milvus::proto::schema::CollectionSchema& schema,
                ::milvus::proto::milvus::IndexDescription* index);
+
+    Status
+    DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
+             const ::milvus::proto::schema::CollectionSchema& schema,
+             const std::vector<std::string>& all_index,
+             ::milvus::proto::milvus::SearchResults* search_result);
 
  private:
     MilvusLocal milvus_local_;
