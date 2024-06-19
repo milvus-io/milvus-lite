@@ -177,7 +177,14 @@ HyBridSearchTask::ProcessSearch(
         search_request.set_dsl(req.dsl());
         search_request.set_placeholder_group(req.placeholder_group());
         search_request.set_dsl_type(req.dsl_type());
-        search_request.mutable_search_params()->CopyFrom(req.search_params());
+        // need remove offset in subrequest
+        for (const auto& pair : req.search_params()) {
+            if (pair.key() != kOffsetKey) {
+                auto new_pair = search_request.add_search_params();
+                new_pair->set_key(pair.key());
+                new_pair->set_value(pair.value());
+            }
+        }
         search_request.set_nq(req.nq());
         std::string metric;
         CHECK_STATUS(GetMetricType(search_request, &metric), "");
@@ -199,9 +206,9 @@ HyBridSearchTask::PostProcessSearch(
     }
     std::vector<std::map<MilvusID, float>> accumulated_scores(nq_);
     for (const auto& req : search_results) {
+        int64_t start = 0;
         for (int64_t i = 0; i < nq_; i++) {
             int64_t topk = req.results().topks(i);
-            int64_t start = 0;
             for (int64_t j = start; j < start + topk; j++) {
                 MilvusID id(req.results().ids(), j);
                 if (accumulated_scores[i].find(id) ==
@@ -318,7 +325,7 @@ HyBridSearchTask::PostProcess(
         new_data->set_is_dynamic(field_data.is_dynamic());
         schema_util::PickFieldDataByIndex(field_data, indexes, new_data);
     }
-    for (const auto& name : output_fields_) {
+    for (const auto& name : user_output_fields_) {
         search_result->mutable_results()
             ->mutable_output_fields()
             ->Add()

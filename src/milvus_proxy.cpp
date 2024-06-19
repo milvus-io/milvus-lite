@@ -277,7 +277,6 @@ MilvusProxy::HybridSearch(
     if (schema_util::IDsSize(search_result->results().ids()) == 0) {
         return Status::Ok();
     }
-
     // requery, get output field data
     ::milvus::proto::milvus::QueryRequest query_req;
     task.ProcessQuery(r, search_result, &query_req);
