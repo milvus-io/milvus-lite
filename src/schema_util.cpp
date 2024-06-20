@@ -386,12 +386,12 @@ PickFieldDataByIndex(const ::milvus::proto::schema::FieldData& src_data,
             } break;
 
             case DType::Int8: {
-                auto data = std::any_cast<int8_t>(GetField(src_data, i));
+                auto data = std::any_cast<int>(GetField(src_data, i));
                 dst->mutable_scalars()->mutable_int_data()->add_data(data);
             } break;
 
             case DType::Int16: {
-                auto data = std::any_cast<int16_t>(GetField(src_data, i));
+                auto data = std::any_cast<int>(GetField(src_data, i));
                 dst->mutable_scalars()->mutable_int_data()->add_data(data);
             } break;
 
