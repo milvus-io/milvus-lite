@@ -139,10 +139,8 @@ class TestcaseBase(Base):
         elif enable_milvus_local_api:
             path = ct.default_milvus_local_path if enable_milvus_local_api == "True" else enable_milvus_local_api
             if init_collection:
-                print("lite connect")
                 res, is_succ = self.connection_wrap.connect(uri=path)
             else:
-                print("client init url")
                 uri = server_manager_instance.start_and_get_uri(path)
                 res, is_succ = self.connection_wrap.MilvusClient(uri=uri)
         else:
