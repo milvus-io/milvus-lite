@@ -1,0 +1,30 @@
+# Copyright (C) 2019-2020 Zilliz. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance
+# with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under the License.
+
+
+FROM quay.io/pypa/manylinux_2_28_aarch64
+
+RUN  yum install -y openblas-devel libatomic-static git && cp /usr/lib/gcc/aarch64-redhat-linux/8/libatomic.a /usr/lib64/
+ENV PATH="/opt/_internal/cpython-3.8.19/bin:${PATH}"
+RUN pip3 install conan==1.63.0
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+ENV CCFLAGS="-Wno-error=address"
+ENV CXXFLAGS="-Wno-error=address"
+RUN mkdir -p /workspace
+WORKDIR  /workspace
+
+RUN conan remote add default-conan-local https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local
+
+COPY build_milvus_lite.sh /workspace/build_milvus_lite.sh
+RUN chmod +x /workspace/build_milvus_lite.sh
+
+ENTRYPOINT ["/workspace/build_milvus_lite.sh"]
