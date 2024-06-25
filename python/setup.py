@@ -157,6 +157,9 @@ setup(name='milvus-lite',
       package_data={},
       include_package_data=True,
       python_requires='>=3.7',
+      entry_points={
+          'console_scripts': ['milvus-lite=milvus_lite.cmdline:main']
+      },
       cmdclass={"bdist_wheel": CMakeBuild},
       long_description=open("../README.md", "r", encoding="utf-8").read(),
       long_description_content_type='text/markdown'
