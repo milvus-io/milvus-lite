@@ -19,9 +19,7 @@ from pymilvus import (
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 
-
-# connections.connect("default", uri="milvus.db")
-connections.connect("default", host="localhost", port="19530")
+connections.connect("default", uri="milvus.db")
 analyzer = build_default_analyzer(language="en")
 bm25_ef = BM25EmbeddingFunction(analyzer)
 
