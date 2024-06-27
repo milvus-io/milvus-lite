@@ -1,0 +1,8 @@
+[build-system]
+requires = [
+    "setuptools>=64.0",
+    "wheel"
+]
+
+# Use legacy backend to import local packages in setup.py
+build-backend = "setuptools.build_meta:__legacy__"

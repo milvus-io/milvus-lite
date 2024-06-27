@@ -3,5 +3,5 @@
 ## build commond
 
 ```shell
-    build.sh ${TAG} {$CONAN_CACHE}
+    build.sh ${Dockerfile} ${TAG} {$CONAN_CACHE}
 ```
