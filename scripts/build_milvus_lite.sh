@@ -29,6 +29,6 @@ git clone --recurse-submodules https://github.com/milvus-io/milvus-lite.git \
     && cd milvus-lite \
     && git checkout $tag \
     && cd python \
-    && python3 setup.py bdist_wheel \
+    && python3 -m build --wheel \
     && cp -r dist /workspace/ \
     && cd /workspace && rm -rf milvus-lite    

@@ -110,7 +110,7 @@ class CMakeBuild(_bdist_wheel):
         subprocess.check_call(['git', 'apply', MILVUS_PATCH], cwd=MILVUS_ROOT)
         # build
         subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF'], cwd=build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.', '--', '-j48'],
+        subprocess.check_call(['cmake', '--build', '.', '--', '-j4'],
                               cwd=build_temp,
                               env=env,
                               )
@@ -145,6 +145,7 @@ def parse_requirements(file_name: str) -> List[str]:
             if require.strip() and not require.startswith('#')
         ]
 
+
 setup(name='milvus-lite',
       version='2.4.8',
       description='A lightweight version of Milvus wrapped with Python.',
@@ -152,6 +153,7 @@ setup(name='milvus-lite',
       author_email='milvus-team@zilliz.com',
       url='https://github.com/milvus-io/milvus-lite.git',
       test_suite='setup.test_suite',
+      install_requires=parse_requirements('requirements.txt'),
       package_dir={'': 'src'},
       packages=find_namespace_packages('src'),
       package_data={},

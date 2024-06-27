@@ -17,17 +17,23 @@
 # limitations under the License.
 
 TAG="main"
+IMAGE_TAG="latest"
 
 if [ "$#" -eq 0 ]; then
-    docker build -t build_milvus_lite:$TAG . \
-        && docker run --rm -v $PWD:/workspace/dist build_milvus_lite:$TAG $TAG
+    echo "Please set dockerfile path"
+elif [ "$#" -eq 0 ]; then
+    DOCKERFILE=$1
+    docker build -t build_milvus_lite:$IMAGE_TAG -f $DOCKERFILE . \
+        && docker run --rm -v $PWD:/workspace/dist build_milvus_lite:$IMAGE_TAG /workspace/build_milvus_lite.sh $TAG
 elif [ "$#" -eq 1 ]; then
-    TAG=$1
-    docker build -t build_milvus_lite:$TAG . \
-        && docker run --rm -v $PWD:/workspace/dist build_milvus_lite:$TAG $TAG
+    DOCKERFILE=$1
+    TAG=$2
+    docker build -t build_milvus_lite:$IMAGE_TAG $DOCKERFILE . \
+        && docker run --rm -v $PWD:/workspace/dist build_milvus_lite:$IMAGE_TAG /workspace/build_milvus_lite.sh $TAG
 elif [ "$#" -eq 2 ]; then
-    TAG=$1
-    CACAN_CACHE=$2
-    docker build -t build_milvus_lite:$TAG . \
-        && docker run --rm -e CONAN_USER_HOME=/workspace/conan -v $CACAN_CACHE:/workspace/conan -v $PWD:/workspace/dist build_milvus_lite:$TAG $TAG
+    DOCKERFILE=$1
+    TAG=$2
+    CACAN_CACHE=$3
+    docker build -t build_milvus_lite:$IMAGE_TAG $DOCKERFILE . \
+        && docker run --rm -e CONAN_USER_HOME=/workspace/conan -v $CACAN_CACHE:/workspace/conan -v $PWD:/workspace/dist build_milvus_lite:$IMAGE_TAG /workspace/build_milvus_lite.sh $TAG
 fi
