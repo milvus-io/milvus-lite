@@ -260,7 +260,7 @@ FetchContent_MakeAvailable(clone_opendal)
 
 add_custom_command(OUTPUT compile_opendal
     COMMENT "Compiling opendal"
-    COMMAND bash -c "cargo build --release --verbose"
+    COMMAND bash -c "cargo +1.73 build --release --verbose"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/bindings/c
 )
 add_custom_target(compile_opendal_target DEPENDS compile_opendal)
