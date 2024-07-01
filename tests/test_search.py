@@ -73,6 +73,42 @@ class TestDefaultSearch(unittest.TestCase):
         self.assertEqual(len(result[0]), 1)
         self.assertEqual(result[0][0]['id'], 6)
 
+        # range search
+        result = self.milvus_client.search(
+            self.collection_name,
+            [[0.0, 1.0]],
+            limit=3,
+            search_params={
+                'metric_type': 'COSINE',
+                "params": {
+                    "radius": 0.99,
+                    "range_filter": 1.0
+                }
+            }
+        )
+        self.assertEqual(len(result[0]), 2)
+        self.assertTrue(0.99 <= result[0][0]['distance'] <= 1.0)
+        self.assertTrue(0.99 <= result[0][1]['distance'] <= 1.0)
+
+        # range search
+        result = self.milvus_client.search(
+            self.collection_name,
+            [[0.0, 1.0]],
+            limit=3,
+            search_params={
+                'metric_type': 'COSINE',
+                "params": {
+                    "radius": 0.9,
+                    "range_filter": 1.0
+                }
+            }
+        )
+        self.assertEqual(len(result[0]), 3)
+        self.assertTrue(0.9 <= result[0][0]['distance'] <= 1.0)
+        self.assertTrue(0.9 <= result[0][1]['distance'] <= 1.0)
+        self.assertTrue(0.9 <= result[0][2]['distance'] <= 1.0)
+
+
     def test_multi_search(self):
         rows = [
             {'id': 1, 'vector': [0.0, 1], 'a': 100},
@@ -99,7 +135,7 @@ class TestDefaultSearch(unittest.TestCase):
         self.assertEqual([item['id']for item in result[0]], [1, 2, 3, 4, 5, 6])
         self.assertEqual([item['id']for item in result[1]], [6, 5, 4, 3, 2, 1])
 
-    
+
 class TestIndexMetric(unittest.TestCase):
     def setUp(self):
         self.dim = 2
