@@ -1101,7 +1101,8 @@ class PlanCCVisitor : public PlanVisitor {
                 google::protobuf::Arena::CreateMessage<proto::plan::UnaryExpr>(
                     arena.get());
             unary_expr->set_op(proto::plan::UnaryExpr_UnaryOp_Not);
-            unary_expr->set_allocated_child(expr);
+            unary_expr->unsafe_arena_set_allocated_child(expr);
+            root_expr->unsafe_arena_set_allocated_unary_expr(unary_expr);
             return ExprWithDtype(
                 root_expr, proto::schema::DataType::Bool, false);
         }
