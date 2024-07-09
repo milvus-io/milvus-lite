@@ -12,7 +12,7 @@ With Milvus Lite, you can start building an AI application with vector similarit
 
 # Requirements
 Milvus Lite supports the following OS distributions and sillicons:
-- Ubuntu >= 20.04 (x86_64)
+- Ubuntu >= 20.04 (x86_64 and arm64)
 - MacOS >= 11.0 (Apple Silicon and x86_64)
 
 Please note that Milvus Lite is good for small scale vector search use cases. For a large scale use case, we recommend using Milvus on [Docker](https://milvus.io/docs/install_standalone-docker.md) or [Kubenetes](https://milvus.io/docs/install_cluster-milvusoperator.md), or considering the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
@@ -89,7 +89,11 @@ print(res)
 All data stored in Milvus Lite can be easily exported and loaded into other types of Milvus deployment, such as Standalone on Docker, Cluster on K8s, or [Zilliz Cloud](https://zilliz.com/cloud)(the fully managed cloud service for Milvus).
 
 Milvus Lite provides a command line tool that can dump milvus-lite data into a json file, which can be imported into [milvus](https://github.com/milvus-io/milvus) and [Zilliz Cloud](https://zilliz.com/cloud)(the fully managed cloud service for Milvus). The milvus-lite command will be installed together with milvus-lite python package 
+
 ```shell
+# Install
+pip install -U "pymilvus[bulk_writer]"
+
 milvus-lite dump -h
 
 usage: milvus-lite dump [-h] [-d DB_FILE] [-c COLLECTION] [-p PATH]
@@ -128,3 +132,4 @@ For any bug or feature request, please report it by submitting an issue in [milv
 
 # License
 Milvus Lite is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/milvus-lite/blob/main/LICENSE) file for details.
+p
