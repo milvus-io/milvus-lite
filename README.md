@@ -1,3 +1,24 @@
+<div align="center">
+    <img src="milvus_lite_log.png#gh-light-mode-only" width="60%"/>
+</div>
+
+<h3 align="center">
+    <p style="text-align: center;"> <span style="font-weight: bold; font: Arial, sans-serif;"></span>A lightweight version of Milvus</p>
+</h3>
+
+<div class="column" align="middle">
+  <a href="https://www.apache.org/licenses/LICENSE-2.0">
+    <img src="https://img.shields.io/badge/license-apache2.0-green?style=flat" alt="license"/>
+  </a>
+  <a href="https://pypi.org/project/milvus-lite/">
+    <img src="https://img.shields.io/pypi/v/milvus-lite?label=Release&color&logo=Python" alt="github actions">
+  </a>
+    <a href="https://pypi.org/project/milvus-lite/">
+    <img src="https://img.shields.io/pypi/dm/milvus-lite.svg?color=bright-green&logo=Pypi" alt="github actions">
+  </a>
+</div>
+
+
 # Introduction
 Milvus Lite is the lightweight version of [Milvus](https://github.com/milvus-io/milvus), an open-source vector database that powers AI applications with vector embeddings and similarity search.
 
