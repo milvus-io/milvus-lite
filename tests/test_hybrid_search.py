@@ -11,6 +11,7 @@
 # the License.
 
 import unittest
+import random
 from pymilvus import (
     FieldSchema, CollectionSchema, DataType, utility,
     Collection, AnnSearchRequest, RRFRanker, connections, WeightedRanker
@@ -79,6 +80,7 @@ class TestHybridSearch(unittest.TestCase):
 
         res = col.hybrid_search([sparse_req, dense_req], rerank=RRFRanker(),
                                 limit=k, output_fields=['text'])
+        print(res)
         self.assertEqual(len(res), 1)
         self.assertEqual(len(res[0]), 2)
         self.assertEqual(res[0][0].fields['text'], docs[1])
@@ -240,7 +242,74 @@ class TestHybridSearch(unittest.TestCase):
         self.assertEqual(res[1][1].get('c'), None)
         self.assertEqual(res[1][2].fields['text'], docs[2])
         self.assertEqual(res[1][2].fields.get('c'), 4)
-        col.drop()        
+        col.drop()
+
+    def test_dense(self):
+        fields = [
+            FieldSchema(name="film_id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="filmVector", dtype=DataType.FLOAT_VECTOR, dim=5),
+            FieldSchema(name="posterVector", dtype=DataType.FLOAT_VECTOR, dim=5)]
+
+        schema = CollectionSchema(fields=fields,enable_dynamic_field=False)
+
+        collection = Collection(name="test_collection1", schema=schema)
+        index_params = {"index_type": "FLAT", "metric_type": "L2"}
+        collection.create_index("filmVector", index_params)
+        collection.create_index("posterVector", index_params)
+
+        entities = []
+        for _ in range(1000):
+            film_id = random.randint(1, 1000)
+            film_vector = [ random.random() for _ in range(5) ]
+            poster_vector = [ random.random() for _ in range(5) ]
+
+            entity = {
+                "film_id": film_id,
+                "filmVector": film_vector,
+                "posterVector": poster_vector
+            }
+            entities.append(entity)
+        collection.insert(entities)
+
+        query_filmVector = [[0.8896863042430693, 0.370613100114602, 0.23779315077113428, 0.38227915951132996, 0.5997064603128835]] * 2
+        search_param_1 = {
+            "data": query_filmVector,
+            "anns_field": "filmVector",
+            "param": {
+                "metric_type": "L2",
+            },
+            "limit": 2
+        }
+        request_1 = AnnSearchRequest(**search_param_1)
+
+        query_posterVector = [[0.02550758562349764, 0.006085637357292062, 0.5325251250159071, 0.7676432650114147, 0.5521074424751443]] * 2
+        search_param_2 = {
+            "data": query_posterVector,
+            "anns_field": "posterVector",
+            "param": {
+                "metric_type": "L2",
+            },
+            "limit": 2
+        }
+        request_2 = AnnSearchRequest(**search_param_2)
+        rerank = WeightedRanker(0.8, 0.2)
+        reqs = [request_1, request_2]
+        collection.load()
+        res = collection.hybrid_search(
+            reqs,
+            rerank,
+            limit=2
+        )
+        self.assertEqual(len(res[0]), 2)
+        self.assertEqual(len(res[1]), 2)
+
+        res = collection.hybrid_search(
+            reqs,
+            rerank,
+            limit=5
+        )
+        self.assertEqual(len(res[0]), 4)
+        self.assertEqual(len(res[1]), 4)
 
 
 if __name__ == '__main__':

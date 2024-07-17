@@ -237,9 +237,13 @@ HyBridSearchTask::PostProcessSearch(
                      const std::pair<MilvusID, float>& b) {
                       return a.second >= b.second;
                   });
-        auto topk_id_scores = std::vector<std::pair<MilvusID, float>>(
-            sorted_id_scores.begin() + offset_, sorted_id_scores.end());
+        auto begin = sorted_id_scores.begin() + offset_;
+        auto end = offset_ + limit_ < sorted_id_scores.size()
+                       ? sorted_id_scores.begin() + offset_ + limit_
+                       : sorted_id_scores.end();
 
+        auto topk_id_scores =
+            std::vector<std::pair<MilvusID, float>>(begin, end);
         search_result->mutable_results()->add_topks(topk_id_scores.size());
         for (const auto& id_score_pair : topk_id_scores) {
             search_result->mutable_results()->add_scores(id_score_pair.second);
