@@ -48,11 +48,14 @@ default_float16_vec_field_name = "float16_vector"
 default_bfloat16_vec_field_name = "bfloat16_vector"
 another_float_vec_field_name = "float_vector1"
 default_binary_vec_field_name = "binary_vector"
-default_sparse_vec_field_name = "SPARSE_FLOAT_VECTOR"
 float_type = "FLOAT_VECTOR"
 float16_type = "FLOAT16_VECTOR"
 bfloat16_type = "BFLOAT16_VECTOR"
 vector_data_type_all = [float_type, float16_type, bfloat16_type]
+sparse_vector = "SPARSE_FLOAT_VECTOR"
+append_vector_type = [float16_type, bfloat16_type, sparse_vector]
+all_dense_vector_types = [float_type, float16_type, bfloat16_type]
+default_sparse_vec_field_name = "sparse_vector"
 default_partition_name = "_default"
 default_resource_group_name = '__default_resource_group'
 default_resource_group_capacity = 1000000
@@ -109,6 +112,7 @@ err_msg = "err_msg"
 in_cluster_env = "IN_CLUSTER"
 
 default_flat_index = {"index_type": "FLAT", "params": {}, "metric_type": "COSINE"}
+default_hnsw_index = {"index_type": "HNSW", "metric_type": "COSINE", "params": {"M": 16, "efConstruction": 128}}
 default_bin_flat_index = {"index_type": "BIN_FLAT", "params": {}, "metric_type": "JACCARD"}
 default_sparse_inverted_index = {"index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP",
                                  "params": {"drop_ratio_build": 0.2}}

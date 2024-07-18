@@ -146,7 +146,7 @@ def gen_double_field(name=ct.default_double_field_name, is_primary=False, descri
 
 def gen_float_vec_field(name=ct.default_float_vec_field_name, is_primary=False, dim=ct.default_dim,
                         description=ct.default_desc, vector_data_type="FLOAT_VECTOR", **kwargs):
-    if vector_data_type == "":
+    if vector_data_type == "SPARSE_FLOAT_VECTOR":
         dtype = DataType.SPARSE_FLOAT_VECTOR
         float_vec_field, _ = ApiFieldSchemaWrapper().init_field_schema(name=name, dtype=dtype,
                                                                        description=description,
@@ -391,8 +391,10 @@ def gen_default_binary_collection_schema(description=ct.default_desc, primary_fi
 
 
 def gen_default_sparse_schema(description=ct.default_desc, primary_field=ct.default_int64_field_name,
-                                         auto_id=False, **kwargs):
+                                         auto_id=False, with_json=False, **kwargs):
     fields = [gen_int64_field(), gen_float_field(), gen_string_field(), gen_sparse_vec_field()]
+    if with_json:
+        fields.insert(-1, gen_json_field())
     sparse_schema, _ = ApiCollectionSchemaWrapper().init_collection_schema(fields=fields, description=description,
                                                                            primary_field=primary_field,
                                                                            auto_id=auto_id, **kwargs)
@@ -1746,8 +1748,9 @@ def insert_data(collection_w, nb=ct.default_nb, is_binary=False, is_all_data_typ
     method: insert non-binary/binary data into partitions if any
     expected: return collection and raw data
     """
-    par = collection_w.partitions
-    num = len(par)
+    # par = collection_w.partitions
+    # num = len(par)
+    num = 1
     vectors = []
     binary_raw_vectors = []
     insert_ids = []
@@ -1768,7 +1771,7 @@ def insert_data(collection_w, nb=ct.default_nb, is_binary=False, is_all_data_typ
                                                                   multiple_vector_field_name=vector_name_list,
                                                                   vector_data_type=vector_data_type,
                                                                   auto_id=auto_id, primary_field=primary_field)
-                    elif vector_data_type == "FLOAT16_VECTOR" or "BFLOAT16_VECTOR":
+                    elif vector_data_type in ct.append_vector_type:
                         default_data = gen_general_default_list_data(nb // num, dim=dim, start=start, with_json=with_json,
                                                                      random_primary_key=random_primary_key,
                                                                      multiple_dim_array=multiple_dim_array,
@@ -1813,7 +1816,8 @@ def insert_data(collection_w, nb=ct.default_nb, is_binary=False, is_all_data_typ
                                                                               auto_id=auto_id,
                                                                               primary_field=primary_field)
             binary_raw_vectors.extend(binary_raw_data)
-        insert_res = collection_w.insert(default_data, par[i].name)[0]
+        # insert_res = collection_w.insert(default_data, par[i].name)[0]
+        insert_res = collection_w.insert(default_data)[0]
         log.info(f"inserted {nb // num} data into collection {collection_w.name}")
         time_stamp = insert_res.timestamp
         insert_ids.extend(insert_res.primary_keys)
