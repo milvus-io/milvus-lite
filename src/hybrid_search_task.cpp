@@ -221,7 +221,6 @@ HyBridSearchTask::PostProcessSearch(
             start += topk;
         }
     }
-
     for (int64_t i = 0; i < nq_; i++) {
         auto id_scores = accumulated_scores[i];
         if (id_scores.size() < offset_) {
@@ -235,7 +234,7 @@ HyBridSearchTask::PostProcessSearch(
                   sorted_id_scores.end(),
                   [](const std::pair<MilvusID, float>& a,
                      const std::pair<MilvusID, float>& b) {
-                      return a.second >= b.second;
+                      return a.second > b.second;
                   });
         auto begin = sorted_id_scores.begin() + offset_;
         auto end = offset_ + limit_ < sorted_id_scores.size()
