@@ -1,14 +1,19 @@
+import math
 import multiprocessing
 import numbers
 import random
 import numpy
 import threading
+
+import numpy as np
 import pytest
 import pandas as pd
 import decimal
 from decimal import Decimal, getcontext
 from time import sleep
 import heapq
+from pymilvus import AnnSearchRequest, RRFRanker, WeightedRanker, connections, CollectionSchema, Collection, \
+    FieldSchema, DataType
 
 from base.client_base import TestcaseBase
 from utils.util_log import test_log as log
@@ -19,6 +24,8 @@ from utils.util_pymilvus import *
 from common.constants import *
 from pymilvus.orm.types import CONSISTENCY_STRONG, CONSISTENCY_BOUNDED, CONSISTENCY_SESSION, CONSISTENCY_EVENTUALLY
 from base.high_level_api_wrapper import HighLevelApiWrapper
+from base.collection_wrapper import ApiCollectionWrapper
+
 client_w = HighLevelApiWrapper()
 
 prefix = "milvus_client_api_search"
@@ -44,6 +51,12 @@ default_bool_field_name = ct.default_bool_field_name
 default_string_field_name = ct.default_string_field_name
 default_int32_array_field_name = ct.default_int32_array_field_name
 default_string_array_field_name = ct.default_string_array_field_name
+hybrid_search_epsilon = 0.01
+max_hybrid_search_req_num = ct.max_hybrid_search_req_num
+default_json_field_name = ct.default_json_field_name
+default_int64_field_name = ct.default_int64_field_name
+max_limit = ct.max_limit
+min_dim = ct.min_dim
 
 
 class TestMilvusClientSearchInvalid(TestcaseBase):
@@ -161,6 +174,18 @@ class TestMilvusClientSearchValid(TestcaseBase):
 
     @pytest.fixture(scope="function", params=["COSINE", "L2"])
     def metric_type(self, request):
+        yield request.param
+
+    @pytest.fixture(scope="function", params=[default_nb, default_nb_medium])
+    def nb(self, request):
+        yield request.param
+
+    @pytest.fixture(scope="function", params=[2, 500])
+    def nq(self, request):
+        yield request.param
+
+    @pytest.fixture(scope="function", params=[32, 128])
+    def dim(self, request):
         yield request.param
 
     """
@@ -477,3 +502,142 @@ class TestMilvusClientSearchValid(TestcaseBase):
                                     "with_vec": True,
                                     "primary_field": default_primary_key_field_name})
         client_w.drop_collection(client, collection_name)
+
+    @pytest.mark.tags(CaseLabel.L1)
+    def test_milvus_client_range_search_cosine(self, enable_milvus_local_api):
+        """
+        target: test delete (high level api)
+        method: create connection, collection, insert delete, and search
+        expected: search/query successfully without deleted data
+        """
+        client = self._connect(enable_milvus_client_api=True, enable_milvus_local_api=enable_milvus_local_api)
+        collection_name = cf.gen_unique_str(prefix)
+        # 1. create collection
+        client_w.create_collection(client, collection_name, default_dim)
+        # 2. insert
+        default_nb = 2000
+        rng = np.random.default_rng(seed=19530)
+        rows = [{default_primary_key_field_name: i, default_vector_field_name: list(rng.random((1, default_dim))[0]),
+                 default_float_field_name: i * 1.0, default_string_field_name: str(i)} for i in range(default_nb)]
+        client_w.insert(client, collection_name, rows)
+        range_filter = random.uniform(0.5, 1)
+        radius = random.uniform(0, range_filter)
+        # 2. range search
+        range_search_params = {"metric_type": "COSINE",
+                               "params": {"radius": radius, "range_filter": range_filter}}
+        search_res = client_w.search(client, collection_name, rng.random((1, default_dim)), limit=3,
+                                         search_params=range_search_params)[0]
+        # 3. check search results
+        for hits in search_res[0]:
+            distance = hits["distance"]
+            assert range_filter >= distance > radius
+
+    @pytest.mark.tags(CaseLabel.L2)
+    def test_range_search_load_release_load(self, enable_milvus_local_api):
+        """
+        target: test range search when load before flush
+        method: 1. insert data and load
+                2. flush, and load
+                3. search the collection
+        expected: search success with limit(topK)
+        """
+        dim = 128
+        client = self._connect(enable_milvus_client_api=True, enable_milvus_local_api=enable_milvus_local_api)
+        collection_name = cf.gen_unique_str(prefix)
+        # 1. create collection
+        client_w.create_collection(client, collection_name, default_dim)
+        # 2. insert data
+        default_nb = 2000
+        rng = np.random.default_rng(seed=19530)
+        rows = [{default_primary_key_field_name: i, default_vector_field_name: list(rng.random((1, default_dim))[0]),
+                 default_float_field_name: i * 1.0, default_string_field_name: str(i)} for i in range(default_nb)]
+        client_w.insert(client, collection_name, rows)
+
+        index_params = client_w.prepare_index_params(client)[0]
+        index_params.add_index(field_name="vector", index_type="HNSW", metric_type="IP")
+        client_w.create_index(client, collection_name, index_params)
+        # 3. load
+        client_w.load_collection(client, collection_name)
+        # 4. reload
+        client_w.release_collection(client, collection_name)
+        client_w.load_collection(client, collection_name)
+        # 5. search
+        vectors = [[random.random() for _ in range(dim)]
+                   for _ in range(default_nq)]
+        range_filter, radius = 1000, 0.5
+        range_search_params = {"metric_type": "COSINE", "params": {"ef": 32, "radius": 0.5,
+                                                                   "range_filter": 1000}}
+        search_res = client_w.search(client, collection_name, vectors[:default_nq], search_params=range_search_params,
+                                                output_fields=[default_primary_key_field_name])
+        for hits in search_res[0][0]:
+            distance = hits["distance"]
+            assert range_filter >= distance > radius
+
+    @pytest.mark.tags(CaseLabel.L2)
+    @pytest.mark.parametrize("index", ["BIN_FLAT"])
+    def test_range_search_binary_jaccard(self, index):
+        """
+        target: range search on binary_array
+        method: range search on binary_array
+        expected: successful search
+        """
+        connections.connect(uri='./test.db')
+        collection_name = cf.gen_unique_str(prefix)
+        int64_field = FieldSchema(name="int64", dtype=DataType.INT64, is_primary=True, auto_id=True)
+        dim = 128
+        nb = 3000
+        vector_field_name = "binary_vector"
+        binary_vector = FieldSchema(name=vector_field_name, dtype=DataType.BINARY_VECTOR, dim=dim)
+        schema = CollectionSchema(fields=[int64_field, binary_vector], enable_dynamic_field=True)
+        collection_w = Collection(collection_name, schema)
+        _ , vectors = cf.gen_binary_vectors(nb, dim)
+        rows = []
+        for vec in vectors:
+            _data = {vector_field_name: vec}
+            rows.append(_data)
+        collection_w.insert(rows)
+        collection_w.flush()
+        default_index = {"index_type": index, "params": {
+            "nlist": 128}, "metric_type": "JACCARD"}
+        collection_w.create_index(vector_field_name, index_params=default_index)
+        search_params = {"metric_type": "JACCARD",
+                         "params": {"radius": 0.8, "range_filter": 0.2}}
+        collection_w.load()
+        collection_w.search(vectors[:default_nq], "binary_vector",
+                            search_params, default_limit, default_search_exp)
+        # 5. range search
+        radius, range_filter = 0.7, 0.1
+        search_params = {"metric_type": "JACCARD", "params": {"nprobe": 10, "radius": radius,
+                                                              "range_filter": range_filter}}
+        search_res = collection_w.search(vectors[:default_nq], "binary_vector",
+                            search_params)
+        for hits in search_res[0]:
+            assert radius > hits.distance > range_filter
+
+    @pytest.mark.tags(CaseLabel.L2)
+    def test_range_search_sparse(self):
+        """
+        target: test sparse index normal range search
+        method: create connection, collection, insert and range search
+        expected: range search successfully
+        """
+        # 1. initialize with data
+        collection_w = self.init_collection_general(prefix, True, nb=5000,
+                                                    with_json=True,
+                                                    vector_data_type=ct.sparse_vector)[0]
+        range_filter = random.uniform(0.5, 1)
+        radius = random.uniform(0, 0.5)
+
+        # 2. range search
+        range_search_params = {"metric_type": "IP",
+                               "params": {"radius": radius, "range_filter": range_filter}}
+        d = cf.gen_default_list_sparse_data(nb=1)
+        search_res = collection_w.search(d[-1][-1:], ct.default_sparse_vec_field_name,
+                                         range_search_params, default_limit,
+                                         default_search_exp)[0]
+
+        # 3. check search results
+        for hits in search_res:
+            for distance in hits.distances:
+                assert range_filter >= distance > radius
+
