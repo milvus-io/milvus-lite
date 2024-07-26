@@ -139,10 +139,10 @@ class TestcaseBase(Base):
         elif enable_milvus_local_api:
             path = ct.default_milvus_local_path if enable_milvus_local_api == "True" else enable_milvus_local_api
             if init_collection:
-                print("ApiConnectionsWrapper :: init ")
+                print("lite connect")
                 res, is_succ = self.connection_wrap.connect(uri=path)
             else:
-                print("MilvusClient init")
+                print("client init url")
                 uri = server_manager_instance.start_and_get_uri(path)
                 res, is_succ = self.connection_wrap.MilvusClient(uri=uri)
         else:
@@ -166,9 +166,8 @@ class TestcaseBase(Base):
         schema = cf.gen_default_collection_schema(enable_dynamic_field=enable_dynamic_field, with_json=with_json) \
             if schema is None else schema
         if not self.connection_wrap.has_connection(alias=DefaultConfig.DEFAULT_USING)[0]:
-            client = self._connect(enable_milvus_local_api="milvus-lite.db", init_collection=True)
+            self._connect(enable_milvus_local_api="milvus-lite.db", init_collection=True)
         collection_w = ApiCollectionWrapper()
-        # collection_w = HighLevelApiWrapper()
         collection_w.init_collection(name=name, schema=schema, check_task=check_task,
                                      check_items=check_items, **kwargs)
 
@@ -254,7 +253,7 @@ class TestcaseBase(Base):
         expected: return collection and raw data, insert ids
         """
         log.info("Test case of search interface: initialize before test case")
-        client = self._connect(enable_milvus_client_api=True, enable_milvus_local_api="./local_test.db", init_collection=True)
+        self._connect(enable_milvus_local_api="./local_test.db", init_collection=True)
         collection_name = cf.gen_unique_str(prefix)
         if name is not None:
             collection_name = name
@@ -264,25 +263,24 @@ class TestcaseBase(Base):
         time_stamp = 0
         # 1 create collection
         default_schema = cf.gen_default_collection_schema(auto_id=auto_id, dim=dim, primary_field=primary_field,
-                                                          enable_dynamic_field=enable_dynamic_field, 
+                                                          enable_dynamic_field=enable_dynamic_field,
                                                           with_json=with_json, multiple_dim_array=multiple_dim_array,
                                                           is_partition_key=is_partition_key,
                                                           vector_data_type=vector_data_type)
         if is_binary:
             default_schema = cf.gen_default_binary_collection_schema(auto_id=auto_id, dim=dim,
-                                                         primary_field=primary_field)
+                                                                     primary_field=primary_field)
         if vector_data_type == ct.sparse_vector:
             default_schema = cf.gen_default_sparse_schema(auto_id=auto_id, primary_field=primary_field,
-                                                          enable_dynamic_field=enable_dynamic_field,
-                                                          with_json=with_json,
-                                                          multiple_dim_array=multiple_dim_array)
+                                                                     enable_dynamic_field=enable_dynamic_field,
+                                                                     with_json=with_json,
+                                                                     multiple_dim_array=multiple_dim_array)
         if is_all_data_type:
             default_schema = cf.gen_collection_schema_all_datatype(auto_id=auto_id, dim=dim,
                                                                    primary_field=primary_field,
                                                                    enable_dynamic_field=enable_dynamic_field,
                                                                    with_json=with_json,
                                                                    multiple_dim_array=multiple_dim_array)
-        log.info("init_collection_general: collection creation")
         collection_w = self.init_collection_wrap(name=collection_name, schema=default_schema, **kwargs)
         vector_name_list = cf.extract_vector_field_name_list(collection_w)
         # 2 add extra partitions if specified (default is 1 partition named "_default")
@@ -310,7 +308,11 @@ class TestcaseBase(Base):
                 if len(multiple_dim_array) == 0 or is_all_data_type == False:
                     vector_name_list.append(ct.default_float_vec_field_name)
                 for vector_name in vector_name_list:
-                    collection_w.create_index(vector_name, ct.default_flat_index)
+                    # Unlike dense vectors, sparse vectors cannot create flat index.
+                    if ct.sparse_vector in vector_name:
+                        collection_w.create_index(vector_name, ct.default_sparse_inverted_index)
+                    else:
+                        collection_w.create_index(vector_name, ct.default_flat_index)
 
             collection_w.load()
 
@@ -399,5 +401,4 @@ class TestcaseBase(Base):
         self.utility_wrap.role_add_user(tmp_user)
 
         return tmp_user, tmp_pwd, tmp_role
-
 
