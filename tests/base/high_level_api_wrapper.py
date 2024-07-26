@@ -5,7 +5,7 @@ from numpy import NaN
 
 from pymilvus import Collection
 from pymilvus import MilvusClient
-from pymilvus import AnnSearchRequest, RRFRanker, WeightedRanker
+
 sys.path.append("..")
 from check.func_check import ResponseChecker
 from utils.api_request import api_request
@@ -696,17 +696,16 @@ class HighLevelApiWrapper:
         return res, check_result
 
     @trace()
-    def hybrid_search(self, client, reqs, rerank, limit, partition_names=None,
+    def hybrid_search(self, client,   reqs, rerank, limit,
                       output_fields=None, timeout=None, round_decimal=-1,
                       check_task=None, check_items=None, **kwargs):
         timeout = TIMEOUT if timeout is None else timeout
 
         func_name = sys._getframe().f_code.co_name
-        res, check = api_request([client.hybrid_search, reqs, rerank, limit, partition_names,
+        res, check = api_request([client.hybrid_search,   reqs, rerank, limit,
                                   output_fields, timeout, round_decimal], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, check,
                                        reqs=reqs, rerank=rerank, limit=limit,
-                                       partition_names=partition_names,
                                        output_fields=output_fields,
                                        timeout=timeout, **kwargs).run()
         return res, check_result

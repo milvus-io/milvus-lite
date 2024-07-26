@@ -391,10 +391,17 @@ def gen_default_binary_collection_schema(description=ct.default_desc, primary_fi
 
 
 def gen_default_sparse_schema(description=ct.default_desc, primary_field=ct.default_int64_field_name,
-                                         auto_id=False, with_json=False, **kwargs):
+                                         auto_id=False, with_json=False, multiple_dim_array=[], **kwargs):
+
     fields = [gen_int64_field(), gen_float_field(), gen_string_field(), gen_sparse_vec_field()]
     if with_json:
         fields.insert(-1, gen_json_field())
+
+    if len(multiple_dim_array) != 0:
+        for i in range(len(multiple_dim_array)):
+            vec_name = ct.default_sparse_vec_field_name + "_" + str(i)
+            vec_field = gen_sparse_vec_field(name=vec_name)
+            fields.append(vec_field)
     sparse_schema, _ = ApiCollectionSchemaWrapper().init_collection_schema(fields=fields, description=description,
                                                                            primary_field=primary_field,
                                                                            auto_id=auto_id, **kwargs)
@@ -517,10 +524,10 @@ def gen_general_default_list_data(nb=ct.default_nb, dim=ct.default_dim, start=0,
             index = 2
         del insert_list[index]
     if len(multiple_dim_array) != 0:
-        if len(multiple_vector_field_name) != len(multiple_dim_array):
-            log.error("multiple vector feature is enabled, please input the vector field name list "
-                      "not including the default vector field")
-            assert len(multiple_vector_field_name) == len(multiple_dim_array)
+        # if len(multiple_vector_field_name) != len(multiple_dim_array):
+        #     log.error("multiple vector feature is enabled, please input the vector field name list "
+        #               "not including the default vector field")
+        #     assert len(multiple_vector_field_name) == len(multiple_dim_array)
         for i in range(len(multiple_dim_array)):
             new_float_vec_values = gen_vectors(nb, multiple_dim_array[i], vector_data_type=vector_data_type)
             insert_list.append(new_float_vec_values)
@@ -1816,7 +1823,6 @@ def insert_data(collection_w, nb=ct.default_nb, is_binary=False, is_all_data_typ
                                                                               auto_id=auto_id,
                                                                               primary_field=primary_field)
             binary_raw_vectors.extend(binary_raw_data)
-        # insert_res = collection_w.insert(default_data, par[i].name)[0]
         insert_res = collection_w.insert(default_data)[0]
         log.info(f"inserted {nb // num} data into collection {collection_w.name}")
         time_stamp = insert_res.timestamp
@@ -1972,14 +1978,10 @@ def extract_vector_field_name_list(collection_w):
     fields = schema_dict.get('fields')
     vector_name_list = []
     for field in fields:
-        if str(field['type']) in ["101", "102", "103"]:
-            if field['name'] != ct.default_float_vec_field_name:
-                vector_name_list.append(field['name'])
-
-    for field in fields:
-        if str(field['type']) == 'DataType.FLOAT_VECTOR' \
-                or str(field['type']) == 'DataType.FLOAT16_VECTOR' \
-                or str(field['type']) == 'DataType.BFLOAT16_VECTOR':
+        if field['type'] == DataType.FLOAT_VECTOR \
+                or field['type'] == DataType.FLOAT16_VECTOR \
+                or field['type'] == DataType.BFLOAT16_VECTOR \
+                or field['type'] == DataType.SPARSE_FLOAT_VECTOR:
             if field['name'] != ct.default_float_vec_field_name:
                 vector_name_list.append(field['name'])
 
