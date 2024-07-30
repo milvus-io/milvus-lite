@@ -101,7 +101,7 @@ QueryTask::ParseQueryParams(::milvus::proto::plan::PlanNode* plan,
             // not used in local
         }
     }
-    if (offset_ < 0 || offset_ >= kTopkLimit) {
+    if (offset_ < 0 || offset_ > kTopkLimit) {
         return Status::ParameterInvalid(
             "Offset should be in range [0, {}], but got {}",
             kTopkLimit,
@@ -120,12 +120,12 @@ QueryTask::ParseQueryParams(::milvus::proto::plan::PlanNode* plan,
     }
 
     // get and validate topk
-    if (limit_ >= kTopkLimit) {
+    if (limit_ > kTopkLimit) {
         return Status::ParameterInvalid(
             "limit should be in range [1, {}], but got {}", kTopkLimit, limit_);
     }
 
-    if ((limit_ + offset_) >= kTopkLimit) {
+    if ((limit_ + offset_) > kTopkLimit) {
         return Status::ParameterInvalid(
             "topk + offset should be in range [1, {}], but got {}",
             kTopkLimit,

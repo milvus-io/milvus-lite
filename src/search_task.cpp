@@ -91,20 +91,20 @@ SearchTask::ParseSearchInfo(::milvus::proto::plan::QueryInfo* info) {
     }
 
     // get and validate topk
-    if (topk_ <= 0 || topk_ >= kTopkLimit) {
+    if (topk_ <= 0 || topk_ > kTopkLimit) {
         LOG_ERROR(
             "Topk should be in range [1, {}], but got {}", kTopkLimit, topk_);
         return false;
     }
 
-    if (offset_ >= kTopkLimit) {
+    if (offset_ > kTopkLimit) {
         LOG_ERROR("Offset should be in range [0, {}], but got {}",
                   kTopkLimit,
                   offset_);
         return false;
     }
 
-    if ((topk_ + offset_) >= kTopkLimit) {
+    if ((topk_ + offset_) > kTopkLimit) {
         LOG_ERROR("topk + offset should be in range [1, {}], but got {}",
                   kTopkLimit,
                   topk_ + offset_);
