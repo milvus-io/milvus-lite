@@ -101,10 +101,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitPower(PlanParser::PowerContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this)).expr;
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this)).expr;
         auto right_expr =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this)).expr;
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this)).expr;
 
         auto left = extractValue(left_expr);
         auto right = extractValue(right_expr);
@@ -134,10 +135,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitLogicalOr(PlanParser::LogicalOrContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
 
         auto left_expr = left_expr_with_type.expr;
         auto right_expr = right_expr_with_type.expr;
@@ -173,10 +175,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitLogicalAnd(PlanParser::LogicalAndContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
 
         auto left_expr = left_expr_with_type.expr;
         auto right_expr = right_expr_with_type.expr;
@@ -232,11 +235,12 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitJSONContainsAll(PlanParser::JSONContainsAllContext* ctx) override {
-        auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+        auto expr_ret = ctx->expr();
+        auto field = std::any_cast<ExprWithDtype>(expr_ret[0]->accept(this));
         auto info = field.expr->column_expr().info();
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
-        auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+        auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
@@ -267,10 +271,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitMulDivMod(PlanParser::MulDivModContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
         auto left_expr = left_expr_with_type.expr;
         auto right_expr = right_expr_with_type.expr;
 
@@ -533,10 +538,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitEquality(PlanParser::EqualityContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
 
         auto left_value = extractValue(left_expr_with_type.expr);
         auto right_value = extractValue(right_expr_with_type.expr);
@@ -704,12 +710,13 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitReverseRange(PlanParser::ReverseRangeContext* ctx) override {
+        auto expr = ctx->expr();
         auto info =
             getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
         TRY_WITH_EXCEPTION(info != nullptr);
         TRY_WITH_EXCEPTION(checkDirectComparisonBinaryField(info));
-        auto lower = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
-        auto upper = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+        auto lower = std::any_cast<ExprWithDtype>(expr[1]->accept(this));
+        auto upper = std::any_cast<ExprWithDtype>(expr[0]->accept(this));
 
         if (info->data_type() == proto::schema::DataType::Int8 ||
             info->data_type() == proto::schema::DataType::Int16 ||
@@ -788,10 +795,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitAddSub(PlanParser::AddSubContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
         auto left_value = extractValue(left_expr_with_type.expr);
         auto right_value = extractValue(right_expr_with_type.expr);
 
@@ -902,10 +910,11 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitRelational(PlanParser::RelationalContext* ctx) override {
+        auto expr = ctx->expr();
         auto left_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[0]->accept(this));
         auto right_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+            std::any_cast<ExprWithDtype>(expr[1]->accept(this));
         auto left_value = extractValue(left_expr_with_type.expr);
         auto right_value = extractValue(right_expr_with_type.expr);
         if (left_value.has_value() && right_value.has_value()) {
@@ -1029,17 +1038,18 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitTerm(PlanParser::TermContext* ctx) override {
+        auto expr_ret = ctx->expr();
         auto first_expr_with_type =
-            std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+            std::any_cast<ExprWithDtype>(expr_ret[0]->accept(this));
         auto info =
             first_expr_with_type.expr->unsafe_arena_release_column_expr()
                 ->unsafe_arena_release_info();
-
         auto term_expr =
             google::protobuf::Arena::CreateMessage<proto::plan::TermExpr>(
                 arena.get());
-        for (size_t i = 1; i < ctx->expr().size(); ++i) {
-            auto elem = ctx->expr()[i];
+
+        for (size_t i = 1; i < expr_ret.size(); ++i) {
+            auto elem = expr_ret[i];
             auto expr_ = std::any_cast<ExprWithDtype>(elem->accept(this)).expr;
             auto v = google::protobuf::Arena::CreateMessage<
                 proto::plan::GenericValue>(arena.get());
@@ -1111,11 +1121,12 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitJSONContains(PlanParser::JSONContainsContext* ctx) override {
-        auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+        auto expr_ret = ctx->expr();
+        auto field = std::any_cast<ExprWithDtype>(expr_ret[0]->accept(this));
         auto info = field.expr->column_expr().info();
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
-        auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+        auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
@@ -1146,12 +1157,13 @@ class PlanCCVisitor : public PlanVisitor {
 
     virtual std::any
     visitRange(PlanParser::RangeContext* ctx) override {
+        auto expr = ctx->expr();
         auto info =
             getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
         TRY_WITH_EXCEPTION(info != nullptr);
         TRY_WITH_EXCEPTION(checkDirectComparisonBinaryField(info));
-        auto lower = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
-        auto upper = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+        auto lower = std::any_cast<ExprWithDtype>(expr[0]->accept(this));
+        auto upper = std::any_cast<ExprWithDtype>(expr[1]->accept(this));
 
         if (info->data_type() == proto::schema::DataType::Int8 ||
             info->data_type() == proto::schema::DataType::Int16 ||
@@ -1299,7 +1311,8 @@ class PlanCCVisitor : public PlanVisitor {
         auto dtype = proto::schema::DataType::None;
 
         auto is_same = true;
-        for (auto&& elem : ctx->expr()) {
+        auto expr_ret = ctx->expr();
+        for (auto&& elem : expr_ret) {
             auto expr_ = std::any_cast<ExprWithDtype>(elem->accept(this)).expr;
             auto v = array_expr->add_array();
             auto value = extractValue(expr_);
@@ -1392,11 +1405,12 @@ class PlanCCVisitor : public PlanVisitor {
     }
     virtual std::any
     visitJSONContainsAny(PlanParser::JSONContainsAnyContext* ctx) override {
-        auto field = std::any_cast<ExprWithDtype>(ctx->expr()[0]->accept(this));
+        auto expr_ret = ctx->expr();
+        auto field = std::any_cast<ExprWithDtype>(expr_ret[0]->accept(this));
         auto info = field.expr->column_expr().info();
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
-        auto elem = std::any_cast<ExprWithDtype>(ctx->expr()[1]->accept(this));
+        auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
                 proto::plan::GenericValue(elem.expr->value_expr().value());
