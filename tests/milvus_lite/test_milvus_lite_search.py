@@ -1663,7 +1663,7 @@ class TestCollectionHybridSearchValid(TestcaseBase):
             # search to get the base line of hybrid_search
             search_res = collection_w.search(vectors[:1], vector_name_list[i],
                                              default_search_params, limit,
-                                             default_expr, round_decimal=5,
+                                             default_expr,
                                              check_task=CheckTasks.check_search_results,
                                              check_items={"nq": 1,
                                                           "ids": insert_ids,
@@ -1674,10 +1674,9 @@ class TestCollectionHybridSearchValid(TestcaseBase):
                 search_res_dict[ids[j]] = distance_array[j]
             search_res_dict_array.append(search_res_dict)
         # 4. calculate hybrid search base line
-        ids_answer, score_answer = cf.get_hybrid_search_base_results(search_res_dict_array, weights, metrics, 5)
+        ids_answer, score_answer = cf.get_hybrid_search_base_results(search_res_dict_array, weights, metrics)
         # 5. hybrid search
         hybrid_res = collection_w.hybrid_search(req_list, WeightedRanker(*weights), limit,
-                                                round_decimal=5,
                                                 check_task=CheckTasks.check_search_results,
                                                 check_items={"nq": 1,
                                                              "ids": insert_ids,

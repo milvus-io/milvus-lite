@@ -162,13 +162,13 @@ class ApiCollectionWrapper:
 
     @trace()
     def search(self, data, anns_field, param, limit, expr=None,
-               partition_names=None, output_fields=None, timeout=None, round_decimal=-1,
-               check_task=None, check_items=None, **kwargs):
+               partition_names=None, output_fields=None, timeout=None # round_decimal=-1,
+               , check_task=None, check_items=None, **kwargs):
         timeout = TIMEOUT if timeout is None else timeout
 
         func_name = sys._getframe().f_code.co_name
         res, check = api_request([self.collection.search, data, anns_field, param, limit,
-                                  expr, partition_names, output_fields, timeout, round_decimal], **kwargs)
+                                  expr, partition_names, output_fields, timeout], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, check,
                                        data=data, anns_field=anns_field, param=param, limit=limit,
                                        expr=expr, partition_names=partition_names,
@@ -181,9 +181,10 @@ class ApiCollectionWrapper:
                       output_fields=None, timeout=None, round_decimal=-1,
                       check_task=None, check_items=None, **kwargs):
         timeout = TIMEOUT if timeout is None else timeout
+        partition_names = None
         func_name = sys._getframe().f_code.co_name
         res, check = api_request([self.collection.hybrid_search, reqs, rerank, limit,
-                                  output_fields, timeout, round_decimal], **kwargs)
+                                  partition_names, output_fields, timeout], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, check,
                                        reqs=reqs, rerank=rerank, limit=limit,
                                        output_fields=output_fields,
@@ -202,21 +203,6 @@ class ApiCollectionWrapper:
         check_result = ResponseChecker(res, func_name, check_task, check_items, check,
                                        data=data, anns_field=anns_field, param=param, limit=limit,
                                        expr=expr, partition_names=partition_names,
-                                       output_fields=output_fields,
-                                       timeout=timeout, **kwargs).run()
-        return res, check_result
-
-    @trace()
-    def hybrid_search(self, reqs, rerank, limit, partition_names=None, output_fields=None, timeout=None, round_decimal=-1,
-               check_task=None, check_items=None, **kwargs):
-        timeout = TIMEOUT if timeout is None else timeout
-
-        func_name = sys._getframe().f_code.co_name
-        res, check = api_request([self.collection.hybrid_search, reqs, rerank, limit,
-                                        partition_names, output_fields, timeout, round_decimal], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, check,
-                                       reqs=reqs, rerank=rerank, limit=limit,
-                                       partition_names=partition_names,
                                        output_fields=output_fields,
                                        timeout=timeout, **kwargs).run()
         return res, check_result
