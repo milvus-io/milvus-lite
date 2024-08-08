@@ -59,7 +59,7 @@ main(int argc, char** argv) {
     std::string work_dir = argv[1];
     std::string address = argv[2];
     std::string log_level = "ERROR";
-    if (argc == 4) {
+    if (argc >= 4) {
         log_level = argv[3];
     }
     if (log_level == "INFO") {
