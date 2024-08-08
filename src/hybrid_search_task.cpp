@@ -188,7 +188,7 @@ HyBridSearchTask::ProcessSearch(
         search_request.set_nq(req.nq());
         std::string metric;
         CHECK_STATUS(GetMetricType(search_request, &metric), "");
-        re_scorers_[0]->SetMetricType(metric);
+        re_scorers_[i]->SetMetricType(metric);
         search_requests->push_back(search_request);
     }
     return Status::Ok();
