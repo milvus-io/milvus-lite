@@ -42,7 +42,7 @@ Please note that Milvus Lite is only suitable for small scale vector search use 
 ```shell
 pip install -U pymilvus
 ```
-We recommend using `pymilvus`. Since `milvus-lite` is included in `pymilvus` version 2.4.2 or above, you can `pip install` with `-U` to force update to the latest version and `milvus-lite` is automatically installed..
+We recommend using `pymilvus`. Since `milvus-lite` is included in `pymilvus` version 2.4.2 or above, you can `pip install` with `-U` to force update to the latest version and `milvus-lite` is automatically installed.
 
 
 If you want to explicitly install `milvus-lite` package, or you have installed an older version of `milvus-lite` and would like to update it, you can do `pip install -U milvus-lite`.
@@ -51,7 +51,7 @@ If you want to explicitly install `milvus-lite` package, or you have installed a
 In `pymilvus`, specify a local file name as uri parameter of MilvusClient will use Milvus Lite.
 ```python
 from pymilvus import MilvusClient
-client = MilvusClient("milvus_demo.db")
+client = MilvusClient("./milvus_demo.db")
 ```
 
 > **_NOTE:_**  Note that the same API also applies to Milvus Standalone, Milvus Distributed and Zilliz Cloud, the only difference is to replace local file name to remote server endpoint and credentials, e.g. 
@@ -112,7 +112,15 @@ res = client.delete(
 print(res)
 ```
 
+# Supported Features
+
+# Known Limitations
+Milvus Lite only supports [FLAT](https://milvus.io/docs/index.md?tab=floating#FLAT) index type. It uses FLAT type regardless of the specified index type in collection.
+
+Milvus Lite does not support partitions, users/roles/RBAC, alias. To use those features, please choose other Milvus deployment types such as [Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone), [Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed) or [Zilliz Cloud](https://zilliz.com/cloud) (fully-managed Milvus).
+
 # Migrating data from Milvus Lite
+
 All data stored in Milvus Lite can be easily exported and loaded into other types of Milvus deployment, such as Milvus Standalone on Docker, Milvus Distributed on K8s, or fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
 
 Milvus Lite provides a command line tool that can dump data into a json file, which can be imported into [milvus](https://github.com/milvus-io/milvus) and [Zilliz Cloud](https://zilliz.com/cloud)(the fully managed cloud service for Milvus). The milvus-lite command will be installed together with milvus-lite python package 
@@ -135,7 +143,7 @@ optional arguments:
 ```
 The following example dumps all data from `demo_collection` collection that's stored in `./milvus_demo.db` (Milvus Lite database file)
 
-export data:
+To export data:
 
 ```shell
 milvus-lite dump -d ./milvus_demo.db -c demo_collection -p ./data_dir
@@ -143,14 +151,8 @@ milvus-lite dump -d ./milvus_demo.db -c demo_collection -p ./data_dir
 # demo_collection: collection that need to be dumped
 #./data_dir : dump file storage dir
 ```
-With this file, you can upload data to zilliz cloud:
 
-https://docs.zilliz.com/docs/byoc/import-data 
-
-Or upload data to milvus:
-
-https://milvus.io/api-reference/pymilvus/v2.4.x/ORM/utility/do_bulk_insert.md
-
+With the dump file, you can upload data to Zilliz Cloud via [Data Import](https://docs.zilliz.com/docs/data-import), or upload data to Milvus servers via [Bulk Insert](https://milvus.io/docs/import-data.md).
 # Contributing
 If you want to contribute to Milvus Lite, please read the [Contributing Guide](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md) first.
 
