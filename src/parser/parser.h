@@ -1127,22 +1127,22 @@ class PlanCCVisitor : public PlanVisitor {
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
+        auto elem_value = elem.expr->value_expr().value();
+
         if (info.data_type() == proto::schema::DataType::Array) {
             proto::plan::GenericValue expr =
-                proto::plan::GenericValue(elem.expr->value_expr().value());
+                proto::plan::GenericValue(elem_value);
             TRY_WITH_EXCEPTION(
                 canBeCompared(field, toValueExpr(&expr, this->arena.get())));
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             this->arena.get());
+
         auto json_contain_expr = google::protobuf::Arena::CreateMessage<
             proto::plan::JSONContainsExpr>(this->arena.get());
         auto value = json_contain_expr->add_elements();
-        value->unsafe_arena_set_allocated_array_val(
-            CreateMessageWithCopy<proto::plan::Array>(
-                this->arena.get(),
-                elem.expr->value_expr().value().array_val()));
+        value->CopyFrom(elem_value);
         json_contain_expr->set_elements_same_type(true);
         json_contain_expr->set_allocated_column_info(
             CreateMessageWithCopy(this->arena.get(), info));

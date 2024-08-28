@@ -38,9 +38,13 @@ Storage::Open() {
             db_file_,
             SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE |
                 SQLite::OPEN_FULLMUTEX);
+
+        SQLite::Transaction transaction(*db_ptr_.get());
         if (!cm_.Init(db_ptr_.get())) {
             return false;
         }
+        transaction.commit();
+
         std::vector<std::string> names;
         cm_.CollectionNames(&names);
         for (const auto& name : names) {

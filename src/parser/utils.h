@@ -184,7 +184,7 @@ arithmeticDtype(proto::schema::DataType type) {
 inline proto::schema::DataType
 getArrayElementType(proto::plan::Expr* expr) {
     if (expr->has_column_expr()) {
-        return expr->column_expr().info().data_type();
+        return expr->column_expr().info().element_type();
     }
     if (expr->has_value_expr() && expr->value_expr().has_value() &&
         expr->value_expr().value().has_array_val()) {
