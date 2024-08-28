@@ -592,6 +592,7 @@ ParseExpr(const std::string& expr_str,
         expr_out->ParseFromString(buf);
         return Status::Ok();
     } catch (std::exception& e) {
+        LOG_ERROR(e.what());
         return Status::ParameterInvalid(
             string_util::SFormat("Invalid expr: {}", expr_str));
     }
