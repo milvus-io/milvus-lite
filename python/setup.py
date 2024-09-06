@@ -18,7 +18,7 @@ from typing import List
 import subprocess
 import platform
 
-from setuptools import setup, find_namespace_packages, Extension
+from setuptools import setup, find_namespace_packages
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 import shutil
@@ -147,7 +147,7 @@ def parse_requirements(file_name: str) -> List[str]:
 
 
 setup(name='milvus-lite',
-      version='2.4.9',
+      version='2.4.10',
       description='A lightweight version of Milvus wrapped with Python.',
       author='Milvus Team',
       author_email='milvus-team@zilliz.com',
