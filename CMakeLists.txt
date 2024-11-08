@@ -64,7 +64,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 include(FetchContent)
 
-set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;google-cloud-cpp::rest_internal;AWS::aws-sdk-cpp-identity-management")
+if(REMOTE_STORAGE)
+  set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;google-cloud-cpp::rest_internal;AWS::aws-sdk-cpp-identity-management")
+else ()
+  set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;")
+endif()    
 
 find_package(SQLiteCpp REQUIRED)
 include_directories(${SQLiteCpp_INCLUDE_DIRS})
@@ -121,13 +125,14 @@ include_directories(${marisa_INCLUDE_DIRS})
 find_package(yaml-cpp REQUIRED)
 include_directories(${yaml-cpp_INCLUDE_DIRS})
 
-find_package(google-cloud-cpp REQUIRED)
-include_directories(${google-cloud-cpp_INCLUDE_DIRS})
+if(REMOTE_STORAGE)
+  find_package(google-cloud-cpp REQUIRED)
+  include_directories(${google-cloud-cpp_INCLUDE_DIRS})
+  find_package(AWSSDK REQUIRED)
+endif()
 
 find_package(absl REQUIRED)
 include_directories(${absl_type_traits_INCLUDE_DIRS})
-
-find_package(AWSSDK REQUIRED)
 
 add_definitions(-DANTLR4CPP_STATIC)
 add_definitions(-DHAVE_CPP_STDLIB)

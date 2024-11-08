@@ -36,7 +36,6 @@ class MilvusLiteConan(ConanFile):
         "zstd/1.5.4",
         "yaml-cpp/0.7.0",
         "libdwarf/0.9.1",
-        "google-cloud-cpp/2.5.0@milvus/dev",
     )
 
     generators = {"cmake", "cmake_find_package"}
@@ -61,10 +60,7 @@ class MilvusLiteConan(ConanFile):
         "arrow:with_thrift": True,
         "arrow:with_jemalloc": True,
         "arrow:shared": False,
-        "arrow:with_s3": True,
-        "aws-sdk-cpp:config": True,
-        "aws-sdk-cpp:text-to-speech": False,
-        "aws-sdk-cpp:transfer": False,
+        "arrow:with_s3": False,        
     }
 
     def configure(self):

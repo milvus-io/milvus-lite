@@ -38,10 +38,37 @@ index eb92f5657..ea5ca2b51 100644
  target_link_libraries(milvus_segcore milvus_query milvus_bitset milvus_exec ${OpenMP_CXX_FLAGS} milvus-storage)
  
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
-index ac600d945..0fd9953f0 100644
+index ac600d945..c20117759 100644
 --- a/internal/core/src/storage/CMakeLists.txt
 +++ b/internal/core/src/storage/CMakeLists.txt
-@@ -62,7 +62,7 @@ if(USE_OPENDAL)
+@@ -46,23 +46,29 @@ set(STORAGE_FILES
+     ThreadPool.cpp
+     prometheus_client.cpp
+     storage_c.cpp
+-    ChunkManager.cpp
+-    MinioChunkManager.cpp
+-    AliyunSTSClient.cpp
+-    AliyunCredentialsProvider.cpp
+     MemFileManagerImpl.cpp
+     LocalChunkManager.cpp
+     DiskFileManagerImpl.cpp
+     ThreadPools.cpp
+     ChunkCache.cpp
++  )
++
++if(REMOTE_STORAGE)
++  list(APPEND STORAGE_FILES
++    ChunkManager.cpp
++    MinioChunkManager.cpp
++    AliyunSTSClient.cpp
++    AliyunCredentialsProvider.cpp
+     TencentCloudCredentialsProvider.cpp
+-    TencentCloudSTSClient.cpp)
++    TencentCloudSTSClient.cpp
++  )
++endif()  
+ 
+ if(USE_OPENDAL)
      list(APPEND STORAGE_FILES OpenDALChunkManager.cpp)
  endif()
  
@@ -50,3 +77,33 @@ index ac600d945..0fd9953f0 100644
  
  if (DEFINED AZURE_BUILD_DIR)
      target_link_libraries(milvus_storage PUBLIC
+diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
+index 0e714f0a9..40621555b 100644
+--- a/internal/core/src/storage/Util.cpp
++++ b/internal/core/src/storage/Util.cpp
+@@ -34,7 +34,9 @@
+ #include "storage/InsertData.h"
+ #include "storage/LocalChunkManager.h"
+ #include "storage/MemFileManagerImpl.h"
++#ifdef REMOTE_STORAGE
+ #include "storage/MinioChunkManager.h"
++#endif
+ #ifdef USE_OPENDAL
+ #include "storage/OpenDALChunkManager.h"
+ #endif
+@@ -701,6 +703,7 @@ CreateChunkManager(const StorageConfig& storage_config) {
+             return std::make_shared<LocalChunkManager>(
+                 storage_config.root_path);
+         }
++#ifdef REMOTE_STORAGE
+         case ChunkManagerType::Minio: {
+             return std::make_shared<MinioChunkManager>(storage_config);
+         }
+@@ -731,6 +734,7 @@ CreateChunkManager(const StorageConfig& storage_config) {
+                 }
+             }
+         }
++#endif
+ #ifdef USE_OPENDAL
+         case ChunkManagerType::OpenDAL: {
+             return std::make_shared<OpenDALChunkManager>(storage_config);
