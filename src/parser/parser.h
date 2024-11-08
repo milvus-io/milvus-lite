@@ -191,7 +191,7 @@ class PlanCCVisitor : public PlanVisitor {
             left_value.type() == typeid(bool) &&
             right_value.type() == typeid(bool)) {
             return ExprWithDtype(
-                createValueExpr<bool>(std::any_cast<bool>(left_value) ||
+                createValueExpr<bool>(std::any_cast<bool>(left_value) &&
                                           std::any_cast<bool>(right_value),
                                       this->arena.get()
 
