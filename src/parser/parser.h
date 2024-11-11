@@ -1171,6 +1171,7 @@ class PlanCCVisitor : public PlanVisitor {
             info->data_type() == proto::schema::DataType::Int64 ||
             info->data_type() == proto::schema::DataType::Float ||
             info->data_type() == proto::schema::DataType::Double ||
+            info->data_type() == proto::schema::DataType::Bool ||
             info->data_type() == proto::schema::DataType::String ||
             info->data_type() == proto::schema::DataType::VarChar) {
             auto a = extractValue(lower.expr);
@@ -1204,6 +1205,8 @@ class PlanCCVisitor : public PlanVisitor {
                     lower_value->set_float_val(double(std::any_cast<float>(a)));
                 if (a.type() == typeid(std::string))
                     lower_value->set_string_val(std::any_cast<std::string>(a));
+                if (a.type() == typeid(bool))
+                    lower_value->set_bool_val(std::any_cast<bool>(a));
 
                 if (b.type() == typeid(int8_t))
                     upper_value->set_int64_val(
@@ -1223,6 +1226,8 @@ class PlanCCVisitor : public PlanVisitor {
                     upper_value->set_float_val(double(std::any_cast<float>(b)));
                 if (b.type() == typeid(std::string))
                     upper_value->set_string_val(std::any_cast<std::string>(b));
+                if (b.type() == typeid(bool))
+                    upper_value->set_bool_val(std::any_cast<bool>(b));
 
                 binary_range_expr->set_lower_inclusive(lowerinclusive);
                 binary_range_expr->set_upper_inclusive(upperinclusive);
