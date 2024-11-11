@@ -11,6 +11,149 @@ index 4330b43f8..255a4c63c 100644
  
  target_link_libraries(milvus_common
          milvus_bitset
+diff --git a/internal/core/src/common/Tracer.cpp b/internal/core/src/common/Tracer.cpp
+index 4711ef76a..a84c637fe 100644
+--- a/internal/core/src/common/Tracer.cpp
++++ b/internal/core/src/common/Tracer.cpp
+@@ -17,6 +17,8 @@
+ #include <vector>
+ #include <utility>
+ 
++#ifndef MILVUS_LITE
++
+ #include "opentelemetry/exporters/jaeger/jaeger_exporter_factory.h"
+ #include "opentelemetry/exporters/ostream/span_exporter_factory.h"
+ #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
+@@ -29,8 +31,10 @@
+ #include "opentelemetry/sdk/version/version.h"
+ #include "opentelemetry/trace/span_context.h"
+ #include "opentelemetry/trace/span_metadata.h"
++#endif
+ 
+ namespace milvus::tracer {
++#ifndef MILVUS_LITE
+ 
+ namespace trace = opentelemetry::trace;
+ namespace nostd = opentelemetry::nostd;
+@@ -170,5 +174,68 @@ GetSpanIDAsVector(const TraceContext* ctx) {
+         return {};
+     }
+ }
++#endif
++
++#ifdef MILVUS_LITE
++
++void
++initTelemetry(const TraceConfig& cfg) {
++}
++
++std::shared_ptr<trace::Tracer>
++GetTracer() {
++    return std::make_shared<trace::Tracer>();
++}
++
++std::shared_ptr<trace::Span>
++StartSpan(const std::string& name, TraceContext* parentCtx) {
++    return std::make_shared<trace::Span>();
++}
++
++thread_local std::shared_ptr<trace::Span> local_span;
++void
++SetRootSpan(std::shared_ptr<trace::Span> span) {
++}
++
++void
++CloseRootSpan() {
++}
++
++void
++AddEvent(const std::string& event_label) {
++}
++
++bool
++isEmptyID(const uint8_t* id, int length) {
++    if (id != nullptr) {
++        for (int i = 0; i < length; i++) {
++            if (id[i] != 0) {
++                return false;
++            }
++        }
++    }
++    return true;
++}
++
++bool
++EmptyTraceID(const TraceContext* ctx) {
++    return true;
++}
++
++bool
++EmptySpanID(const TraceContext* ctx) {
++    return true;
++}
++
++std::vector<uint8_t>
++GetTraceIDAsVector(const TraceContext* ctx) {
++    return {};
++}
++
++std::vector<uint8_t>
++GetSpanIDAsVector(const TraceContext* ctx) {
++    return {};
++}
++#endif
+ 
+ }  // namespace milvus::tracer
+diff --git a/internal/core/src/common/Tracer.h b/internal/core/src/common/Tracer.h
+index 3ecb0798f..7aadb0531 100644
+--- a/internal/core/src/common/Tracer.h
++++ b/internal/core/src/common/Tracer.h
+@@ -13,11 +13,34 @@
+ 
+ #include <memory>
+ #include <string>
++#include <vector>
+ 
++#ifndef MILVUS_LITE
+ #include "opentelemetry/trace/provider.h"
++#endif
+ 
+ #define TRACE_SERVICE_SEGCORE "segcore"
+ 
++namespace trace {
++
++#ifdef MILVUS_LITE
++class Span {
++ public:
++    void
++    End() {
++    }
++};
++class Tracer {
++ public:
++    static int
++    WithActiveSpan(std::shared_ptr<Span>& span) noexcept {
++        return 0;
++    }
++};
++
++};  // namespace trace
++#endif
++
+ namespace milvus::tracer {
+ 
+ struct TraceConfig {
+@@ -35,7 +58,10 @@ struct TraceContext {
+     const uint8_t* spanID = nullptr;
+     uint8_t traceFlags = 0;
+ };
++
++#ifndef MILVUS_LITE
+ namespace trace = opentelemetry::trace;
++#endif
+ 
+ void
+ initTelemetry(const TraceConfig& cfg);
 diff --git a/internal/core/src/index/CMakeLists.txt b/internal/core/src/index/CMakeLists.txt
 index c49e9477f..2280a84bc 100644
 --- a/internal/core/src/index/CMakeLists.txt
@@ -38,7 +181,7 @@ index eb92f5657..ea5ca2b51 100644
  target_link_libraries(milvus_segcore milvus_query milvus_bitset milvus_exec ${OpenMP_CXX_FLAGS} milvus-storage)
  
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
-index ac600d945..c20117759 100644
+index ac600d945..f4d450f77 100644
 --- a/internal/core/src/storage/CMakeLists.txt
 +++ b/internal/core/src/storage/CMakeLists.txt
 @@ -46,23 +46,29 @@ set(STORAGE_FILES
@@ -56,7 +199,7 @@ index ac600d945..c20117759 100644
      ChunkCache.cpp
 +  )
 +
-+if(REMOTE_STORAGE)
++if(NOT MILVUS_LITE)
 +  list(APPEND STORAGE_FILES
 +    ChunkManager.cpp
 +    MinioChunkManager.cpp
@@ -78,14 +221,14 @@ index ac600d945..c20117759 100644
  if (DEFINED AZURE_BUILD_DIR)
      target_link_libraries(milvus_storage PUBLIC
 diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
-index 0e714f0a9..40621555b 100644
+index 0e714f0a9..46ebabf2e 100644
 --- a/internal/core/src/storage/Util.cpp
 +++ b/internal/core/src/storage/Util.cpp
 @@ -34,7 +34,9 @@
  #include "storage/InsertData.h"
  #include "storage/LocalChunkManager.h"
  #include "storage/MemFileManagerImpl.h"
-+#ifdef REMOTE_STORAGE
++#ifndef MILVUS_LITE
  #include "storage/MinioChunkManager.h"
 +#endif
  #ifdef USE_OPENDAL
@@ -95,7 +238,7 @@ index 0e714f0a9..40621555b 100644
              return std::make_shared<LocalChunkManager>(
                  storage_config.root_path);
          }
-+#ifdef REMOTE_STORAGE
++#ifndef MILVUS_LITE
          case ChunkManagerType::Minio: {
              return std::make_shared<MinioChunkManager>(storage_config);
          }
@@ -107,3 +250,39 @@ index 0e714f0a9..40621555b 100644
  #ifdef USE_OPENDAL
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
+diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
+index 745842432..9dc5872e4 100644
+--- a/internal/core/thirdparty/knowhere/CMakeLists.txt
++++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
+@@ -43,14 +43,29 @@ FetchContent_Declare(
+         GIT_TAG         ${KNOWHERE_VERSION}
+         SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
+         BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
+-        DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH} )
++        DOWNLOAD_DIR    ${THIRDPARTY_DOWNLOAD_PATH}
++      )
+ 
+ FetchContent_GetProperties( knowhere )
+ if ( NOT knowhere_POPULATED )
+     FetchContent_Populate( knowhere )
+
++    execute_process(COMMAND git diff --quiet
++      WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
++      RESULT_VARIABLE KNOWHERE_CHECK_RESULT
++    )
++
++    if(${KNOWHERE_CHECK_RESULT} EQUAL 0)
++      message("Apply knowhere patch...")
++      execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere.patch
++        WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
++        OUTPUT_VARIABLE result
++      )
++    endif()
++
++
+     # Adding the following target:
+-    # knowhere
++    # knowhere
+     add_subdirectory( ${knowhere_SOURCE_DIR}
+                       ${knowhere_BINARY_DIR} )
+ endif()
