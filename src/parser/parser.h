@@ -1171,6 +1171,7 @@ class PlanCCVisitor : public PlanVisitor {
             info->data_type() == proto::schema::DataType::Int64 ||
             info->data_type() == proto::schema::DataType::Float ||
             info->data_type() == proto::schema::DataType::Double ||
+            info->data_type() == proto::schema::DataType::String ||
             info->data_type() == proto::schema::DataType::VarChar) {
             auto a = extractValue(lower.expr);
             auto b = extractValue(upper.expr);
