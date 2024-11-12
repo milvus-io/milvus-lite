@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="milvus_lite_log.png#gh-light-mode-only" width="60%"/>
+    <img src="https://raw.githubusercontent.com/milvus-io/milvus-lite/refs/heads/main/milvus_lite_log.png#gh-light-mode-only" width="60%"/>
 </div>
 
 <h3 align="center">
