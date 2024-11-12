@@ -20,5 +20,4 @@ target_link_libraries(milvus-storage PUBLIC
     Boost::boost
     protobuf::protobuf
     glog::glog
-    opendal
 )
