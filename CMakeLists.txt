@@ -262,31 +262,6 @@ set_target_properties(tantivy_binding
 
 add_dependencies(tantivy_binding tantivy_binding_target)
 
-FetchContent_Declare(clone_opendal
-  GIT_REPOSITORY "https://github.com/apache/incubator-opendal.git"
-  GIT_TAG "v0.43.0-rc.2"   # it's much better to use a specific Git revision or Git tag for reproducibility
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal"
-  GIT_SHALLOW 1
-)
-
-FetchContent_MakeAvailable(clone_opendal)
-
-add_custom_command(OUTPUT compile_opendal
-    COMMENT "Compiling opendal"
-    COMMAND bash -c "cargo +1.73 build --release --verbose"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/bindings/c
-)
-add_custom_target(compile_opendal_target DEPENDS compile_opendal)
-
-add_library(opendal STATIC IMPORTED)
-set_target_properties(opendal
-    PROPERTIES
-    IMPORTED_GLOBAL TRUE
-    IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/target/release/libopendal_c.a"
-    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/incubator-opendal/bindings/c/include/")
-
-add_dependencies(opendal compile_opendal_target clone_opendal_target)
-
 set(MILVUS_ENGINE_SRC
     "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
 add_subdirectory(thirdparty/milvus/internal/core/src/log)
