@@ -546,7 +546,9 @@ castValue(proto::schema::DataType dtype,
         return CreateMessageWithCopy<proto::plan::GenericValue>(arena, *value);
     if (dtype == proto::schema::DataType::Array && value->has_array_val())
         return CreateMessageWithCopy<proto::plan::GenericValue>(arena, *value);
-    if (dtype == proto::schema::DataType::VarChar && value->has_string_val())
+    if ((dtype == proto::schema::DataType::VarChar ||
+         dtype == proto::schema::DataType::String) &&
+        value->has_string_val())
         return CreateMessageWithCopy<proto::plan::GenericValue>(arena, *value);
 
     if (dtype == proto::schema::DataType::Bool && value->has_bool_val())
