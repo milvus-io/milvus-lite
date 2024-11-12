@@ -119,9 +119,6 @@ include_directories(${marisa_INCLUDE_DIRS})
 find_package(yaml-cpp REQUIRED)
 include_directories(${yaml-cpp_INCLUDE_DIRS})
 
-find_package(absl REQUIRED)
-include_directories(${absl_type_traits_INCLUDE_DIRS})
-
 add_definitions(-DANTLR4CPP_STATIC)
 add_definitions(-DHAVE_CPP_STDLIB)
 add_definitions(-DMILVUS_LITE)
