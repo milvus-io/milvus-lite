@@ -61,10 +61,11 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(MILVUS_LITE True)
 
 include(FetchContent)
 
-set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;google-cloud-cpp::rest_internal;AWS::aws-sdk-cpp-identity-management")
+set(CONAN_LIBS "${CONAN_LIBS};marisa::marisa;")
 
 find_package(SQLiteCpp REQUIRED)
 include_directories(${SQLiteCpp_INCLUDE_DIRS})
@@ -93,9 +94,6 @@ include_directories(${Folly_INCLUDE_DIRS})
 find_package(fmt REQUIRED)
 include_directories(${fmt_INCLUDE_DIRS})
 
-find_package(opentelemetry-cpp REQUIRED)
-include_directories(${opentelemetry-cpp_INCLUDE_DIRS})
-
 find_package(glog REQUIRED)
 include_directories(${glog_INCLUDE_DIRS})
 
@@ -121,22 +119,34 @@ include_directories(${marisa_INCLUDE_DIRS})
 find_package(yaml-cpp REQUIRED)
 include_directories(${yaml-cpp_INCLUDE_DIRS})
 
-find_package(google-cloud-cpp REQUIRED)
-include_directories(${google-cloud-cpp_INCLUDE_DIRS})
-
 find_package(absl REQUIRED)
 include_directories(${absl_type_traits_INCLUDE_DIRS})
 
-find_package(AWSSDK REQUIRED)
-
 add_definitions(-DANTLR4CPP_STATIC)
 add_definitions(-DHAVE_CPP_STDLIB)
+add_definitions(-DMILVUS_LITE)
 
 IF(APPLE)
     add_definitions("-D_GNU_SOURCE")
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pb)
+
+execute_process(
+  COMMAND git diff --quiet
+  WORKING_DIRECTORY  ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+  RESULT_VARIABLE CHECK_RESULT
+)
+
+if(${CHECK_RESULT} EQUAL 0)
+  message("Apply milvus patch...")
+  execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
+    WORKING_DIRECTORY  ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+    OUTPUT_VARIABLE result
+  )
+else ()
+  message("Milvus not need applying patch...")
+endif()
 
 add_library(milvus_proto STATIC "${CMAKE_SOURCE_DIR}/src/proto/plan.proto"
     "${CMAKE_SOURCE_DIR}/src/proto/schema.proto"
@@ -160,9 +170,12 @@ add_library(milvus_grpc_service STATIC
   "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
 )
 
-target_link_libraries(milvus_grpc_service milvus_proto)
+target_link_libraries(milvus_grpc_service
+  gRPC::grpc++
+  milvus_proto
+)
 
-protobuf_generate(  
+protobuf_generate(
   TARGET milvus_grpc_service
   # OUT_VAR PROTO_GENERATED_FILES
   LANGUAGE grpc
@@ -184,7 +197,7 @@ add_library(parser STATIC "${CMAKE_SOURCE_DIR}/src/parser/parser.cc"
   )
 
 
-target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})  
+  target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})
 
 add_subdirectory(thirdparty/milvus/internal/core/thirdparty/knowhere)
 

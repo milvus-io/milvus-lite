@@ -26,7 +26,8 @@ class MilvusLiteConan(ConanFile):
         "fmt/9.1.0",
         "openssl/1.1.1t",
         "libcurl/7.86.0",
-        "opentelemetry-cpp/1.8.1.1@milvus/dev",
+        # "opentelemetry-cpp/1.8.1.1@milvus/dev",
+        "grpc/1.50.1",
         "prometheus-cpp/1.1.0",
         "re2/20230301",
         "simdjson/3.7.0",
@@ -36,7 +37,6 @@ class MilvusLiteConan(ConanFile):
         "zstd/1.5.4",
         "yaml-cpp/0.7.0",
         "libdwarf/0.9.1",
-        "google-cloud-cpp/2.5.0@milvus/dev",
     )
 
     generators = {"cmake", "cmake_find_package"}
@@ -61,10 +61,7 @@ class MilvusLiteConan(ConanFile):
         "arrow:with_thrift": True,
         "arrow:with_jemalloc": True,
         "arrow:shared": False,
-        "arrow:with_s3": True,
-        "aws-sdk-cpp:config": True,
-        "aws-sdk-cpp:text-to-speech": False,
-        "aws-sdk-cpp:transfer": False,
+        "arrow:with_s3": False,        
     }
 
     def configure(self):
