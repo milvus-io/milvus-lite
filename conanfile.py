@@ -12,7 +12,7 @@ class MilvusLiteConan(ConanFile):
         "zlib/1.2.13",
         "glog/0.6.0",
         # protobuf
-        "protobuf/3.21.4",
+        "protobuf/3.21.12",
         # folly
         "fmt/9.1.0",
         "folly/2023.10.30.05@milvus/dev",
@@ -26,7 +26,6 @@ class MilvusLiteConan(ConanFile):
         "fmt/9.1.0",
         "openssl/1.1.1t",
         "libcurl/7.86.0",
-        # "opentelemetry-cpp/1.8.1.1@milvus/dev",
         "grpc/1.50.1",
         "prometheus-cpp/1.1.0",
         "re2/20230301",
@@ -47,8 +46,10 @@ class MilvusLiteConan(ConanFile):
         "gtest:build_gmock": False,
         "onetbb:tbbmalloc": False,
         "onetbb:tbbproxy": False,
-        "boost:without_locale": False,
+        "onetbb:tbbbind": False,
+        "boost:without_locale": True,
         "boost:without_test": True,
+        "boost:without_stacktrace": True,
         "fmt:header_only": True,
         "prometheus-cpp:with_pull": False,
         "double-conversion:shared": True,
@@ -61,11 +62,11 @@ class MilvusLiteConan(ConanFile):
         "arrow:with_thrift": True,
         "arrow:with_jemalloc": True,
         "arrow:shared": False,
-        "arrow:with_s3": False,        
+        "arrow:with_s3": False,
     }
 
     def configure(self):
-        if self.settings.os == "Macos":
+        if self.settings.os in ["Macos", "Android"]:
             self.options["arrow"].with_jemalloc = False
 
         if self.settings.compiler == "gcc":
@@ -73,8 +74,10 @@ class MilvusLiteConan(ConanFile):
                 raise Exception("This package is only compatible with libstdc++11")
 
     def requirements(self):
-        if self.settings.os != "Macos":
+        if self.settings.os not in ["Macos", "Android"]:
             self.requires("libunwind/1.7.2")
+        if self.settings.os == "Android":
+            self.requires("openblas/0.3.27")
 
     def imports(self):
         self.copy("*.so*", "./lib", "lib")
@@ -83,4 +86,3 @@ class MilvusLiteConan(ConanFile):
     def build(self):
         target = "11.0"
         self.run("export MACOSX_DEPLOYMENT_TARGET={}".format(target))
-

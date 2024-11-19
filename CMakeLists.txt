@@ -24,39 +24,39 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(COMPILER_SUPPORTS_CXX17 True)
 if(APPLE)
-    SET(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 endif()
 set(CMAKE_VERBOSE_MAKEFILE ON)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "-g  -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-g  -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 else()
-    set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
 if(APPLE)
-    if(DEFINED ENV{HOMEBREW_PREFIX})
-        message(STATUS "Homebrew prefix from environment: $ENV{HOMEBREW_PREFIX}")
-        set(OMP_INCLUDE $ENV{HOMEBREW_PREFIX}/opt/libomp/include)
-        include_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/include)
-        link_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/lib)
-        
-    else()
-        message(STATUS "Homebrew prefix from environment not found, use default")
-        set(OMP_INCLUDE /opt/homebrew/opt/libomp/include)
-        include_directories(/opt/homebrew/opt/libomp/include)
-        link_directories(/opt/homebrew/opt/libomp/lib)
-    endif()
+  if(DEFINED ENV{HOMEBREW_PREFIX})
+    message(STATUS "Homebrew prefix from environment: $ENV{HOMEBREW_PREFIX}")
+    set(OMP_INCLUDE $ENV{HOMEBREW_PREFIX}/opt/libomp/include)
+    include_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/include)
+    link_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/lib)
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lomp")
-    set(OpenMP_C "${CMAKE_C_COMPILER}")
- 	set(OpenMP_C_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
- 	set(OpenMP_C_LIB_NAMES "libomp")
- 	set(OpenMP_libomp_LIBRARY "omp")
+  else()
+    message(STATUS "Homebrew prefix from environment not found, use default")
+    set(OMP_INCLUDE /opt/homebrew/opt/libomp/include)
+    include_directories(/opt/homebrew/opt/libomp/include)
+    link_directories(/opt/homebrew/opt/libomp/lib)
+  endif()
 
- 	set(OpenMP_CXX "${CMAKE_CXX_COMPILER}")
- 	set(OpenMP_CXX_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
-    set(OpenMP_CXX_LIB_NAMES "libomp")
-    set(OpenMP_libomp_LIBRARY "omp")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lomp")
+  set(OpenMP_C "${CMAKE_C_COMPILER}")
+  set(OpenMP_C_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
+  set(OpenMP_C_LIB_NAMES "libomp")
+  set(OpenMP_libomp_LIBRARY "omp")
+
+  set(OpenMP_CXX "${CMAKE_CXX_COMPILER}")
+  set(OpenMP_CXX_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
+  set(OpenMP_CXX_LIB_NAMES "libomp")
+  set(OpenMP_libomp_LIBRARY "omp")
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -123,144 +123,165 @@ add_definitions(-DANTLR4CPP_STATIC)
 add_definitions(-DHAVE_CPP_STDLIB)
 add_definitions(-DMILVUS_LITE)
 
-IF(APPLE)
-    add_definitions("-D_GNU_SOURCE")
+if(APPLE)
+  add_definitions("-D_GNU_SOURCE")
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pb)
 
 execute_process(
   COMMAND git diff --quiet
-  WORKING_DIRECTORY  ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-  RESULT_VARIABLE CHECK_RESULT
-)
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+  RESULT_VARIABLE CHECK_RESULT)
 
 if(${CHECK_RESULT} EQUAL 0)
   message("Apply milvus patch...")
-  execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
-    WORKING_DIRECTORY  ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-    OUTPUT_VARIABLE result
-  )
-else ()
+  execute_process(
+    COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+    OUTPUT_VARIABLE result)
+else()
   message("Milvus not need applying patch...")
 endif()
 
-add_library(milvus_proto STATIC "${CMAKE_SOURCE_DIR}/src/proto/plan.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/schema.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/common.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/segcore.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/msg.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/feder.proto"
-    "${CMAKE_SOURCE_DIR}/src/proto/rg.proto"
-)
+add_library(
+  milvus_proto STATIC
+  "${CMAKE_SOURCE_DIR}/src/proto/plan.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/schema.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/common.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/segcore.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/msg.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/feder.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/rg.proto")
 
 set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/pb")
 
 protobuf_generate(
-    TARGET milvus_proto
-    IMPORT_DIRS "${CMAKE_SOURCE_DIR}/src/proto"
-    PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
-
+  TARGET milvus_proto IMPORT_DIRS "${CMAKE_SOURCE_DIR}/src/proto"
+  PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
 
 add_library(milvus_grpc_service STATIC
-  "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
-)
+            "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto")
 
-target_link_libraries(milvus_grpc_service
-  gRPC::grpc++
-  milvus_proto
-)
+target_link_libraries(milvus_grpc_service gRPC::grpc++ milvus_proto)
 
 protobuf_generate(
-  TARGET milvus_grpc_service
+  TARGET
+  milvus_grpc_service
   # OUT_VAR PROTO_GENERATED_FILES
-  LANGUAGE grpc
-  GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
-  PLUGIN "protoc-gen-grpc=\$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
-  IMPORT_DIRS  "${CMAKE_SOURCE_DIR}/src/proto"
-  PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
+  LANGUAGE
+  grpc
+  GENERATE_EXTENSIONS
+  .grpc.pb.h
+  .grpc.pb.cc
+  PLUGIN
+  "protoc-gen-grpc=\$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
+  IMPORT_DIRS
+  "${CMAKE_SOURCE_DIR}/src/proto"
+  PROTOC_OUT_DIR
+  "${PROTO_BINARY_DIR}")
 
 include_directories("${CMAKE_SOURCE_DIR}/src/parser/")
 include_directories("${CMAKE_SOURCE_DIR}/src/parser/antlr/")
 include_directories("${CMAKE_BINARY_DIR}/pb")
 include_directories("${CMAKE_BINARY_DIR}")
 
-add_library(parser STATIC "${CMAKE_SOURCE_DIR}/src/parser/parser.cc"
-    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanBaseVisitor.cpp"
-    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanLexer.cpp"
-    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanParser.cpp"
-    "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanVisitor.cpp"
-  )
+add_library(
+  parser STATIC
+  "${CMAKE_SOURCE_DIR}/src/parser/parser.cc"
+  "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanBaseVisitor.cpp"
+  "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanLexer.cpp"
+  "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanParser.cpp"
+  "${CMAKE_SOURCE_DIR}/src/parser/antlr/PlanVisitor.cpp")
 
-
-  target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})
+target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})
 
 add_subdirectory(thirdparty/milvus/internal/core/thirdparty/knowhere)
 
-include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/")
-include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/")
-include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/")
+include_directories(
+  "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/")
+include_directories(
+  "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/"
+)
+include_directories(
+  "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/")
 
 include_directories("${knowhere_SOURCE_DIR}/include")
 function(MILVUS_ADD_PKG_CONFIG MODULE)
-    configure_file(${MODULE}.pc.in "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc" @ONLY)
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
+  configure_file(${MODULE}.pc.in "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
+                 @ONLY)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
           DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig/")
 endfunction()
-
 
 include(cmake/milvus-storage.cmake)
 
 include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src/")
-add_library(boost_bitset_ext 
- thirdparty/milvus/internal/core/thirdparty/boost_ext/dynamic_bitset_ext.cpp)
-
+add_library(
+  boost_bitset_ext
+  thirdparty/milvus/internal/core/thirdparty/boost_ext/dynamic_bitset_ext.cpp)
 
 FetchContent_Declare(
-    simdjson
-    GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-    GIT_TAG        v3.1.7
-)
+  simdjson
+  GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+  GIT_TAG v3.1.7)
 FetchContent_MakeAvailable(simdjson)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CARGO_CMD cargo build)
+else()
+  set(CARGO_CMD cargo build --release)
+endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CARGO_CMD cargo build)
-else ()
-    set(CARGO_CMD cargo build --release)
-endif ()
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
+                                            "aarch64")
+  set(CARGO_CMD "${CARGO_CMD} --target aarch64-linux-android")
+endif()
 
 set(HOME_VAR $ENV{HOME})
 
-add_custom_command(OUTPUT ls_cargo
-        COMMENT "ls cargo"
-        COMMAND ls ${HOME_VAR}/.cargo/bin/
-        )
+add_custom_command(
+  OUTPUT ls_cargo
+  COMMENT "ls cargo"
+  COMMAND ls ${HOME_VAR}/.cargo/bin/)
 
 add_custom_target(ls_cargo_target DEPENDS ls_cargo)
 
-add_custom_command(OUTPUT compile_tantivy
-        COMMENT "Compiling tantivy binding"
-        COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} MACOSX_DEPLOYMENT_TARGET=11.0 ${CARGO_CMD}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding
-        DEPENDS ls_cargo_target
-    )
+add_custom_command(
+  OUTPUT compile_tantivy
+  COMMENT "Compiling tantivy binding"
+  COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR}
+          MACOSX_DEPLOYMENT_TARGET=11.0 ${CARGO_CMD}
+  WORKING_DIRECTORY
+    ${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding
+  DEPENDS ls_cargo_target)
 
 add_custom_target(tantivy_binding_target DEPENDS compile_tantivy)
 
 add_library(tantivy_binding STATIC IMPORTED)
-set_target_properties(tantivy_binding 
-    PROPERTIES
+
+set(IMPORT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/release/libtantivy_binding.a")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
+                                            "aarch64")
+  set(IMPORT_LOCATION
+      "${CMAKE_CURRENT_BINARY_DIR}/aarch64-linux-android/release/libtantivy_binding.a"
+  )
+endif()
+
+set_target_properties(
+  tantivy_binding
+  PROPERTIES
     IMPORTED_GLOBAL TRUE
-    IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/release/libtantivy_binding.a"
-    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/"
+    IMPORTED_LOCATION "${IMPORT_LOCATION}"
+    INTERFACE_INCLUDE_DIRECTORIES
+    "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/tantivy-binding/include/"
 )
 
 add_dependencies(tantivy_binding tantivy_binding_target)
 
-set(MILVUS_ENGINE_SRC
-    "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
+set(MILVUS_ENGINE_SRC "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
 add_subdirectory(thirdparty/milvus/internal/core/src/log)
 add_subdirectory(thirdparty/milvus/internal/core/src/config)
 add_subdirectory(thirdparty/milvus/internal/core/src/common)
@@ -279,4 +300,6 @@ endif()
 add_subdirectory(src)
 
 find_program(MEMORYCHECK_COMMAND NAMES valgrind)
-set(MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --track-origins=yes --leak-check=full --show-leak-kinds=all")
+set(MEMORYCHECK_COMMAND_OPTIONS
+    "--trace-children=yes --track-origins=yes --leak-check=full --show-leak-kinds=all"
+)
