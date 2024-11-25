@@ -168,7 +168,7 @@ class PlanCCVisitor : public PlanVisitor {
                            proto::schema::DataType::Bool);
         return ExprWithDtype(
             createBinExpr<proto::plan::BinaryExpr_BinaryOp_LogicalOr>(
-                left_expr, right_expr),
+                left_expr, right_expr, this->arena.get()),
             proto::schema::DataType::Bool,
             false);
     }
