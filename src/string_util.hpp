@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <vector>
 #include <sstream>
+#include <random>
+#include <chrono>
 
 namespace milvus::local {
 
@@ -80,12 +82,17 @@ GenRandomString(const char* prefix) {
     const std::string CHARACTERS =
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-    std::srand(std::time(0));
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::mt19937 generator(seed);
+
+    std::uniform_int_distribution<int> distribution(0, CHARACTERS.size() - 1);
+
     std::ostringstream oss;
     oss << prefix << '-';
 
     for (size_t i = 0; i < 8; ++i) {
-        oss << CHARACTERS[std::rand() % CHARACTERS.size()];
+        int random_number = distribution(generator);
+        oss << CHARACTERS[random_number];
     }
 
     return oss.str();
