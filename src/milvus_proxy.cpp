@@ -39,6 +39,7 @@
 #include "search_task.h"
 #include "status.h"
 #include "string_util.hpp"
+#include "timer.h"
 #include "type.h"
 #include "upsert_task.h"
 
@@ -231,6 +232,7 @@ MilvusProxy::DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
                     &schema,
                     &all_index);
     CHECK_STATUS(task.Process(&plan, &placeholder_group, &nqs, &topks), "");
+    RecordEvent("ParseProto");
     SearchResult result(nqs, topks);
     CHECK_STATUS(milvus_local_.Search(r->collection_name(),
                                       plan.SerializeAsString(),
@@ -238,7 +240,9 @@ MilvusProxy::DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
                                       &result),
                  "");
     search_result->set_collection_name(r->collection_name());
+    RecordEvent("DoSearch");
     task.PostProcess(result, search_result);
+    RecordEvent("PostProcess");
     if (search_result->results().has_ids()) {
         return Status::Ok();
     } else {
@@ -304,14 +308,16 @@ MilvusProxy::Query(const ::milvus::proto::milvus::QueryRequest* r,
     ::milvus::proto::plan::PlanNode plan;
     QueryTask task(r, &schema);
     CHECK_STATUS(task.Process(&plan), "");
-
+    RecordEvent("ParseProto");
     RetrieveResult result;
     CHECK_STATUS(milvus_local_.Retrieve(
                      r->collection_name(), plan.SerializeAsString(), &result),
                  "");
 
     query_result->set_collection_name(r->collection_name());
+    RecordEvent("DoQuery");
     task.PostProcess(result, query_result);
+    RecordEvent("PostProcess");
     return Status::Ok();
 }
 

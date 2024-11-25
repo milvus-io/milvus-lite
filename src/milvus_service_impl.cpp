@@ -18,6 +18,7 @@
 #include <exception>
 #include "log/Log.h"
 #include "status.h"
+#include "timer.h"
 
 namespace milvus::local {
 
@@ -116,8 +117,12 @@ MilvusServiceImpl::Upsert(::grpc::ServerContext* context,
 MilvusServiceImpl::Search(::grpc::ServerContext* context,
                           const ::milvus::proto::milvus::SearchRequest* request,
                           ::milvus::proto::milvus::SearchResults* response) {
+    InitializeTimer(string_util::GenRandomString("Search"));
     Status s = proxy_.Search(request, response);
     Status2Response(s, response->mutable_status());
+    RecordEvent("SerializationResponse");
+    PrintTimerRecords();
+    StopTimer();
     return ::grpc::Status::OK;
 }
 
@@ -140,8 +145,12 @@ MilvusServiceImpl::HybridSearch(
 MilvusServiceImpl::Query(::grpc::ServerContext* context,
                          const ::milvus::proto::milvus::QueryRequest* request,
                          ::milvus::proto::milvus::QueryResults* response) {
+    InitializeTimer(string_util::GenRandomString("Query"));
     Status s = proxy_.Query(request, response);
     Status2Response(s, response->mutable_status());
+    RecordEvent("SerializationResponse");
+    PrintTimerRecords();
+    StopTimer();
     return ::grpc::Status::OK;
 }
 

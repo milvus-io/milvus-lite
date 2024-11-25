@@ -20,6 +20,7 @@
 #include <regex>
 #include <algorithm>
 #include <vector>
+#include <sstream>
 
 namespace milvus::local {
 
@@ -74,6 +75,21 @@ IsAlpha(char c) {
     return true;
 }
 
+inline std::string
+GenRandomString(const char* prefix) {
+    const std::string CHARACTERS =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    std::srand(std::time(0));
+    std::ostringstream oss;
+    oss << prefix << '-';
+
+    for (size_t i = 0; i < 8; ++i) {
+        oss << CHARACTERS[std::rand() % CHARACTERS.size()];
+    }
+
+    return oss.str();
+}
 }  // namespace string_util
 
 }  // namespace milvus::local

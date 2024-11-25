@@ -18,6 +18,7 @@ add_library(milite STATIC
   ${CMAKE_CURRENT_LIST_DIR}/collection_meta.cpp
   ${CMAKE_CURRENT_LIST_DIR}/collection_data.cpp
   ${CMAKE_CURRENT_LIST_DIR}/storage.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/timer.cpp
   ${CMAKE_CURRENT_LIST_DIR}/index.cpp
   ${CMAKE_CURRENT_LIST_DIR}/milvus_local.cpp
   ${CMAKE_CURRENT_LIST_DIR}/segcore_wrapper.cpp
