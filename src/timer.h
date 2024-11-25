@@ -35,6 +35,7 @@ class Timer {
     void
     Start(const std::string& uid) {
         assert(!start_);
+        start_ = true;
         start_time_ = std::chrono::high_resolution_clock::now();
         uid_ = uid;
     }
