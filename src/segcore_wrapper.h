@@ -36,7 +36,8 @@ class SegcoreWrapper final : NonCopyableNonMovable {
  public:
     Status
     SetCollectionInfo(const std::string& collection_name_,
-                      const std::string& collection_info);
+                      const std::string& collection_info,
+                      const std::string& index_meta);
 
     Status
     SetIndexMeta(const std::string& meta_info);

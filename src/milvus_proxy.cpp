@@ -128,7 +128,7 @@ MilvusProxy::CreateIndex(const ::milvus::proto::milvus::CreateIndexRequest* r) {
         LOG_ERROR(err);
         return Status::CollectionNotFound(err);
     }
-    CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
+    // CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
 
     // get all index
     milvus::proto::segcore::FieldIndexMeta field_meta;
@@ -243,6 +243,7 @@ MilvusProxy::DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
     RecordEvent("DoSearch");
     task.PostProcess(result, search_result);
     RecordEvent("PostProcess");
+    // search_result->PrintDebugString();
     if (search_result->results().has_ids()) {
         return Status::Ok();
     } else {

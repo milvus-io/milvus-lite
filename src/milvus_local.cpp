@@ -111,34 +111,7 @@ MilvusLocal::LoadCollection(const std::string& collection_name) {
         return Status::Ok();
     }
 
-    std::string schema_proto, index_proto;
-    if (!storage_.GetCollectionSchema(collection_name, &schema_proto)) {
-        LOG_ERROR("Can not find {}'s schema", collection_name);
-        return Status::ServiceInternal("Schema not found");
-    }
-
-    CHECK_STATUS(index_.CreateCollection(collection_name, schema_proto), "");
-    std::vector<std::string> all_index_proto;
-    storage_.GetAllIndex(collection_name, "", &all_index_proto);
-    auto index_meta_proto = schema_util::MergeIndexs(all_index_proto);
-    CHECK_STATUS(index_.CreateIndex(collection_name, index_meta_proto), "");
-    std::vector<std::string> rows;
-    int64_t start = 0;
-    while (true) {
-        storage_.LoadCollecton(collection_name, start, 200000, &rows);
-        if (rows.size() == 0) {
-            LOG_INFO("Success load {} rows", start);
-            return Status::Ok();
-        }
-        for (const auto& row : rows) {
-            CHECK_STATUS(index_.Insert(collection_name, 1, row),
-                         "Load data failed: ");
-        }
-        start += rows.size();
-        rows.clear();
-    }
-
-    return Status::Ok();
+    return DoLoadCollection(collection_name);
 }
 
 Status
@@ -183,7 +156,8 @@ MilvusLocal::CreateCollection(const std::string& collection_name,
     }
 
     // CHECK_COLLECTION_NOT_EXIST(collection_name);
-    CHECK_STATUS(index_.CreateCollection(collection_name, schema_proto), "");
+    CHECK_STATUS(index_.CreateCollection(collection_name, schema_proto, ""),
+                 "");
     if (!storage_.CreateCollection(collection_name, pk_name, schema_proto)) {
         return Status::ServiceInternal();
     }
@@ -232,16 +206,22 @@ MilvusLocal::CreateIndex(const std::string& collection_name,
         return Status::Ok();
     }
     // get existed index
-    std::vector<std::string> all_index_proto;
-    storage_.GetAllIndex(collection_name, "", &all_index_proto);
-    all_index_proto.push_back(index_proto);
-    auto index_meta_proto = schema_util::MergeIndexs(all_index_proto);
+    // std::vector<std::string> all_index_proto;
+    // storage_.GetAllIndex(collection_name, "", &all_index_proto);
+    // all_index_proto.push_back(index_proto);
+    // auto index_meta_proto = schema_util::MergeIndexs(all_index_proto);
 
-    CHECK_STATUS(index_.CreateIndex(collection_name, index_meta_proto), "");
+    // // make sure the index info is legal
+    // CHECK_STATUS(index_.CreateIndex(collection_name, index_meta_proto), "");
     if (!storage_.CreateIndex(collection_name, index_name, index_proto)) {
         return Status::ServiceInternal();
     }
-    return Status::Ok();
+    // reload collection
+    if (!index_.DropCollection(collection_name)) {
+        return Status::ServiceInternal();
+    }
+
+    return DoLoadCollection(collection_name);
 }
 
 Status
@@ -350,4 +330,39 @@ MilvusLocal::GetNumRowsOfCollection(const std::string& collection_name,
     }
     return Status::Ok();
 }
+
+Status
+MilvusLocal::DoLoadCollection(const std::string& collection_name) {
+    std::string schema_proto, index_proto;
+    if (!storage_.GetCollectionSchema(collection_name, &schema_proto)) {
+        LOG_ERROR("Can not find {}'s schema", collection_name);
+        return Status::ServiceInternal("Schema not found");
+    }
+
+    // load index info
+    std::vector<std::string> all_index_proto;
+    storage_.GetAllIndex(collection_name, "", &all_index_proto);
+    auto index_meta_proto = schema_util::MergeIndexs(all_index_proto);
+
+    CHECK_STATUS(index_.CreateCollection(
+                     collection_name, schema_proto, index_meta_proto),
+                 "");
+    std::vector<std::string> rows;
+    int64_t start = 0;
+    while (true) {
+        storage_.LoadCollecton(collection_name, start, 200000, &rows);
+        if (rows.size() == 0) {
+            LOG_INFO("Success load {} rows", start);
+            return Status::Ok();
+        }
+        for (const auto& row : rows) {
+            CHECK_STATUS(index_.Insert(collection_name, 1, row),
+                         "Load data failed: ");
+        }
+        start += rows.size();
+        rows.clear();
+    }
+    return Status::Ok();
+}
+
 }  // namespace milvus::local

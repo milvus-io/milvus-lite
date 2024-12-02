@@ -22,15 +22,17 @@ namespace milvus::local {
 
 Status
 Index::CreateCollection(const std::string& collection_name,
-                        const std::string& schema_proto) {
+                        const std::string& schema_proto,
+                        const std::string& index_proto) {
     if (HasLoaded(collection_name)) {
         LOG_INFO("Collection {} alread load", collection_name);
         return Status::Ok();
     }
 
     auto c = std::make_unique<SegcoreWrapper>();
-    CHECK_STATUS(c->SetCollectionInfo(collection_name, schema_proto),
-                 "Create collection failed: ");
+    CHECK_STATUS(
+        c->SetCollectionInfo(collection_name, schema_proto, index_proto),
+        "Create collection failed: ");
     collections_[collection_name] = std::move(c);
     return Status::Ok();
 }
