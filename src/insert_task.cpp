@@ -13,6 +13,7 @@
 // the License.
 
 #include "insert_task.h"
+#include <algorithm>
 #include <any>
 #include <chrono>
 #include <cstddef>
@@ -141,7 +142,7 @@ InsertTask::Process(Rows* rows) {
         return Status::ParameterInvalid();
     }
 
-    CHECK_STATUS(CheckVectorDim(), "");
+    CHECK_STATUS(CheckOrSetVectorDim(), "");
 
     auto pk_field_name = schema_util::GetPkName(*schema_);
     if (!pk_field_name.has_value()) {
@@ -184,7 +185,7 @@ InsertTask::Process(Rows* rows) {
 }
 
 Status
-InsertTask::CheckVectorDim() {
+InsertTask::CheckOrSetVectorDim() {
     int64_t num_rows = insert_request_->num_rows();
     if (num_rows <= 0) {
         return Status::ParameterInvalid("Err num_rows: {}", num_rows);
@@ -216,6 +217,34 @@ InsertTask::CheckVectorDim() {
                     num_rows,
                     num_rows,
                     vec_rows);
+            }
+        } else if (field_schema.data_type() == DType::SparseFloatVector) {
+            // set dim
+            auto field_data = field_data_map_.at(field_schema.name());
+            for (int i = 0;
+                 i <
+                 field_data->vectors().sparse_float_vector().contents_size();
+                 i++) {
+                uint32_t dim = 0;
+                const char* pos = field_data->vectors()
+                                      .sparse_float_vector()
+                                      .contents(i)
+                                      .c_str();
+                size_t size = field_data->vectors()
+                                  .sparse_float_vector()
+                                  .contents(i)
+                                  .size();
+                const char* end = pos + size;
+
+                for (; pos < end; pos += 8) {
+                    dim = std::max(dim,
+                                   *(reinterpret_cast<const uint32_t*>(pos))) +
+                          1;
+                }
+                const_cast<::milvus::proto::schema::FieldData*>(field_data)
+                    ->mutable_vectors()
+                    ->mutable_sparse_float_vector()
+                    ->set_dim(dim);
             }
         }
     }

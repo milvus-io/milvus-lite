@@ -45,7 +45,7 @@ class InsertTask : NonCopyableNonMovable {
     GenFieldMap();
 
     Status
-    CheckVectorDim();
+    CheckOrSetVectorDim();
 
     std::vector<uint64_t>
     GetTimestamps(int64_t size);
