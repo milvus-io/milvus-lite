@@ -181,7 +181,7 @@ index eb92f5657..ea5ca2b51 100644
  target_link_libraries(milvus_segcore milvus_query milvus_bitset milvus_exec ${OpenMP_CXX_FLAGS} milvus-storage)
  
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
-index ac600d945..f4d450f77 100644
+index ac600d945..9d82574af 100644
 --- a/internal/core/src/storage/CMakeLists.txt
 +++ b/internal/core/src/storage/CMakeLists.txt
 @@ -46,23 +46,29 @@ set(STORAGE_FILES
@@ -220,6 +220,21 @@ index ac600d945..f4d450f77 100644
  
  if (DEFINED AZURE_BUILD_DIR)
      target_link_libraries(milvus_storage PUBLIC
+@@ -70,14 +76,12 @@ if (DEFINED AZURE_BUILD_DIR)
+             blob-chunk-manager
+             milvus_common
+             milvus-storage
+-            pthread
+             ${CONAN_LIBS}
+             )
+ else ()
+     target_link_libraries(milvus_storage PUBLIC
+             milvus_common
+             milvus-storage
+-            pthread
+             ${CONAN_LIBS}
+             )
+ endif()
 diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
 index 0e714f0a9..46ebabf2e 100644
 --- a/internal/core/src/storage/Util.cpp
@@ -251,10 +266,10 @@ index 0e714f0a9..46ebabf2e 100644
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index 745842432..9dc5872e4 100644
+index 745842432..73934cd14 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
 +++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
-@@ -43,14 +43,29 @@ FetchContent_Declare(
+@@ -43,12 +43,27 @@ FetchContent_Declare(
          GIT_TAG         ${KNOWHERE_VERSION}
          SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
          BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
@@ -265,7 +280,7 @@ index 745842432..9dc5872e4 100644
  FetchContent_GetProperties( knowhere )
  if ( NOT knowhere_POPULATED )
      FetchContent_Populate( knowhere )
-
+ 
 +    execute_process(COMMAND git diff --quiet
 +      WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
 +      RESULT_VARIABLE KNOWHERE_CHECK_RESULT
@@ -281,8 +296,5 @@ index 745842432..9dc5872e4 100644
 +
 +
      # Adding the following target:
--    # knowhere
-+    # knowhere
+     # knowhere
      add_subdirectory( ${knowhere_SOURCE_DIR}
-                       ${knowhere_BINARY_DIR} )
- endif()
