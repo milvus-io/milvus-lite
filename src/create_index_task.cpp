@@ -53,7 +53,8 @@ const char* kSuperStructure = "SUPERSTRUCTURE";
 const char* kAutoIndex = "AUTOINDEX";
 const char* kFlat = "FLAT";
 const char* kBin_Flat = "BIN_FLAT";
-const char* kHNSW = "HNSW";
+// const char* kHNSW = "HNSW";
+const char* kIvf_Flat = "IVF_FLAT";
 const char* kSparseInvertedIndex = "SPARSE_INVERTED_INDEX";
 const char* kSparseWand = "SPARSE_WAND";
 
@@ -146,7 +147,7 @@ class FloatVectorIndexChecker : public virtual IndexChecker {
         : IndexChecker(index_type, metric, dim) {
         min_dim_ = 2;
         max_dim_ = 32768;
-        supported_index_ = {kFlat, kHNSW, kAutoIndex};
+        supported_index_ = {kFlat, kIvf_Flat, kAutoIndex};
         supported_metric_ = {kL2, kIP, kCosine};
     }
 

@@ -25,6 +25,7 @@
 #include "log/Log.h"
 #include "pb/segcore.pb.h"
 #include "retrieve_result.h"
+#include "segcore/collection_c.h"
 #include "segcore/reduce_c.h"
 #include "segcore/segment_c.h"
 #include "pb/schema.pb.h"
@@ -101,12 +102,17 @@ SegcoreWrapper::~SegcoreWrapper() {
 
 Status
 SegcoreWrapper::SetCollectionInfo(const std::string& collection_name,
-                                  const std::string& collection_info) {
+                                  const std::string& collection_info,
+                                  const std::string& index_meta) {
     assert(collection_ == nullptr);
     auto new_collection_info = NewCollectionInfo(collection_info);
     try {
         collection_ = ::NewCollection(new_collection_info.c_str(),
                                       new_collection_info.size());
+        // set index info if has
+        if (!index_meta.empty()) {
+            ::SetIndexMeta(collection_, index_meta.c_str(), index_meta.size());
+        }
         CHECK_STATUS(Status(::NewSegment(collection_, Growing, 0, &segment_)),
                      "Init segcore failed");
         collection_name_ = collection_name;
@@ -194,7 +200,8 @@ SegcoreWrapper::Retrieve(const std::string& plan, RetrieveResult* result) {
                                     retrieve_plan.plan_,
                                     GetTimestamp(),
                                     &(result->retrieve_result_),
-                                    DEFAULT_MAX_OUTPUT_SIZE, false));
+                                    DEFAULT_MAX_OUTPUT_SIZE,
+                                    false));
         CHECK_STATUS(rs, "Retrieve failed, errs:");
         return Status::Ok();
     } catch (std::exception& e) {

@@ -33,7 +33,8 @@ class Index final : NonCopyableNonMovable {
     // meta interface
     Status
     CreateCollection(const std::string& collection_name,
-                     const std::string& schema_proto);
+                     const std::string& schema_proto,
+                     const std::string& index_proto);
     bool
     DropCollection(const std::string& collection_name);
 

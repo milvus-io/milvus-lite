@@ -105,7 +105,7 @@ class TestSparse(unittest.TestCase):
         search_params = {
             "metric_type": "IP",
             "params": {
-                "drop_ratio_search": 0.2,
+                "drop_ratio_search": 0.0,
             }
         }
         result = self.milvus_client.search(self.collection_name, vectors_to_search, limit=3, output_fields=[
@@ -122,7 +122,7 @@ class TestSparse(unittest.TestCase):
         search_params = {
             "metric_type": "IP",
             "params": {
-                "drop_ratio_search": 0.2,
+                "drop_ratio_search": 0.0,
             }
         }
         result = self.milvus_client.search(self.collection_name, vectors_to_search, limit=3, output_fields=[

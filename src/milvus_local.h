@@ -112,6 +112,9 @@ class MilvusLocal final : NonCopyableNonMovable {
     Status
     CheckCollectionName(const std::string& collection_name);
 
+    Status
+    DoLoadCollection(const std::string& collection_name);
+
  private:
     std::mutex mutex_;
     std::string db_file_;

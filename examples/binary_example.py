@@ -32,7 +32,7 @@ def binary_vector_search():
     binary_vector = FieldSchema(name=vector_field_name, dtype=DataType.BINARY_VECTOR, dim=dim)
     schema = CollectionSchema(fields=[int64_field, binary_vector], enable_dynamic_field=True)
 
-    has = utility.has_collection("hello_milvus")
+    has = utility.has_collection("hello_milvus_bin")
     if has:
         hello_milvus = Collection("hello_milvus_bin")
         hello_milvus.drop()
