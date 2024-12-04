@@ -15,7 +15,7 @@ class MilvusLiteConan(ConanFile):
         "protobuf/3.21.12",
         # folly
         "fmt/9.1.0",
-        "folly/2023.10.30.05@milvus/dev",
+        "folly/2023.10.30.09@milvus/dev",
         # antlr
         "antlr4-cppruntime/4.13.1",
         # sqlite
@@ -63,6 +63,7 @@ class MilvusLiteConan(ConanFile):
         "arrow:with_jemalloc": True,
         "arrow:shared": False,
         "arrow:with_s3": False,
+        "libcurl:with_ssl": False,
     }
 
     def configure(self):

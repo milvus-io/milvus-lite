@@ -236,7 +236,12 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
                                             "aarch64")
-  set(CARGO_CMD "${CARGO_CMD} --target aarch64-linux-android")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD cargo build --target aarch64-linux-android)
+  else()
+    set(CARGO_CMD cargo build --target aarch64-linux-android --release)
+  endif()
+
 endif()
 
 set(HOME_VAR $ENV{HOME})
