@@ -284,6 +284,864 @@ index 99daf00a..9864e62d 100644
  
 +#endif
  }  // namespace knowhere::tracer
+diff --git a/src/simd/distances_avx.cc b/src/simd/distances_avx.cc
+index bfb85f5f..a57830a5 100644
+--- a/src/simd/distances_avx.cc
++++ b/src/simd/distances_avx.cc
+@@ -18,6 +18,7 @@
+ #include <cassert>
+ 
+ #include "faiss/impl/platform_macros.h"
++#include "simd_util.h"
+ 
+ namespace faiss {
+ 
+@@ -54,6 +55,86 @@ fvec_inner_product_avx(const float* x, const float* y, size_t d) {
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++float
++fp16_vec_inner_product_avx(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        auto my_0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)y));
++        auto mx_1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(x + 8)));
++        auto my_1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(y + 8)));
++        msum_0 = _mm256_fmadd_ps(mx_0, my_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, my_1, msum_1);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        auto my = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)y));
++        msum_0 = _mm256_fmadd_ps(mx, my, msum_0);
++        x += 8;
++        y += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_cvtph_ps(mm_masked_read_short(d, (uint16_t*)x));
++        auto my = _mm256_cvtph_ps(mm_masked_read_short(d, (uint16_t*)y));
++        msum_0 = _mm256_fmadd_ps(mx, my, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++float
++bf16_vec_inner_product_avx(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        auto my_0 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)y));
++        auto mx_1 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)(x + 8)));
++        auto my_1 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)(y + 8)));
++        msum_0 = _mm256_fmadd_ps(mx_0, my_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, my_1, msum_1);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        auto my = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)y));
++        msum_0 = _mm256_fmadd_ps(mx, my, msum_0);
++        x += 8;
++        y += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        auto my = _mm256_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)y));
++        msum_0 = _mm256_fmadd_ps(mx, my, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++// trust the compiler to unroll this properly
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++float
++fvec_inner_product_avx_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (i = 0; i < d; i++) {
++        res += x[i] * bf16_float(y[i]);
++    }
++    return res;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+ float
+@@ -69,6 +150,94 @@ fvec_L2sqr_avx(const float* x, const float* y, size_t d) {
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++float
++fp16_vec_L2sqr_avx(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        auto my_0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)y));
++        auto mx_1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(x + 8)));
++        auto my_1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(y + 8)));
++        mx_0 = _mm256_sub_ps(mx_0, my_0);
++        mx_1 = _mm256_sub_ps(mx_1, my_1);
++        msum_0 = _mm256_fmadd_ps(mx_0, mx_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, mx_1, msum_1);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        auto my = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)y));
++        mx = _mm256_sub_ps(mx, my);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++        x += 8;
++        y += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_cvtph_ps(mm_masked_read_short(d, (uint16_t*)x));
++        auto my = _mm256_cvtph_ps(mm_masked_read_short(d, (uint16_t*)y));
++        mx = _mm256_sub_ps(mx, my);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++float
++bf16_vec_L2sqr_avx(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        auto my_0 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)y));
++        auto mx_1 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)(x + 8)));
++        auto my_1 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)(y + 8)));
++        mx_0 = _mm256_sub_ps(mx_0, my_0);
++        mx_1 = _mm256_sub_ps(mx_1, my_1);
++        msum_0 = _mm256_fmadd_ps(mx_0, mx_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, mx_1, msum_1);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        auto my = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)y));
++        mx = _mm256_sub_ps(mx, my);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++        x += 8;
++        y += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        auto my = _mm256_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)y));
++        mx = _mm256_sub_ps(mx, my);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++float
++fvec_L2sqr_avx_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (i = 0; i < d; i++) {
++        const float tmp = x[i] - bf16_float(y[i]);
++        res += tmp * tmp;
++    }
++    return res;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ float
+ fvec_L1_avx(const float* x, const float* y, size_t d) {
+     __m256 msum1 = _mm256_setzero_ps();
+@@ -187,6 +356,32 @@ fvec_inner_product_batch_4_avx(const float* __restrict x, const float* __restric
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++// trust the compiler to unroll this properly
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++void
++fvec_inner_product_batch_4_avx_bf16_patch(const float* __restrict x, const float* __restrict y0,
++                                          const float* __restrict y1, const float* __restrict y2,
++                                          const float* __restrict y3, const size_t d, float& dis0, float& dis1,
++                                          float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (size_t i = 0; i < d; ++i) {
++        d0 += x[i] * bf16_float(y0[i]);
++        d1 += x[i] * bf16_float(y1[i]);
++        d2 += x[i] * bf16_float(y2[i]);
++        d3 += x[i] * bf16_float(y3[i]);
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+ void
+@@ -215,6 +410,34 @@ fvec_L2sqr_batch_4_avx(const float* x, const float* y0, const float* y1, const f
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++// trust the compiler to unroll this properly
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++void
++fvec_L2sqr_batch_4_avx_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                  const size_t d, float& dis0, float& dis1, float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (size_t i = 0; i < d; ++i) {
++        const float q0 = x[i] - bf16_float(y0[i]);
++        const float q1 = x[i] - bf16_float(y1[i]);
++        const float q2 = x[i] - bf16_float(y2[i]);
++        const float q3 = x[i] - bf16_float(y3[i]);
++        d0 += q0 * q0;
++        d1 += q1 * q1;
++        d2 += q2 * q2;
++        d3 += q3 * q3;
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ int32_t
+ ivec_inner_product_avx(const int8_t* x, const int8_t* y, size_t d) {
+@@ -238,5 +461,95 @@ ivec_L2sqr_avx(const int8_t* x, const int8_t* y, size_t d) {
+     return res;
+ }
+ 
++float
++fvec_norm_L2sqr_avx(const float* x, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_loadu_ps(x);
++        auto mx_1 = _mm256_loadu_ps(x + 8);
++        msum_0 = _mm256_fmadd_ps(mx_0, mx_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, mx_1, msum_1);
++        x += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    if (d >= 8) {
++        auto mx = _mm256_loadu_ps(x);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++        x += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        __m128 rest_0 = _mm_setzero_ps();
++        __m128 rest_1 = _mm_setzero_ps();
++        if (d >= 4) {
++            rest_0 = _mm_loadu_ps(x);
++            x += 4;
++            d -= 4;
++        }
++        if (d >= 0) {
++            rest_1 = masked_read(d, x);
++        }
++        auto mx = _mm256_set_m128(rest_0, rest_1);
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++float
++fp16_vec_norm_L2sqr_avx(const knowhere::fp16* x, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        auto mx_1 = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)(x + 8)));
++        msum_0 = _mm256_fmadd_ps(mx_0, mx_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, mx_1, msum_1);
++        x += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_cvtph_ps(_mm_loadu_si128((__m128i*)x));
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++        x += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_cvtph_ps(mm_masked_read_short(d, (uint16_t*)x));
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
++
++float
++bf16_vec_norm_L2sqr_avx(const knowhere::bf16* x, size_t d) {
++    __m256 msum_0 = _mm256_setzero_ps();
++    __m256 msum_1 = _mm256_setzero_ps();
++    while (d >= 16) {
++        auto mx_0 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        auto mx_1 = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)(x + 8)));
++        msum_0 = _mm256_fmadd_ps(mx_0, mx_0, msum_0);
++        msum_1 = _mm256_fmadd_ps(mx_1, mx_1, msum_1);
++        x += 16;
++        d -= 16;
++    }
++    msum_0 = msum_0 + msum_1;
++    while (d >= 8) {
++        auto mx = _mm256_bf16_to_fp32(_mm_loadu_si128((__m128i*)x));
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++        x += 8;
++        d -= 8;
++    }
++    if (d > 0) {
++        auto mx = _mm256_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        msum_0 = _mm256_fmadd_ps(mx, mx, msum_0);
++    }
++    auto res = _mm256_reduce_add_ps(msum_0);
++    return res;
++}
+ }  // namespace faiss
+ #endif
+diff --git a/src/simd/distances_avx.h b/src/simd/distances_avx.h
+index f786dc69..441daee1 100644
+--- a/src/simd/distances_avx.h
++++ b/src/simd/distances_avx.h
+@@ -15,16 +15,36 @@
+ #include <cstddef>
+ #include <cstdint>
+ 
++#include "knowhere/operands.h"
++
+ namespace faiss {
+ 
+ /// Squared L2 distance between two vectors
+ float
+ fvec_L2sqr_avx(const float* x, const float* y, size_t d);
+ 
++float
++fvec_L2sqr_avx_bf16_patch(const float* x, const float* y, size_t d);
++
++float
++fp16_vec_L2sqr_avx(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_L2sqr_avx(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
+ /// inner product
+ float
+ fvec_inner_product_avx(const float* x, const float* y, size_t d);
+ 
++float
++fvec_inner_product_avx_bf16_patch(const float* x, const float* y, size_t d);
++
++float
++fp16_vec_inner_product_avx(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_inner_product_avx(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
+ /// L1 distance
+ float
+ fvec_L1_avx(const float* x, const float* y, size_t d);
+@@ -40,16 +60,34 @@ void
+ fvec_inner_product_batch_4_avx(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                                const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_inner_product_batch_4_avx_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2,
++                                          const float* y3, const size_t d, float& dis0, float& dis1, float& dis2,
++                                          float& dis3);
++
+ void
+ fvec_L2sqr_batch_4_avx(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                        const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_L2sqr_batch_4_avx_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                  const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
++
+ int32_t
+ ivec_inner_product_avx(const int8_t* x, const int8_t* y, size_t d);
+ 
+ int32_t
+ ivec_L2sqr_avx(const int8_t* x, const int8_t* y, size_t d);
+ 
++float
++fvec_norm_L2sqr_avx(const float* x, size_t d);
++
++float
++fp16_vec_norm_L2sqr_avx(const knowhere::fp16* x, size_t d);
++
++float
++bf16_vec_norm_L2sqr_avx(const knowhere::bf16* x, size_t d);
++
+ }  // namespace faiss
+ 
+ #endif /* DISTANCES_AVX_H */
+diff --git a/src/simd/distances_avx512.cc b/src/simd/distances_avx512.cc
+index 50cfbd15..07b74195 100644
+--- a/src/simd/distances_avx512.cc
++++ b/src/simd/distances_avx512.cc
+@@ -19,6 +19,7 @@
+ #include <string>
+ 
+ #include "faiss/impl/platform_macros.h"
++#include "simd_util.h"
+ 
+ namespace faiss {
+ 
+@@ -53,6 +54,93 @@ fvec_inner_product_avx512(const float* x, const float* y, size_t d) {
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++float
++fp16_vec_L2sqr_avx512(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        auto my_0 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)y));
++        auto mx_1 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)(x + 16)));
++        auto my_1 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)(y + 16)));
++        mx_0 = mx_0 - my_0;
++        mx_1 = mx_1 - my_1;
++        m512_res = _mm512_fmadd_ps(mx_0, mx_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, mx_1, m512_res_0);
++        x += 32;
++        y += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        auto my = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)y));
++        mx = mx - my;
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_cvtph_ps(_mm256_maskz_loadu_epi16(mask, x));
++        auto my = _mm512_cvtph_ps(_mm256_maskz_loadu_epi16(mask, y));
++        mx = _mm512_sub_ps(mx, my);
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++float
++bf16_vec_L2sqr_avx512(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        auto my_0 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)y));
++        auto mx_1 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(x + 16)));
++        auto my_1 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(y + 16)));
++        mx_0 = mx_0 - my_0;
++        mx_1 = mx_1 - my_1;
++        m512_res = _mm512_fmadd_ps(mx_0, mx_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, mx_1, m512_res_0);
++        x += 32;
++        y += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        auto my = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)y));
++        mx = mx - my;
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, x));
++        auto my = _mm512_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, y));
++        mx = _mm512_sub_ps(mx, my);
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++float
++fvec_inner_product_avx512_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (i = 0; i < d; i++) {
++        res += x[i] * bf16_float(y[i]);
++    }
++    return res;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+ float
+@@ -68,6 +156,86 @@ fvec_L2sqr_avx512(const float* x, const float* y, size_t d) {
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++float
++fp16_vec_inner_product_avx512(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        auto my_0 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)y));
++        auto mx_1 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)(x + 16)));
++        auto my_1 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)(y + 16)));
++        m512_res = _mm512_fmadd_ps(mx_0, my_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, my_1, m512_res_0);
++        x += 32;
++        y += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        auto my = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)y));
++        m512_res = _mm512_fmadd_ps(mx, my, m512_res);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_cvtph_ps(_mm256_maskz_loadu_epi16(mask, x));
++        auto my = _mm512_cvtph_ps(_mm256_maskz_loadu_epi16(mask, y));
++        m512_res = _mm512_fmadd_ps(mx, my, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++float
++bf16_vec_inner_product_avx512(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        auto my_0 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)y));
++        auto mx_1 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(x + 16)));
++        auto my_1 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(y + 16)));
++        m512_res = _mm512_fmadd_ps(mx_0, my_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, my_1, m512_res_0);
++        x += 32;
++        y += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        auto my = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)y));
++        m512_res = _mm512_fmadd_ps(mx, my, m512_res);
++        x += 16;
++        y += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, x));
++        auto my = _mm512_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, y));
++        m512_res = _mm512_fmadd_ps(mx, my, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++float
++fvec_L2sqr_avx512_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (i = 0; i < d; i++) {
++        const float tmp = x[i] - bf16_float(y[i]);
++        res += tmp * tmp;
++    }
++    return res;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ float
+ fvec_L1_avx512(const float* x, const float* y, size_t d) {
+     __m512 msum0 = _mm512_setzero_ps();
+@@ -214,6 +382,32 @@ fvec_inner_product_batch_4_avx512(const float* __restrict x, const float* __rest
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++// trust the compiler to unroll this properly
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++void
++fvec_inner_product_batch_4_avx512_bf16_patch(const float* __restrict x, const float* __restrict y0,
++                                             const float* __restrict y1, const float* __restrict y2,
++                                             const float* __restrict y3, const size_t d, float& dis0, float& dis1,
++                                             float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (size_t i = 0; i < d; ++i) {
++        d0 += x[i] * bf16_float(y0[i]);
++        d1 += x[i] * bf16_float(y1[i]);
++        d2 += x[i] * bf16_float(y2[i]);
++        d3 += x[i] * bf16_float(y3[i]);
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+ void
+@@ -242,6 +436,34 @@ fvec_L2sqr_batch_4_avx512(const float* x, const float* y0, const float* y1, cons
+ }
+ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+ 
++// trust the compiler to unroll this properly
++FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
++void
++fvec_L2sqr_batch_4_avx512_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                     const size_t d, float& dis0, float& dis1, float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    FAISS_PRAGMA_IMPRECISE_LOOP
++    for (size_t i = 0; i < d; ++i) {
++        const float q0 = x[i] - bf16_float(y0[i]);
++        const float q1 = x[i] - bf16_float(y1[i]);
++        const float q2 = x[i] - bf16_float(y2[i]);
++        const float q3 = x[i] - bf16_float(y3[i]);
++        d0 += q0 * q0;
++        d1 += q1 * q1;
++        d2 += q2 * q2;
++        d3 += q3 * q3;
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++FAISS_PRAGMA_IMPRECISE_FUNCTION_END
++
+ // trust the compiler to unroll this properly
+ int32_t
+ ivec_inner_product_avx512(const int8_t* x, const int8_t* y, size_t d) {
+@@ -265,6 +487,87 @@ ivec_L2sqr_avx512(const int8_t* x, const int8_t* y, size_t d) {
+     return res;
+ }
+ 
++float
++fvec_norm_L2sqr_avx512(const float* x, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_loadu_ps(x);
++        auto mx_1 = _mm512_loadu_ps(x + 16);
++        m512_res = _mm512_fmadd_ps(mx_0, mx_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, mx_1, m512_res_0);
++        x += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_loadu_ps(x);
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++        x += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_maskz_loadu_ps(mask, x);
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++float
++fp16_vec_norm_L2sqr_avx512(const knowhere::fp16* x, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        auto mx_1 = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)(x + 16)));
++        m512_res = _mm512_fmadd_ps(mx_0, mx_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, mx_1, m512_res_0);
++        x += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_cvtph_ps(_mm256_loadu_si256((__m256i*)x));
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++        x += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_cvtph_ps(_mm256_maskz_loadu_epi16(mask, x));
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
++float
++bf16_vec_norm_L2sqr_avx512(const knowhere::bf16* x, size_t d) {
++    __m512 m512_res = _mm512_setzero_ps();
++    __m512 m512_res_0 = _mm512_setzero_ps();
++    while (d >= 32) {
++        auto mx_0 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        auto mx_1 = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(x + 16)));
++        m512_res = _mm512_fmadd_ps(mx_0, mx_0, m512_res);
++        m512_res_0 = _mm512_fmadd_ps(mx_1, mx_1, m512_res_0);
++        x += 32;
++        d -= 32;
++    }
++    m512_res = m512_res + m512_res_0;
++    if (d >= 16) {
++        auto mx = _mm512_bf16_to_fp32(_mm256_loadu_si256((__m256i*)x));
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++        x += 16;
++        d -= 16;
++    }
++    if (d > 0) {
++        const __mmask16 mask = (1U << d) - 1U;
++        auto mx = _mm512_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, x));
++        m512_res = _mm512_fmadd_ps(mx, mx, m512_res);
++    }
++    return _mm512_reduce_add_ps(m512_res);
++}
++
+ }  // namespace faiss
+ 
+ #endif
+diff --git a/src/simd/distances_avx512.h b/src/simd/distances_avx512.h
+index 79654319..36096d00 100644
+--- a/src/simd/distances_avx512.h
++++ b/src/simd/distances_avx512.h
+@@ -15,15 +15,35 @@
+ #include <cstddef>
+ #include <cstdint>
+ 
++#include "knowhere/operands.h"
++
+ namespace faiss {
+ 
+ float
+ fvec_L2sqr_avx512(const float* x, const float* y, size_t d);
+ 
++float
++fp16_vec_L2sqr_avx512(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_L2sqr_avx512(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
++float
++fvec_L2sqr_avx512_bf16_patch(const float* x, const float* y, size_t d);
++
+ /// inner product
+ float
+ fvec_inner_product_avx512(const float* x, const float* y, size_t d);
+ 
++float
++fp16_vec_inner_product_avx512(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_inner_product_avx512(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
++float
++fvec_inner_product_avx512_bf16_patch(const float* x, const float* y, size_t d);
++
+ /// L1 distance
+ float
+ fvec_L1_avx512(const float* x, const float* y, size_t d);
+@@ -39,16 +59,34 @@ void
+ fvec_inner_product_batch_4_avx512(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                                   const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_inner_product_batch_4_avx512_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2,
++                                             const float* y3, const size_t d, float& dis0, float& dis1, float& dis2,
++                                             float& dis3);
++
+ void
+ fvec_L2sqr_batch_4_avx512(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                           const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_L2sqr_batch_4_avx512_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                     const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
++
+ int32_t
+ ivec_inner_product_avx512(const int8_t* x, const int8_t* y, size_t d);
+ 
+ int32_t
+ ivec_L2sqr_avx512(const int8_t* x, const int8_t* y, size_t d);
+ 
++float
++fvec_norm_L2sqr_avx512(const float* x, size_t d);
++
++float
++fp16_vec_norm_L2sqr_avx512(const knowhere::fp16* x, size_t d);
++
++float
++bf16_vec_norm_L2sqr_avx512(const knowhere::bf16* x, size_t d);
++
+ }  // namespace faiss
+ 
+ #endif /* DISTANCES_AVX512_H */
 diff --git a/src/simd/distances_neon.cc b/src/simd/distances_neon.cc
 index eb90c9ae..0b600673 100644
 --- a/src/simd/distances_neon.cc
@@ -2047,6 +2905,394 @@ index c3150d16..bb4fd542 100644
  }  // namespace faiss
  
  #endif /* DISTANCES_NEON_H */
+diff --git a/src/simd/distances_ref.cc b/src/simd/distances_ref.cc
+index 2ff6e82f..69734845 100644
+--- a/src/simd/distances_ref.cc
++++ b/src/simd/distances_ref.cc
+@@ -11,6 +11,8 @@
+ 
+ #include <cmath>
+ 
++#include "knowhere/operands.h"
++
+ namespace faiss {
+ 
+ float
+@@ -24,6 +26,39 @@ fvec_L2sqr_ref(const float* x, const float* y, size_t d) {
+     return res;
+ }
+ 
++float
++fp16_vec_L2sqr_ref(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        const float tmp = (float)x[i] - (float)y[i];
++        res += tmp * tmp;
++    }
++    return res;
++}
++
++float
++bf16_vec_L2sqr_ref(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        const float tmp = (float)x[i] - (float)y[i];
++        res += tmp * tmp;
++    }
++    return res;
++}
++
++float
++fvec_L2sqr_ref_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        const float tmp = x[i] - bf16_float(y[i]);
++        res += tmp * tmp;
++    }
++    return res;
++}
++
+ float
+ fvec_L1_ref(const float* x, const float* y, size_t d) {
+     size_t i;
+@@ -55,6 +90,36 @@ fvec_inner_product_ref(const float* x, const float* y, size_t d) {
+     return res;
+ }
+ 
++float
++fp16_vec_inner_product_ref(const knowhere::fp16* x, const knowhere::fp16* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        res += (float)x[i] * (float)y[i];
++    }
++    return res;
++}
++
++float
++bf16_vec_inner_product_ref(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        res += (float)x[i] * (float)y[i];
++    }
++    return res;
++}
++
++float
++fvec_inner_product_ref_bf16_patch(const float* x, const float* y, size_t d) {
++    size_t i;
++    float res = 0;
++    for (i = 0; i < d; i++) {
++        res += x[i] * bf16_float(y[i]);
++    }
++    return res;
++}
++
+ float
+ fvec_norm_L2sqr_ref(const float* x, size_t d) {
+     size_t i;
+@@ -65,6 +130,26 @@ fvec_norm_L2sqr_ref(const float* x, size_t d) {
+     return res;
+ }
+ 
++float
++fp16_vec_norm_L2sqr_ref(const knowhere::fp16* x, size_t d) {
++    size_t i;
++    double res = 0;
++    for (i = 0; i < d; i++) {
++        res += (float)x[i] * (float)x[i];
++    }
++    return res;
++}
++
++float
++bf16_vec_norm_L2sqr_ref(const knowhere::bf16* x, size_t d) {
++    size_t i;
++    double res = 0;
++    for (i = 0; i < d; i++) {
++        res += (float)x[i] * (float)x[i];
++    }
++    return res;
++}
++
+ void
+ fvec_L2sqr_ny_ref(float* dis, const float* x, const float* y, size_t d, size_t ny) {
+     for (size_t i = 0; i < ny; i++) {
+@@ -188,6 +273,28 @@ fvec_inner_product_batch_4_ref(const float* __restrict x, const float* __restric
+     dis3 = d3;
+ }
+ 
++void
++fvec_inner_product_batch_4_ref_bf16_patch(const float* __restrict x, const float* __restrict y0,
++                                          const float* __restrict y1, const float* __restrict y2,
++                                          const float* __restrict y3, const size_t d, float& dis0, float& dis1,
++                                          float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    for (size_t i = 0; i < d; ++i) {
++        d0 += x[i] * bf16_float(y0[i]);
++        d1 += x[i] * bf16_float(y1[i]);
++        d2 += x[i] * bf16_float(y2[i]);
++        d3 += x[i] * bf16_float(y3[i]);
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++
+ void
+ fvec_L2sqr_batch_4_ref(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                        const size_t d, float& dis0, float& dis1, float& dis2, float& dis3) {
+@@ -212,6 +319,30 @@ fvec_L2sqr_batch_4_ref(const float* x, const float* y0, const float* y1, const f
+     dis3 = d3;
+ }
+ 
++void
++fvec_L2sqr_batch_4_ref_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                  const size_t d, float& dis0, float& dis1, float& dis2, float& dis3) {
++    float d0 = 0;
++    float d1 = 0;
++    float d2 = 0;
++    float d3 = 0;
++    for (size_t i = 0; i < d; ++i) {
++        const float q0 = x[i] - bf16_float(y0[i]);
++        const float q1 = x[i] - bf16_float(y1[i]);
++        const float q2 = x[i] - bf16_float(y2[i]);
++        const float q3 = x[i] - bf16_float(y3[i]);
++        d0 += q0 * q0;
++        d1 += q1 * q1;
++        d2 += q2 * q2;
++        d3 += q3 * q3;
++    }
++
++    dis0 = d0;
++    dis1 = d1;
++    dis2 = d2;
++    dis3 = d3;
++}
++
+ int32_t
+ ivec_inner_product_ref(const int8_t* x, const int8_t* y, size_t d) {
+     size_t i;
+diff --git a/src/simd/distances_ref.h b/src/simd/distances_ref.h
+index 2ca81205..d4432039 100644
+--- a/src/simd/distances_ref.h
++++ b/src/simd/distances_ref.h
+@@ -4,16 +4,36 @@
+ #include <cstdint>
+ #include <cstdio>
+ 
++#include "knowhere/operands.h"
++
+ namespace faiss {
+ 
+ /// Squared L2 distance between two vectors
+ float
+ fvec_L2sqr_ref(const float* x, const float* y, size_t d);
+ 
++float
++fp16_vec_L2sqr_ref(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_L2sqr_ref(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
++float
++fvec_L2sqr_ref_bf16_patch(const float* x, const float* y, size_t d);
++
+ /// inner product
+ float
+ fvec_inner_product_ref(const float* x, const float* y, size_t d);
+ 
++float
++fvec_inner_product_ref_bf16_patch(const float* x, const float* y, size_t d);
++
++float
++fp16_vec_inner_product_ref(const knowhere::fp16* x, const knowhere::fp16* y, size_t d);
++
++float
++bf16_vec_inner_product_ref(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
+ /// L1 distance
+ float
+ fvec_L1_ref(const float* x, const float* y, size_t d);
+@@ -26,6 +46,12 @@ fvec_Linf_ref(const float* x, const float* y, size_t d);
+ float
+ fvec_norm_L2sqr_ref(const float* x, size_t d);
+ 
++float
++fp16_vec_norm_L2sqr_ref(const knowhere::fp16* x, size_t d);
++
++float
++bf16_vec_norm_L2sqr_ref(const knowhere::bf16* x, size_t d);
++
+ /// compute ny square L2 distance between x and a set of contiguous y vectors
+ void
+ fvec_L2sqr_ny_ref(float* dis, const float* x, const float* y, size_t d, size_t ny);
+@@ -66,12 +92,21 @@ void
+ fvec_inner_product_batch_4_ref(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                                const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_inner_product_batch_4_ref_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2,
++                                          const float* y3, const size_t d, float& dis0, float& dis1, float& dis2,
++                                          float& dis3);
++
+ /// Special version of L2sqr that computes 4 distances
+ /// between x and yi, which is performance oriented.
+ void
+ fvec_L2sqr_batch_4_ref(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                        const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
+ 
++void
++fvec_L2sqr_batch_4_ref_bf16_patch(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
++                                  const size_t d, float& dis0, float& dis1, float& dis2, float& dis3);
++
+ int32_t
+ ivec_inner_product_ref(const int8_t* x, const int8_t* y, size_t d);
+ 
+diff --git a/src/simd/distances_sse.cc b/src/simd/distances_sse.cc
+index 600ec931..15ca437d 100644
+--- a/src/simd/distances_sse.cc
++++ b/src/simd/distances_sse.cc
+@@ -18,6 +18,7 @@
+ #include <cstdint>
+ 
+ #include "distances_ref.h"
++#include "simd_util.h"
+ 
+ namespace faiss {
+ 
+@@ -64,6 +65,25 @@ fvec_norm_L2sqr_sse(const float* x, size_t d) {
+     return _mm_cvtss_f32(msum1);
+ }
+ 
++float
++bf16_vec_norm_L2sqr_sse(const knowhere::bf16* x, size_t d) {
++    __m128 m_res = _mm_setzero_ps();
++    while (d >= 4) {
++        __m128 m_x = _mm_bf16_to_fp32(_mm_loadl_epi64((const __m128i*)x));
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_x));
++        x += 4;
++        d -= 4;
++    }
++    if (d > 0) {
++        __m128 m_x = _mm_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_x));
++    }
++    m_res = _mm_hadd_ps(m_res, m_res);
++    m_res = _mm_hadd_ps(m_res, m_res);
++    return _mm_cvtss_f32(m_res);
++    ;
++}
++
+ namespace {
+ 
+ /// Function that does a component-wise operation between x and y
+@@ -277,6 +297,29 @@ fvec_L2sqr_sse(const float* x, const float* y, size_t d) {
+     return _mm_cvtss_f32(msum1);
+ }
+ 
++float
++bf16_vec_L2sqr_sse(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m128 m_res = _mm_setzero_ps();
++    while (d >= 4) {
++        __m128 m_x = _mm_bf16_to_fp32(_mm_loadl_epi64((const __m128i*)x));
++        __m128 m_y = _mm_bf16_to_fp32(_mm_loadl_epi64((const __m128i*)y));
++        m_x = _mm_sub_ps(m_x, m_y);
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_x));
++        x += 4;
++        y += 4;
++        d -= 4;
++    }
++    if (d > 0) {
++        __m128 m_x = _mm_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        __m128 m_y = _mm_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)y));
++        m_x = _mm_sub_ps(m_x, m_y);
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_x));
++    }
++    m_res = _mm_hadd_ps(m_res, m_res);
++    m_res = _mm_hadd_ps(m_res, m_res);
++    return _mm_cvtss_f32(m_res);
++}
++
+ float
+ fvec_inner_product_sse(const float* x, const float* y, size_t d) {
+     __m128 mx, my;
+@@ -303,6 +346,27 @@ fvec_inner_product_sse(const float* x, const float* y, size_t d) {
+     return _mm_cvtss_f32(msum1);
+ }
+ 
++float
++bf16_vec_inner_product_sse(const knowhere::bf16* x, const knowhere::bf16* y, size_t d) {
++    __m128 m_res = _mm_setzero_ps();
++    while (d >= 4) {
++        __m128 m_x = _mm_bf16_to_fp32(_mm_loadl_epi64((const __m128i*)x));
++        __m128 m_y = _mm_bf16_to_fp32(_mm_loadl_epi64((const __m128i*)y));
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_y));
++        x += 4;
++        y += 4;
++        d -= 4;
++    }
++    if (d > 0) {
++        __m128 m_x = _mm_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)x));
++        __m128 m_y = _mm_bf16_to_fp32(mm_masked_read_short(d, (uint16_t*)y));
++        m_res = _mm_add_ps(m_res, _mm_mul_ps(m_x, m_y));
++    }
++    m_res = _mm_hadd_ps(m_res, m_res);
++    m_res = _mm_hadd_ps(m_res, m_res);
++    return _mm_cvtss_f32(m_res);
++}
++
+ /***************************************************************************
+  * heavily optimized table computations
+  ***************************************************************************/
+diff --git a/src/simd/distances_sse.h b/src/simd/distances_sse.h
+index a8089c11..4e159a90 100644
+--- a/src/simd/distances_sse.h
++++ b/src/simd/distances_sse.h
+@@ -14,16 +14,24 @@
+ 
+ #include <cstdint>
+ #include <cstdio>
++
++#include "knowhere/operands.h"
+ namespace faiss {
+ 
+ /// Squared L2 distance between two vectors
+ float
+ fvec_L2sqr_sse(const float* x, const float* y, size_t d);
+ 
++float
++bf16_vec_L2sqr_sse(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
+ /// inner product
+ float
+ fvec_inner_product_sse(const float* x, const float* y, size_t d);
+ 
++float
++bf16_vec_inner_product_sse(const knowhere::bf16* x, const knowhere::bf16* y, size_t d);
++
+ /// L1 distance
+ float
+ fvec_L1_sse(const float* x, const float* y, size_t d);
+@@ -35,6 +43,9 @@ fvec_Linf_sse(const float* x, const float* y, size_t d);
+ float
+ fvec_norm_L2sqr_sse(const float* x, size_t d);
+ 
++float
++bf16_vec_norm_L2sqr_sse(const knowhere::bf16* x, size_t d);
++
+ void
+ fvec_L2sqr_ny_sse(float* dis, const float* x, const float* y, size_t d, size_t ny);
+ 
 diff --git a/src/simd/hook.cc b/src/simd/hook.cc
 index 5e40b3f0..48ef2c43 100644
 --- a/src/simd/hook.cc

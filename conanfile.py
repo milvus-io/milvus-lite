@@ -36,6 +36,7 @@ class MilvusLiteConan(ConanFile):
         "zstd/1.5.4",
         "yaml-cpp/0.7.0",
         "libdwarf/0.9.1",
+        "openblas/0.3.27",
     )
 
     generators = {"cmake", "cmake_find_package"}
@@ -77,8 +78,6 @@ class MilvusLiteConan(ConanFile):
     def requirements(self):
         if self.settings.os not in ["Macos", "Android"]:
             self.requires("libunwind/1.7.2")
-        if self.settings.os == "Android":
-            self.requires("openblas/0.3.27")
 
     def imports(self):
         self.copy("*.so*", "./lib", "lib")
