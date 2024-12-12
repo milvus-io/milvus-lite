@@ -33,6 +33,12 @@ else()
   set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
+if(CMAKE_LITE_BUILD_TYPE STREQUAL "SHARED")
+  set(LITE_BUILD_TYPE "SHARED")
+else()
+  set(LITE_BUILD_TYPE "STATIC")
+endif()
+
 if(APPLE)
   if(DEFINED ENV{HOMEBREW_PREFIX})
     message(STATUS "Homebrew prefix from environment: $ENV{HOMEBREW_PREFIX}")
