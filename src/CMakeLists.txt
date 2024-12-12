@@ -14,7 +14,7 @@
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 
-add_library(milite STATIC
+add_library(milite ${LITE_BUILD_TYPE}
   ${CMAKE_CURRENT_LIST_DIR}/collection_meta.cpp
   ${CMAKE_CURRENT_LIST_DIR}/collection_data.cpp
   ${CMAKE_CURRENT_LIST_DIR}/storage.cpp

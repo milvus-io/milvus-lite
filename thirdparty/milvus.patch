@@ -266,10 +266,10 @@ index 0e714f0a9..46ebabf2e 100644
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index 745842432..73934cd14 100644
+index 745842432..3750f8c39 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
 +++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
-@@ -43,12 +43,27 @@ FetchContent_Declare(
+@@ -43,12 +43,35 @@ FetchContent_Declare(
          GIT_TAG         ${KNOWHERE_VERSION}
          SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
          BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
@@ -287,13 +287,21 @@ index 745842432..73934cd14 100644
 +    )
 +
 +    if(${KNOWHERE_CHECK_RESULT} EQUAL 0)
-+      message("Apply knowhere patch...")
-+      execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere.patch
-+        WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
-+        OUTPUT_VARIABLE result
-+      )
++      if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
++          "aarch64")
++        message("Apply knowhere android patch...")
++        execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere-android.patch
++          WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
++          OUTPUT_VARIABLE result
++        )
++      else()
++        message("Apply knowhere patch...")
++        execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere.patch
++          WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
++          OUTPUT_VARIABLE result
++        )
++      endif()
 +    endif()
-+
 +
      # Adding the following target:
      # knowhere
