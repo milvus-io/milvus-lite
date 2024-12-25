@@ -46,7 +46,6 @@ class MilvusLiteConan(ConanFile):
         "gtest:build_gmock": False,
         "onetbb:tbbmalloc": False,
         "onetbb:tbbproxy": False,
-        "onetbb:tbbbind": False,
         "boost:without_locale": True,
         "boost:without_test": True,
         "boost:without_stacktrace": True,
@@ -73,6 +72,10 @@ class MilvusLiteConan(ConanFile):
         if self.settings.compiler == "gcc":
             if self.settings.compiler.libcxx == "libstdc++":
                 raise Exception("This package is only compatible with libstdc++11")
+
+    def config_options(self):
+        if self.settings.os != "Macos":
+            self.options["onetbb"].tbbbind = False
 
     def requirements(self):
         if self.settings.os not in ["Macos", "Android"]:
