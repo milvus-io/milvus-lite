@@ -33,9 +33,11 @@ class MilvusLiteConan(ConanFile):
         "arrow/12.0.1",
         "double-conversion/3.2.1",
         "marisa/0.2.6",
-        "zstd/1.5.4",
+        "zstd/1.5.4#308b8b048f9a3823ce248f9c150cc889",
         "yaml-cpp/0.7.0",
         "libdwarf/0.9.1",
+        "rapidjson/cci.20230929#624c0094d741e6a3749d2e44d834b96c",
+        "roaring/3.0.0#25a703f80eda0764a31ef939229e202d",
     )
 
     generators = {"cmake", "cmake_find_package"}
@@ -56,7 +58,7 @@ class MilvusLiteConan(ConanFile):
         "arrow:parquet": True,
         "arrow:compute": True,
         "arrow:with_re2": True,
-        "arrow:with_zstd": True,
+        "arrow:with_zstd": False,
         "arrow:with_boost": True,
         "arrow:with_thrift": True,
         "arrow:with_jemalloc": True,

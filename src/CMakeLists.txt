@@ -13,7 +13,6 @@
 # the License
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-
 add_library(milite ${LITE_BUILD_TYPE}
   ${CMAKE_CURRENT_LIST_DIR}/collection_meta.cpp
   ${CMAKE_CURRENT_LIST_DIR}/collection_data.cpp
@@ -35,18 +34,22 @@ add_library(milite ${LITE_BUILD_TYPE}
   ${CMAKE_CURRENT_LIST_DIR}/hybrid_search_task.cpp  
 )
 
-
 target_link_libraries(
   milite
   PUBLIC
   parser
-  milvus_proto
-  milvus_segcore
-  ${CONAN_LIBS}
+  milvus_core
+  milvus_log
+  yaml-cpp
+  roaring::roaring
   SQLiteCpp
   ${antlr4-cppruntime_LIBRARIES}
   marisa::marisa
-  TBB::tbb  
+  TBB::tbb
+  protobuf::protobuf
+  arrow::arrow
+  simdjson
+  tantivy_binding
 )
 
 add_library( 
