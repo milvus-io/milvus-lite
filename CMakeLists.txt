@@ -94,6 +94,9 @@ include_directories(${nlohmann_json_INCLUDE_DIRS})
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
+find_package(Libevent REQUIRED)
+include_directories(${libevent_INCLUDE_DIRS})
+
 find_package(folly REQUIRED)
 include_directories(${Folly_INCLUDE_DIRS})
 
