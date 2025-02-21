@@ -136,7 +136,7 @@ CollectionMeta::CreateIndex(SQLite::Database* db,
     // INSERT INTO {table_name} VALUES (NULL, {collection_name}, "schema", {data}, NULL)
     collections_[collection_name]->AddIndex(index_name, index_proto.c_str());
     std::string insert_cmd = string_util::SFormat(
-        "INSERT INTO {} VALUES (NULL, \"{}\", \"index\", \"{}\", \"{}\")",
+        "INSERT INTO {} VALUES (NULL, '{}', 'index', '{}', '{}')",
         table_meta_name_,
         collection_name,
         index_proto,
