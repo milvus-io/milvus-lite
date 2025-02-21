@@ -60,7 +60,7 @@ bool
 CollectionData::DropCollection(SQLite::Database* db) {
     // DROP TABLE {collection_name_}
     std::string drop_sql =
-        string_util::SFormat("DROP TABLE \"{}\"", collection_name_);
+        string_util::SFormat("DROP TABLE '{}'", collection_name_);
 
     if (db->tryExec(drop_sql) != 0) {
         const char* err = db->getErrorMsg();
@@ -93,7 +93,7 @@ CollectionData::Load(SQLite::Database* db,
                      std::vector<std::string>* output_rows) {
     // SELECT {col_data_} from {collection_name_} LIMIT {limit} OFFSET {start}
     std::string select_sql =
-        string_util::SFormat("SELECT {} from \"{}\" LIMIT {} OFFSET {}",
+        string_util::SFormat("SELECT {} from '{}' LIMIT {} OFFSET {}",
                              col_data_,
                              collection_name_,
                              limit,
@@ -115,13 +115,13 @@ CollectionData::Delete(SQLite::Database* db,
     // DELETE FROM {collection_name_} WHERE {col_milvus_id} in ({})
     std::stringstream ss;
     for (size_t i = 0; i < milvus_ids.size(); i++) {
-        ss << "\"" << milvus_ids[i] << "\"";
+        ss << "'" << milvus_ids[i] << "'";
         if (i < milvus_ids.size() - 1)
             ss << ",";
     }
 
     std::string delete_sql =
-        string_util::SFormat("DELETE FROM \"{}\" WHERE {} IN ({})",
+        string_util::SFormat("DELETE FROM '{}' WHERE {} IN ({})",
                              collection_name_,
                              col_milvus_id_,
                              ss.str());
@@ -139,7 +139,7 @@ int64_t
 CollectionData::Count(SQLite::Database* db) {
     // SELECT count(*) FROM {};
     std::string count_sql =
-        string_util::SFormat("SELECT count(*) FROM \"{}\"", collection_name_);
+        string_util::SFormat("SELECT count(*) FROM '{}'", collection_name_);
     try {
         SQLite::Statement query(*db, count_sql);
         query.executeStep();
