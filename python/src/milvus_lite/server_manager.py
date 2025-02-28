@@ -33,10 +33,9 @@ class ServerManager:
                 s = Server(str(path), args)
                 if not s.init():
                     return None
-                self._servers[str(path)] = s
-                if not self._servers[str(path)].start():
-                    logger.error("Start local milvus failed")
+                if not s.start():
                     return None
+                self._servers[str(path)] = s
             return self._servers[str(path)].uds_path
 
     def release_server(self, path: str):

@@ -97,7 +97,13 @@ class Server:
                 },
                 cwd=str(self._work_dir),
             )
-            return True
+            try:
+                # Wait for 0.5 second to ensure successful startup
+                self._p.wait(0.5)
+                logger.error("Start milvus-lite failed")
+                return False
+            except subprocess.TimeoutExpired:
+                return True
         except BlockingIOError:
             logger.error("Open %s failed, the file has been opened by another program", self._db_file)
             return False
