@@ -48,7 +48,7 @@ class Server:
             self._bin_path = pathlib.Path(BIN_PATH).absolute()
         self._db_file = pathlib.Path(db_file).absolute()
         if not re.match(r'^[a-zA-Z0-9.\-_]+$', self._db_file.name):
-            raise RuntimeError(f"Unsupport db name {self._db_file.name}, the name must match ^[a-zA-Z0-9.\-_]+$")
+            raise RuntimeError(f"Unsupport db name {self._db_file.name}, the name must match ^[a-zA-Z0-9.\\-_]+$")
         if len(self._db_file.name) > 36:
             raise RuntimeError(f"Db name {self._db_file.name} is too long, should be less than 36")
         self._work_dir = self._db_file.parent
@@ -109,20 +109,22 @@ class Server:
             return False
 
     def stop(self):
-        if self._p is not None:
-            try:
-                self._p.terminate()
-                self._p.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self._p.kill()
-                self._p.wait(timeout=3)
-            self._p = None
         if self._lock_fd:
+            # When the file lock is released, the milvus-lite service will automatically stop.
             fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
             self._lock_fd.close()
             self._lock_fd = None
-        pathlib.Path(self._uds_path).unlink(missing_ok=True)
-        pathlib.Path(self._lock_path).unlink(missing_ok=True)
+
+        if self._p is not None:
+            self._p = None
+        try:
+            os.unlink(self._uds_path)
+        except FileNotFoundError:
+            pass
+        try:
+            os.unlink(self._lock_path)
+        except FileNotFoundError:
+            pass
 
     def __del__(self):
         self.stop()
