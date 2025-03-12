@@ -200,6 +200,10 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
             index_metric = schema_util::GetIndexMetricType(field_index);
         }
     }
+    if (index_metric.empty()) {
+        return Status::IndexNotFound("No index found in field [{}]",
+                                     field->name());
+    }
 
     if (metric_.empty())
         metric_ = index_metric;
