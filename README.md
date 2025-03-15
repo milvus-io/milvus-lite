@@ -38,7 +38,7 @@ Milvus Lite uses the same API as Milvus Standalone and Distributed, providing a 
 Milvus Lite is only suitable for small scale prototyping (usually less than a million vectors) or edge devices. For large scale production, we recommend using [Milvus Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone) or [Milvus Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed). You can also consider the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
 
 # Requirements
-Milvus Lite currently supports the following environmnets:
+Milvus Lite currently supports the following environments:
 - Ubuntu >= 20.04 (x86_64 and arm64)
 - MacOS >= 11.0 (Apple Silicon M1/M2 and x86_64)
 
