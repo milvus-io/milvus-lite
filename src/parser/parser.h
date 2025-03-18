@@ -241,31 +241,45 @@ class PlanCCVisitor : public PlanVisitor {
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
+        TRY_WITH_EXCEPTION(elem.expr->value_expr().has_value() &&
+                           elem.expr->value_expr().value().has_array_val());
         if (info.data_type() == proto::schema::DataType::Array) {
-            proto::plan::GenericValue expr =
-                proto::plan::GenericValue(elem.expr->value_expr().value());
-            TRY_WITH_EXCEPTION(
-                canBeCompared(field, toValueExpr(&expr, this->arena.get())));
+            auto arr = elem.expr->value_expr().value().array_val();
+            for (int idx = 0; idx < arr.array_size(); idx++) {
+                proto::plan::GenericValue expr = arr.array(idx);
+                TRY_WITH_EXCEPTION(canBeCompared(
+                    field, toValueExpr(&expr, this->arena.get())));
+            }
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
             this->arena.get());
         auto json_contain_expr = google::protobuf::Arena::CreateMessage<
             proto::plan::JSONContainsExpr>(this->arena.get());
-        auto value = json_contain_expr->add_elements();  // MayBe BUG
-        value->unsafe_arena_set_allocated_array_val(
-            CreateMessageWithCopy<proto::plan::Array>(
-                this->arena.get(),
-                elem.expr->value_expr().value().array_val()));
+
+        auto arr = elem.expr->value_expr().value().array_val();
+        for (int idx = 0; idx < arr.array_size(); idx++) {
+            proto::plan::GenericValue expr = arr.array(idx);
+            auto val = json_contain_expr->add_elements();
+            if (expr.has_bool_val())
+                val->set_bool_val(expr.bool_val());
+            if (expr.has_string_val())
+                val->set_string_val(expr.string_val());
+            if (expr.has_float_val())
+                val->set_float_val(expr.float_val());
+            if (expr.has_int64_val())
+                val->set_int64_val(expr.int64_val());
+        }
+
         json_contain_expr->set_elements_same_type(
             elem.expr->value_expr().value().array_val().same_type());
         json_contain_expr->unsafe_arena_set_allocated_column_info(
             CreateMessageWithCopy<proto::plan::ColumnInfo>(this->arena.get(),
                                                            info));
-
         json_contain_expr->set_op(
             proto::plan::JSONContainsExpr_JSONOp_ContainsAll);
         expr->unsafe_arena_set_allocated_json_contains_expr(json_contain_expr);
+
         return ExprWithDtype(expr, proto::schema::Bool, false);
     }
 
@@ -1398,6 +1412,18 @@ class PlanCCVisitor : public PlanVisitor {
                     }
                     continue;
                 }
+
+                if (value.type() == typeid(std::string)) {
+                    v->set_string_val(std::any_cast<std::string>(value));
+                    if (dtype != proto::schema::DataType::None &&
+                        dtype != proto::schema::DataType::VarChar) {
+                        is_same = false;
+                    }
+                    if (dtype == proto::schema::DataType::None) {
+                        dtype = proto::schema::DataType::VarChar;
+                    }
+                    continue;
+                }
             }
         }
 
@@ -1423,11 +1449,15 @@ class PlanCCVisitor : public PlanVisitor {
         TRY_WITH_EXCEPTION(info.data_type() == proto::schema::DataType::Array ||
                            info.data_type() == proto::schema::DataType::JSON);
         auto elem = std::any_cast<ExprWithDtype>(expr_ret[1]->accept(this));
+        TRY_WITH_EXCEPTION(elem.expr->value_expr().has_value() &&
+                           elem.expr->value_expr().value().has_array_val());
         if (info.data_type() == proto::schema::DataType::Array) {
-            proto::plan::GenericValue expr =
-                proto::plan::GenericValue(elem.expr->value_expr().value());
-            TRY_WITH_EXCEPTION(
-                canBeCompared(field, toValueExpr(&expr, this->arena.get())));
+            auto arr = elem.expr->value_expr().value().array_val();
+            for (int idx = 0; idx < arr.array_size(); idx++) {
+                proto::plan::GenericValue expr = arr.array(idx);
+                TRY_WITH_EXCEPTION(canBeCompared(
+                    field, toValueExpr(&expr, this->arena.get())));
+            }
         }
 
         auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
@@ -1435,11 +1465,19 @@ class PlanCCVisitor : public PlanVisitor {
         auto json_contain_expr = google::protobuf::Arena::CreateMessage<
             proto::plan::JSONContainsExpr>(this->arena.get());
 
-        auto value = json_contain_expr->add_elements();
-        value->unsafe_arena_set_allocated_array_val(
-            CreateMessageWithCopy<proto::plan::Array>(
-                this->arena.get(),
-                elem.expr->value_expr().value().array_val()));
+        auto arr = elem.expr->value_expr().value().array_val();
+        for (int idx = 0; idx < arr.array_size(); idx++) {
+            proto::plan::GenericValue expr = arr.array(idx);
+            auto val = json_contain_expr->add_elements();
+            if (expr.has_bool_val())
+                val->set_bool_val(expr.bool_val());
+            if (expr.has_string_val())
+                val->set_string_val(expr.string_val());
+            if (expr.has_float_val())
+                val->set_float_val(expr.float_val());
+            if (expr.has_int64_val())
+                val->set_int64_val(expr.int64_val());
+        }
 
         json_contain_expr->set_elements_same_type(
             elem.expr->value_expr().value().array_val().same_type());
@@ -1449,6 +1487,7 @@ class PlanCCVisitor : public PlanVisitor {
         json_contain_expr->set_op(
             proto::plan::JSONContainsExpr_JSONOp_ContainsAny);
         expr->unsafe_arena_set_allocated_json_contains_expr(json_contain_expr);
+
         return ExprWithDtype(expr, proto::schema::Bool, false);
     }
 
