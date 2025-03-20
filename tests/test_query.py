@@ -11,7 +11,7 @@
 # the License.
 
 import unittest
-from pymilvus import MilvusClient, MilvusException
+from pymilvus import MilvusClient, DataType
 
 
 class TestQuery(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestQuery(unittest.TestCase):
     def tearDown(self):
         self.milvus_client.drop_collection(self.collection_name)
 
-    def test_search(self):
+    def test_query(self):
         rows = [
             {'id': 1, 'vector': [0.0, 1], 'a': 100},
             {'id': 2, 'vector': [0.1, 0.9], 'b': 200},
@@ -54,6 +54,55 @@ class TestQuery(unittest.TestCase):
 
         result = self.milvus_client.query(self.collection_name, filter="a == 100", limit=3)
         self.assertEqual(len(result), 1)
+
+
+class TestArray(unittest.TestCase):
+    def test_query(self):
+        self.dim = 2
+        self.collection_name = 'default'
+        self.milvus_client = MilvusClient('./local_test.db')
+        has_collection = self.milvus_client.has_collection(self.collection_name, timeout=5)
+        if has_collection:
+            self.milvus_client.drop_collection(self.collection_name)
+        schema = self.milvus_client.create_schema(enable_dynamic_field=True)
+        schema.add_field("id", DataType.INT64, is_primary=True)
+        schema.add_field("embeddings", DataType.FLOAT_VECTOR, dim=2)
+        schema.add_field("array", DataType.ARRAY, element_type=DataType.INT64, max_capacity=5)
+        self.milvus_client.create_collection(self.collection_name, self.dim)
+        rows = [
+            {'id': 1, 'vector': [0.0, 1], 'array': [100, 1]},
+            {'id': 2, 'vector': [0.1, 0.9], 'array': [200, 2]},
+            {'id': 3, 'vector': [0.2, 0.8], 'array': [300, 1]},
+            {'id': 4, 'vector': [0.3, 0.7], 'array': [400, 3]},
+            {'id': 5, 'vector': [0.8, 0.2], 'array': [500]},
+            {'id': 6, 'vector': [1.0, 0.0], 'array': [600]},
+        ]
+        insert_result = self.milvus_client.insert(self.collection_name, rows)
+        self.assertEqual(insert_result['insert_count'], 6)
+        result = self.milvus_client.query(
+                collection_name="default",
+                filter="ARRAY_CONTAINS_ANY(array, [1, 2])",
+                output_fields=["id"],
+                limit=3
+            )
+        self.assertEqual(len(result), 3)
+
+        result = self.milvus_client.query(
+                collection_name="default",
+                filter="ARRAY_CONTAINS_ALL(array, [100, 1])",
+                output_fields=["id"],
+                limit=3
+            )
+        self.assertEqual(len(result), 1)
+
+        result = self.milvus_client.query(
+                collection_name="default",
+                filter="ARRAY_LENGTH(array) < 2",
+                output_fields=["id"],
+                limit=3
+            )
+        self.assertEqual(len(result), 2)
+        self.milvus_client.drop_collection(self.collection_name)
 
 
 if __name__ == '__main__':
