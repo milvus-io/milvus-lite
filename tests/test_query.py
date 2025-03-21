@@ -97,11 +97,11 @@ class TestArray(unittest.TestCase):
 
         result = self.milvus_client.query(
                 collection_name="default",
-                filter="ARRAY_LENGTH(array) < 2",
+                filter="ARRAY_LENGTH(array) == 2",
                 output_fields=["id"],
-                limit=3
+                limit=4
             )
-        self.assertEqual(len(result), 2)
+        self.assertEqual(len(result), 4)
         self.milvus_client.drop_collection(self.collection_name)
 
 
