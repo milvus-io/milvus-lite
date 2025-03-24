@@ -75,6 +75,14 @@ class TestDefaultSearch(unittest.TestCase):
         with self.assertRaises(MilvusException):
             milvus_client.create_collection(collection_name, schema=schema, index_params=index_params)                    
 
+    def test_collection_name(self):
+        collection_name = "test_collection_escck"
+        milvus_client = MilvusClient("./local_test.db")
+        has_collection = milvus_client.has_collection(collection_name)
+        if has_collection:
+            milvus_client.drop_collection(collection_name)
+        milvus_client.create_collection(collection_name, dimension=384)
+
 
 if __name__ == '__main__':
     unittest.main()

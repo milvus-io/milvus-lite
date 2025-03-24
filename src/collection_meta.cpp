@@ -116,10 +116,10 @@ CollectionMeta::CreateCollection(SQLite::Database* db,
     try {
         SQLite::Statement query(*db, insert_cmd);
         SQLite::bind(query, collection_name, kSchemaStr, schema_proto, pk_name);
-        return query.exec();
+        return query.exec() == 1;
     } catch (std::exception& e) {
         LOG_ERROR("Insert data failed, errs: {}", e.what());
-        return -1;
+        return false;
     }
 }
 
@@ -136,14 +136,11 @@ CollectionMeta::CreateIndex(SQLite::Database* db,
     // INSERT INTO {table_name} VALUES (NULL, {collection_name}, "schema", {data}, NULL)
     collections_[collection_name]->AddIndex(index_name, index_proto.c_str());
     std::string insert_cmd = string_util::SFormat(
-        "INSERT INTO {} VALUES (NULL, '{}', 'index', '{}', '{}')",
-        table_meta_name_,
-        collection_name,
-        index_proto,
-        index_name);
+        "INSERT INTO {} VALUES (NULL, ?, 'index', ?, ?)", table_meta_name_);
     try {
-        db->exec(insert_cmd);
-        return true;
+        SQLite::Statement query(*db, insert_cmd);
+        SQLite::bind(query, collection_name, index_proto, index_name);
+        return query.exec() == 1;
     } catch (std::exception& e) {
         LOG_ERROR("Add index failed, err: {}", e.what());
         return false;

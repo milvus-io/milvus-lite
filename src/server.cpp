@@ -44,7 +44,7 @@ BlockLock(const char* filename) {
     if (fcntl(fd, F_SETLK, &fl) == -1) {
         return -1;
     }
-    LOG_ERROR("Process exit");
+    LOG_INFO("Process exit");
     close(fd);
     return 0;
 }
