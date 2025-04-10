@@ -31,117 +31,112 @@ namespace milvus::local {
 
 namespace test {
 
-TEST(MilvusLocal, h) {
-    std::string collection_name("test_schema");
-    milvus::local::Rows data = CreateData(10);
-    auto schema_str = CreateCollection();
-    auto index_str = CreateVectorIndex();
-
-    std::remove("milvus_data.db");
+TEST(MilvusLocal, BM25) {
+    std::string collection_name("test_bm25");
+    ::milvus::proto::schema::CollectionSchema schema;
+    schema.set_name("bm25");
     {
-        MilvusLocal ms("./");
-        ms.Init();
-        ms.CreateCollection(collection_name, PK_NAME, schema_str);
-        ms.CreateIndex(collection_name, "test_index", index_str);
-        auto rows = CreateData(20);
-        std::vector<std::string> ids;
-        ms.Insert(collection_name, rows, &ids);
-        milvus::proto::schema::CollectionSchema schema;
-        schema.ParseFromString(schema_str);
-
-        // std::cout << schema.DebugString() << std::endl;
-        std::string exprstr("id in [1, 2, 6, 5, 8, 9]");
-        antlr4::ANTLRInputStream input(exprstr);
-        PlanLexer lexer(&input);
-        antlr4::CommonTokenStream tokens(&lexer);
-        PlanParser parser(&tokens);
-        PlanParser::ExprContext* tree = parser.expr();
-        auto helper = milvus::CreateSchemaHelper(&schema);
-        milvus::PlanCCVisitor visitor(&helper);
-        auto res = std::any_cast<milvus::ExprWithDtype>(visitor.visit(tree));
+        auto field = schema.add_fields();
+        field->set_name("id");
+        field->set_fieldid(101);
+        field->set_data_type(milvus::proto::schema::DataType::Int64);
+        field->set_is_primary_key(true);
+        field->set_autoid(false);
+    }
+    {
+        auto field = schema.add_fields();
+        field->set_name("document_content");
+        field->set_data_type(milvus::proto::schema::DataType::VarChar);
         {
-            ::milvus::proto::plan::PlanNode plan;
-            plan.mutable_query()->set_is_count(false);
-            plan.mutable_query()->set_limit(5);
-            plan.mutable_query()->set_allocated_predicates(res.expr);
-            plan.add_output_field_ids(200);
-            plan.add_output_field_ids(202);
-            std::cout << plan.DebugString() << std::endl;
-            RetrieveResult result;
-            ms.Retrieve(collection_name, plan.SerializeAsString(), &result);
-            milvus::proto::segcore::RetrieveResults rs;
-            rs.ParseFromArray(result.retrieve_result_.proto_blob,
-                              result.retrieve_result_.proto_size);
-            std::cout << rs.DebugString() << std::endl;
+            auto param = field->add_type_params();
+            param->set_key("max_length");
+            param->set_value("9000");
         }
-
         {
-            std::cout << "===============================" << std::endl;
-            ::milvus::proto::plan::PlanNode plan;
-            plan.mutable_vector_anns()->set_field_id(201);
-            plan.mutable_vector_anns()->set_allocated_predicates(res.expr);
-            plan.mutable_vector_anns()->set_placeholder_tag("$0");
-            plan.mutable_vector_anns()->set_vector_type(
-                ::milvus::proto::plan::VectorType::FloatVector);
-            plan.mutable_vector_anns()->mutable_query_info()->set_topk(3);
-            plan.mutable_vector_anns()->mutable_query_info()->set_metric_type(
-                "IP");
-            plan.mutable_vector_anns()->mutable_query_info()->set_search_params(
-                "{\"nprobe\": 10}");
-            plan.mutable_vector_anns()->mutable_query_info()->set_round_decimal(
-                -1);
-            plan.add_output_field_ids(200);
-            plan.add_output_field_ids(202);
-            std::cout << plan.DebugString() << std::endl;
-
-            milvus::proto::common::PlaceholderGroup raw_group;
-            auto value = raw_group.add_placeholders();
-            value->set_tag("$0");
-            value->set_type(
-                milvus::proto::common::PlaceholderType::FloatVector);
-            std::vector<float> vec{0.3, 0.5, 0.2};
-            value->add_values(vec.data(), vec.size() * sizeof(float));
-
-            auto slice_nqs = std::vector<int64_t>{1};
-            auto slice_topKs = std::vector<int64_t>{3};
-            SearchResult result(slice_nqs, slice_topKs);
-            ms.Search(collection_name,
-                      plan.SerializeAsString(),
-                      raw_group.SerializeAsString(),
-                      &result);
-            milvus::proto::schema::SearchResultData rz;
-            rz.ParseFromArray(result.result_[0].proto_blob,
-                              result.result_[0].proto_size);
-            // std::cout << rz.DebugString() << std::endl;
-
-            milvus::proto::schema::IDs ids;
-            ids.mutable_int_id()->add_data(0);
-            ids.mutable_int_id()->add_data(1);
-            ids.mutable_int_id()->add_data(2);
-            ms.DeleteByIds(collection_name,
-                           ids.SerializeAsString(),
-                           3,
-                           std::vector<std::string>{"0", "1", "2"});
-            ms.Search(collection_name,
-                      plan.SerializeAsString(),
-                      raw_group.SerializeAsString(),
-                      &result);
-            rz.ParseFromArray(result.result_[0].proto_blob,
-                              result.result_[0].proto_size);
-            // std::cout << rz.DebugString() << std::endl;
-
-            ms.ReleaseCollection(collection_name);
+            auto param = field->add_type_params();
+            param->set_key("enable_analyzer");
+            param->set_value("true");
         }
+    }
+    {
+        auto field = schema.add_fields();
+        field->set_name("sparse_vector");
+        field->set_autoid(102);
+        field->set_data_type(
+            milvus::proto::schema::DataType::SparseFloatVector);
+    }
+    {
+        auto func = schema.add_functions();
+        func->set_name("bm25_fn");
+        func->add_input_field_names();
+        func->set_input_field_names(0, "document_content");
+        func->add_output_field_names();
+        func->set_output_field_names(0, "sparse_vector");
+        func->set_type(milvus::proto::schema::FunctionType::BM25);
+    }
+    MilvusLocal ms("bm.db");
+    ms.Init();
+    ms.CreateCollection("doc_in_doc_out", "id", schema.SerializeAsString());
+    milvus::proto::segcore::FieldIndexMeta meta;
+    {
+        meta.set_index_name("sparse_inverted_index");
+        meta.set_fieldid(102);
+        auto index_type = meta.add_type_params();
+        index_type->set_key("index_type");
+        index_type->set_value("SPARSE_INVERTED_INDEX");
+        auto metric_type = meta.add_type_params();
+        metric_type->set_key("metric_type");
+        metric_type->set_value("BM25");
+
+        auto bm25_k1 = meta.add_index_params();
+        bm25_k1->set_key("bm25_k1");
+        bm25_k1->set_value(std::to_string(1.2f));
+
+        auto bm25_b = meta.add_index_params();
+        bm25_b->set_key("bm25_b");
+        bm25_b->set_value(std::to_string(0.75f));
+    }
+    std::string meta_proto;
+    meta.SerializeToString(&meta_proto);
+    std::cout << "Create Index" << std::endl;
+    std::cout << meta.DebugString() << std::endl;
+    ms.CreateIndex("doc_in_doc_out", "sparse_inverted_index", meta_proto);
+
+    milvus::proto::segcore::InsertRecord record;
+    record.set_num_rows(1);
+    {
+        auto data = record.add_fields_data();
+        data->set_field_name("id");
+        data->set_field_id(101);
+        data->set_type(milvus::proto::schema::DataType::Int64);
+        data->mutable_scalars()->mutable_long_data()->add_data(1);
+    }
+    {
+        auto data = record.add_fields_data();
+        data->set_field_name("document_content");
+        data->set_field_id(102);
+        data->set_type(milvus::proto::schema::DataType::String);
+        data->mutable_scalars()->mutable_string_data()->add_data("hello world");
+    }
+    {
+        auto data = record.add_fields_data();
+        data->set_field_id(0);
+        data->set_type(milvus::proto::schema::DataType::Int64);
+        data->mutable_scalars()->mutable_long_data()->add_data(0);
     }
 
     {
-        MilvusLocal ms("./");
-        ms.Init();
-        ms.LoadCollection(collection_name);
-        ms.ReleaseCollection(collection_name);
+        auto data = record.add_fields_data();
+        data->set_field_id(1);
+        data->set_type(milvus::proto::schema::DataType::Int64);
+        data->mutable_scalars()->mutable_long_data()->add_data(10000000);
     }
 
-    std::remove("milvus_data.db");
+    std::vector<std::string> ids;
+    auto status = ms.Insert(
+        "doc_in_doc_out",
+        {std::make_tuple(std::to_string(1), record.SerializeAsString())},
+        &ids);
 }
 
 TEST(MilvusLocal, parser) {
