@@ -33,6 +33,7 @@ else()
   set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
+
 if(CMAKE_LITE_BUILD_TYPE STREQUAL "SHARED")
   set(LITE_BUILD_TYPE "SHARED")
 else()
@@ -273,13 +274,13 @@ add_custom_command(
 add_custom_target(tantivy_binding_target DEPENDS compile_tantivy)
 
 add_library(tantivy_binding STATIC IMPORTED)
-
-set(IMPORT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/release/libtantivy_binding.a")
+string(TOLOWER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_LOWER)
+set(IMPORT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE_LOWER}/libtantivy_binding.a")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
                                             "aarch64")
   set(IMPORT_LOCATION
-      "${CMAKE_CURRENT_BINARY_DIR}/aarch64-linux-android/release/libtantivy_binding.a"
+      "${CMAKE_CURRENT_BINARY_DIR}/aarch64-linux-android/${CMAKE_BUILD_TYPE_LOWER}/libtantivy_binding.a"
   )
 endif()
 

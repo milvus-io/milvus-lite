@@ -20,11 +20,12 @@
 
 namespace milvus::local {
 
-#define CHECK_STATUS(status, err) \
-    do {                          \
-        if (!(status).IsOk()) {   \
-            return status;        \
-        }                         \
+#define CHECK_STATUS(status, err)      \
+    do {                               \
+        auto&& _tmp_status = (status); \
+        if (!_tmp_status.IsOk()) {     \
+            return _tmp_status;        \
+        }                              \
     } while (0)
 
 #define DELETE_AND_SET_NULL(ptr, deleter) \
