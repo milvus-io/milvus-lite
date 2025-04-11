@@ -107,14 +107,17 @@ SegcoreWrapper::SetCollectionInfo(const std::string& collection_name,
     assert(collection_ == nullptr);
     auto new_collection_info = NewCollectionInfo(collection_info);
     try {
-        collection_ = ::NewCollection(new_collection_info.c_str(),
-                                      new_collection_info.size());
+        CHECK_STATUS(Status(::NewCollection(new_collection_info.c_str(),
+                                            new_collection_info.size(),
+                                            &collection_)),
+                     "New collection failed");
         // set index info if has
         if (!index_meta.empty()) {
             ::SetIndexMeta(collection_, index_meta.c_str(), index_meta.size());
         }
-        CHECK_STATUS(Status(::NewSegment(collection_, Growing, 0, &segment_)),
-                     "Init segcore failed");
+        CHECK_STATUS(
+            Status(::NewSegment(collection_, Growing, 0, &segment_, false)),
+            "Init segcore failed");
         collection_name_ = collection_name;
         return Status::Ok();
     } catch (std::exception& e) {
@@ -195,13 +198,25 @@ SegcoreWrapper::Retrieve(const std::string& plan, RetrieveResult* result) {
         auto status = Status(::CreateRetrievePlanByExpr(
             collection_, plan.c_str(), plan.size(), &retrieve_plan.plan_));
         CHECK_STATUS(status, "Create retrieve plan failed, invalid expr");
-        auto rs = Status(::Retrieve({},
-                                    segment_,
-                                    retrieve_plan.plan_,
-                                    GetTimestamp(),
-                                    &(result->retrieve_result_),
-                                    DEFAULT_MAX_OUTPUT_SIZE,
-                                    false));
+        auto job = ::AsyncRetrieve({},
+                                   segment_,
+                                   retrieve_plan.plan_,
+                                   GetTimestamp(),
+                                   DEFAULT_MAX_OUTPUT_SIZE,
+                                   false,
+                                   2);
+        std::mutex mu;
+        mu.lock();
+        future_register_ready_callback(
+            job,
+            [](CLockedGoMutex* mutex) { ((std::mutex*)(mutex))->unlock(); },
+            (CLockedGoMutex*)(&mu));
+        mu.lock();
+        CRetrieveResult* tmp_result;
+        auto rs = Status(future_leak_and_get(job, (void**)&(tmp_result)));
+        future_destroy(job);
+        result->retrieve_result_.proto_blob = tmp_result->proto_blob;
+        result->retrieve_result_.proto_size = tmp_result->proto_size;
         CHECK_STATUS(rs, "Retrieve failed, errs:");
         return Status::Ok();
     } catch (std::exception& e) {
@@ -229,16 +244,23 @@ SegcoreWrapper::Search(const std::string& plan,
                                            &group.group_)),
             "Parse placeholder group failed");
         SearchResultWrapper search_result;
-        CHECK_STATUS(Status(::Search({},
-                                     segment_,
-                                     search_plan.plan_,
-                                     group.group_,
-                                     GetTimestamp(),
-                                     &(search_result.ret_))),
-                     "Search failed");
+        auto job = ::AsyncSearch(
+            {}, segment_, search_plan.plan_, group.group_, GetTimestamp(), 2);
+        std::mutex mu;
+        mu.lock();
+        future_register_ready_callback(
+            job,
+            [](CLockedGoMutex* mutex) { ((std::mutex*)(mutex))->unlock(); },
+            (CLockedGoMutex*)(&mu));
+        mu.lock();
+        auto rs =
+            Status(future_leak_and_get(job, (void**)&(search_result.ret_)));
+        future_destroy(job);
+        CHECK_STATUS(rs, "Search failed");
 
         CHECK_STATUS(
-            Status(::ReduceSearchResultsAndFillData(&(result->blob_),
+            Status(::ReduceSearchResultsAndFillData({},
+                                                    &(result->blob_),
                                                     search_plan.plan_,
                                                     &(search_result.ret_),
                                                     1,

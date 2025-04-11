@@ -48,6 +48,7 @@ const char* kHamming = "HAMMING";
 const char* kJaccard = "JACCARD";
 const char* kSubStructure = "SUBSTRUCTURE";
 const char* kSuperStructure = "SUPERSTRUCTURE";
+const char* kBM25 = "BM25";
 
 // index_type
 const char* kAutoIndex = "AUTOINDEX";
@@ -210,7 +211,7 @@ class SparseFloatVectorChecker : public virtual IndexChecker {
         max_dim_ = -1;
         need_check_dim_ = false;
         supported_index_ = {kSparseInvertedIndex, kSparseWand};
-        supported_metric_ = {kIP};
+        supported_metric_ = {kIP, kBM25};
     }
 
     virtual ~SparseFloatVectorChecker() = default;
