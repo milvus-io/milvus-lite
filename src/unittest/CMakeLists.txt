@@ -27,6 +27,18 @@ set(MILVUS_LOCAL_TEST_DEPS
 )
 
 add_executable(
+  milvus_local_test
+  milvus_local_test.cpp
+  test_util.cpp
+)
+
+target_link_libraries(
+milvus_local_test
+PRIVATE
+${MILVUS_LOCAL_TEST_DEPS}
+)
+
+add_executable(
   milvus_proxy_test
   milvus_proxy_test.cpp
   test_util.cpp  
