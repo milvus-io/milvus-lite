@@ -34,7 +34,9 @@ class Timer {
     }
     void
     Start(const std::string& uid) {
-        assert(!start_);
+        if (start_) {
+            return;
+        }
         start_ = true;
         start_time_ = std::chrono::high_resolution_clock::now();
         uid_ = uid;
@@ -42,14 +44,18 @@ class Timer {
 
     void
     DoRecord(const std::string& label) {
-        assert(start_);
+        if (!start_) {
+            return;
+        }
         auto now = std::chrono::high_resolution_clock::now();
         time_record_.emplace_back(label, now);
     }
 
     void
     Print() const {
-        assert(start_ && time_record_.size() != 0);
+        if (!start_) {
+            return;
+        }
         auto pre_time = start_time_;
         const auto& [_, time_point] = time_record_.back();
         LOG_INFO("uid: {} TOTAL duration:{} microseconds ",
@@ -71,7 +77,9 @@ class Timer {
 
     void
     Stop() {
-        assert(start_);
+        if (!start_) {
+            return;
+        }
         time_record_.clear();
         uid_ = "";
         start_ = false;
