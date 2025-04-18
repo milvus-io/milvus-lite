@@ -33,6 +33,7 @@ else()
   set(CMAKE_CXX_FLAGS "-O3 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
+
 if(CMAKE_LITE_BUILD_TYPE STREQUAL "SHARED")
   set(LITE_BUILD_TYPE "SHARED")
 else()
@@ -94,6 +95,9 @@ include_directories(${nlohmann_json_INCLUDE_DIRS})
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
+find_package(Libevent REQUIRED)
+include_directories(${libevent_INCLUDE_DIRS})
+
 find_package(folly REQUIRED)
 include_directories(${Folly_INCLUDE_DIRS})
 
@@ -125,30 +129,35 @@ include_directories(${marisa_INCLUDE_DIRS})
 find_package(yaml-cpp REQUIRED)
 include_directories(${yaml-cpp_INCLUDE_DIRS})
 
+find_package(RapidJSON REQUIRED)
+include_directories(${RapidJSON_INCLUDE_DIRS})
+
+find_package(roaring REQUIRED)
+include_directories(${roaring_INCLUDE_DIRS})
+
+find_package(prometheus-cpp REQUIRED)
+include_directories(${prometheus-cpp_INCLUDE_DIRS})
+
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+
+FetchContent_Declare(
+  simdjson
+  GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+  GIT_TAG v3.1.7)
+FetchContent_MakeAvailable(simdjson)
+
+include_directories(${simdjson_SOURCE_DIR}/include)
+
 add_definitions(-DANTLR4CPP_STATIC)
 add_definitions(-DHAVE_CPP_STDLIB)
 add_definitions(-DMILVUS_LITE)
+add_definitions(-DFMT_HEADER_ONLY)
 
 if(APPLE)
   add_definitions("-D_GNU_SOURCE")
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pb)
-
-execute_process(
-  COMMAND git diff --quiet
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-  RESULT_VARIABLE CHECK_RESULT)
-
-if(${CHECK_RESULT} EQUAL 0)
-  message("Apply milvus patch...")
-  execute_process(
-    COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-    OUTPUT_VARIABLE result)
-else()
-  message("Milvus not need applying patch...")
-endif()
 
 add_library(
   milvus_proto STATIC
@@ -159,6 +168,8 @@ add_library(
   "${CMAKE_SOURCE_DIR}/src/proto/milvus.proto"
   "${CMAKE_SOURCE_DIR}/src/proto/msg.proto"
   "${CMAKE_SOURCE_DIR}/src/proto/feder.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/cgo_msg.proto"
+  "${CMAKE_SOURCE_DIR}/src/proto/index_cgo_msg.proto"
   "${CMAKE_SOURCE_DIR}/src/proto/rg.proto")
 
 set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/pb")
@@ -203,6 +214,9 @@ add_library(
 
 target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})
 
+include(thirdparty/milvus/internal/core/cmake/BuildUtils.cmake)
+include(thirdparty/milvus/internal/core/cmake/Utils.cmake)
+set(WITH_LIGHT ON CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/milvus/internal/core/thirdparty/knowhere)
 
 include_directories(
@@ -214,25 +228,14 @@ include_directories(
   "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/thirdparty/tantivy/")
 
 include_directories("${knowhere_SOURCE_DIR}/include")
-function(MILVUS_ADD_PKG_CONFIG MODULE)
-  configure_file(${MODULE}.pc.in "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
-                 @ONLY)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${MODULE}.pc"
-          DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig/")
-endfunction()
 
-include(cmake/milvus-storage.cmake)
+
+#include(cmake/milvus-storage.cmake)
 
 include_directories("${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src/")
 add_library(
   boost_bitset_ext
   thirdparty/milvus/internal/core/thirdparty/boost_ext/dynamic_bitset_ext.cpp)
-
-FetchContent_Declare(
-  simdjson
-  GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-  GIT_TAG v3.1.7)
-FetchContent_MakeAvailable(simdjson)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CARGO_CMD cargo build)
@@ -271,13 +274,13 @@ add_custom_command(
 add_custom_target(tantivy_binding_target DEPENDS compile_tantivy)
 
 add_library(tantivy_binding STATIC IMPORTED)
-
-set(IMPORT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/release/libtantivy_binding.a")
+string(TOLOWER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_LOWER)
+set(IMPORT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE_LOWER}/libtantivy_binding.a")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
                                             "aarch64")
   set(IMPORT_LOCATION
-      "${CMAKE_CURRENT_BINARY_DIR}/aarch64-linux-android/release/libtantivy_binding.a"
+      "${CMAKE_CURRENT_BINARY_DIR}/aarch64-linux-android/${CMAKE_BUILD_TYPE_LOWER}/libtantivy_binding.a"
   )
 endif()
 
@@ -293,6 +296,7 @@ set_target_properties(
 add_dependencies(tantivy_binding tantivy_binding_target)
 
 set(MILVUS_ENGINE_SRC "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
+
 add_subdirectory(thirdparty/milvus/internal/core/src/log)
 add_subdirectory(thirdparty/milvus/internal/core/src/config)
 add_subdirectory(thirdparty/milvus/internal/core/src/common)
@@ -302,6 +306,32 @@ add_subdirectory(thirdparty/milvus/internal/core/src/exec)
 add_subdirectory(thirdparty/milvus/internal/core/src/index)
 add_subdirectory(thirdparty/milvus/internal/core/src/segcore)
 add_subdirectory(thirdparty/milvus/internal/core/src/bitset)
+add_subdirectory(thirdparty/milvus/internal/core/src/indexbuilder)
+add_subdirectory(thirdparty/milvus/internal/core/src/futures)
+add_subdirectory(thirdparty/milvus/internal/core/src/monitor)
+
+add_library(milvus_core SHARED
+    $<TARGET_OBJECTS:milvus_log>
+    $<TARGET_OBJECTS:milvus_config>
+    $<TARGET_OBJECTS:milvus_common>
+    $<TARGET_OBJECTS:milvus_storage>
+    $<TARGET_OBJECTS:milvus_index>
+    $<TARGET_OBJECTS:milvus_query>
+    $<TARGET_OBJECTS:milvus_segcore>
+    $<TARGET_OBJECTS:milvus_indexbuilder>
+    $<TARGET_OBJECTS:milvus_exec>
+    $<TARGET_OBJECTS:milvus_bitset>
+    $<TARGET_OBJECTS:milvus_futures>
+    $<TARGET_OBJECTS:milvus_monitor>
+)
+
+target_link_libraries(
+  milvus_core
+  PUBLIC
+  milvus_proto
+  prometheus-cpp::prometheus-cpp
+  knowhere
+)
 
 if(ENABLE_UNIT_TESTS)
   include(CTest)

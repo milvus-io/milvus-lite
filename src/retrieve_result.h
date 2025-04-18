@@ -27,7 +27,8 @@ class RetrieveResult final : NonCopyableNonMovable {
     }
     ~RetrieveResult() {
         if (retrieve_result_.proto_blob != nullptr) {
-            DeleteRetrieveResult(&retrieve_result_);
+            delete[] static_cast<uint8_t*>(
+                const_cast<void*>(retrieve_result_.proto_blob));
             retrieve_result_.proto_blob = nullptr;
             retrieve_result_.proto_size = 0;
         }

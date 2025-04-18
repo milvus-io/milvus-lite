@@ -20,12 +20,12 @@
 
 namespace milvus::local {
 
-#define CHECK_STATUS(status, err)      \
-    do {                               \
-        Status _s = std::move(status); \
-        if (!_s.IsOk()) {              \
-            return _s;                 \
-        }                              \
+#define CHECK_STATUS(status, err) \
+    do {                          \
+        Status _s = status;       \
+        if (!_s.IsOk()) {         \
+            return _s;            \
+        }                         \
     } while (0)
 
 #define DELETE_AND_SET_NULL(ptr, deleter) \

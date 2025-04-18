@@ -23,13 +23,25 @@
 #include "segcore/collection_c.h"
 #include "segcore/segcore_init_c.h"
 #include "segcore/segment_c.h"
+#include "storage/storage_c.h"
 
 namespace milvus::local {
 
 class SegcoreWrapper final : NonCopyableNonMovable {
  public:
     SegcoreWrapper() : collection_(nullptr), cur_id_(0), segment_(nullptr) {
-        SegcoreSetEnableTempSegmentIndex(true);
+        SegcoreSetEnableInterminSegmentIndex(true);
+        InitLocalChunkManagerSingleton("/tmp/mydata");
+        CMmapConfig conf;
+        conf.growing_enable_mmap = false;
+        conf.scalar_index_enable_mmap = false;
+        conf.cache_read_ahead_policy = "willneed";
+        conf.mmap_path = "/tmp/mydata";
+        conf.disk_limit = 1024;
+        // uint64_t(2) * uint64_t(1024) * uint64_t(1024) * uint64_t(1024);
+        // conf.fix_file_size = uint64_t(4) * uint64_t(1024) * uint64_t(1024);
+        conf.fix_file_size = 1024;
+        InitMmapManager(conf);
     }
     virtual ~SegcoreWrapper();
 

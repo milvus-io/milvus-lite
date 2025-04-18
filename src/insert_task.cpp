@@ -141,7 +141,6 @@ InsertTask::Process(Rows* rows) {
     if (!(AddSystemField() && CheckDynamicFieldData() && GenFieldMap())) {
         return Status::ParameterInvalid();
     }
-
     CHECK_STATUS(CheckOrSetVectorDim(), "");
 
     auto pk_field_name = schema_util::GetPkName(*schema_);
@@ -163,6 +162,7 @@ InsertTask::Process(Rows* rows) {
             field_data->set_field_id(field.fieldid());
             field_data->set_field_name(field.name());
             field_data->set_type(field.data_type());
+
             if (!schema_util::SliceFieldData(
                     *field_data_map_.at(field.name()),
                     std::vector<std::tuple<int64_t, int64_t>>{{i, 1}},
@@ -218,8 +218,9 @@ InsertTask::CheckOrSetVectorDim() {
                     num_rows,
                     vec_rows);
             }
-        } else if (field_schema.data_type() == DType::SparseFloatVector) {
-            // set dim
+        } else if (field_schema.data_type() == DType::SparseFloatVector &&
+                   !field_schema.is_function_output()) {
+            // set dim, if bm25 function output not need to set dim.
             auto field_data = field_data_map_.at(field_schema.name());
             for (int i = 0;
                  i <

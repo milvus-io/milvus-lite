@@ -1,9 +1,6 @@
-[submodule "thirdparty/milvus"]
-	path = thirdparty/milvus
-	url = https://github.com/milvus-io/milvus.git
 [submodule "thirdparty/milvus-proto"]
 	path = thirdparty/milvus-proto
 	url = https://github.com/milvus-io/milvus-proto.git
-[submodule "thirdparty/milvus-storage"]
-	path = thirdparty/milvus-storage
-	url = https://github.com/milvus-io/milvus-storage.git
+[submodule "thirdparty/milvus"]
+	path = thirdparty/milvus
+	url = https://github.com/Presburger/milvus.git
