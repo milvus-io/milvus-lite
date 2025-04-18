@@ -42,7 +42,10 @@
 #include "timer.h"
 #include "type.h"
 #include "upsert_task.h"
-
+#include "function.h"
+#include "bm25_stat.h"
+#include <cmath>
+#include "nlohmann/json.hpp"
 namespace milvus::local {
 
 MilvusProxy::MilvusProxy(const char* work_dir) : milvus_local_(work_dir) {
@@ -131,11 +134,47 @@ MilvusProxy::CreateIndex(const ::milvus::proto::milvus::CreateIndexRequest* r) {
     // CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
 
     // get all index
+
     milvus::proto::segcore::FieldIndexMeta field_meta;
     CHECK_STATUS(CreateIndexTask(r, &schema).Process(&field_meta), "");
-    return milvus_local_.CreateIndex(r->collection_name(),
-                                     field_meta.index_name(),
-                                     field_meta.SerializeAsString());
+    bool is_bm25 = false;
+    for (int i = 0; i < field_meta.index_params_size(); ++i) {
+        if (field_meta.index_params(i).key() == "metric_type" &&
+            field_meta.index_params(i).value() == "BM25") {
+            is_bm25 = true;
+            break;
+        }
+    }
+
+    if (is_bm25) {
+        auto kv = field_meta.add_index_params();
+        kv->set_key("bm25_avgdl");
+        kv->set_value("10000");  //default avgdl 10000
+    }
+    auto status = milvus_local_.CreateIndex(r->collection_name(),
+                                            field_meta.index_name(),
+                                            field_meta.SerializeAsString());
+
+    if (status.IsOk() && is_bm25) {
+        CHECK(schema.functions_size() == 1);
+        CHECK(schema.functions(0).output_field_names_size() == 1);
+        std::string out_field_name = schema.functions(0).output_field_names(0);
+        bool is_legal = false;
+        for (int i = 0; i < schema.fields_size(); ++i) {
+            if (schema.fields(i).name() == out_field_name) {
+                is_legal = true;
+                break;
+            }
+        }
+        CHECK(is_legal);
+
+        auto& stat = bm25::StatDict::Instance();
+        if (is_bm25) {
+            stat.stats_dict[r->collection_name()] = bm25::Stats(out_field_name);
+        }
+    }
+
+    return status;
 }
 
 Status
@@ -147,6 +186,15 @@ MilvusProxy::Insert(const ::milvus::proto::milvus::InsertRequest* r,
                                         r->collection_name());
         return Status::CollectionNotFound();
     }
+
+    if (schema.functions_size() != 0) {
+        auto runner = CreateRunner(schema);
+        if (runner) {
+            runner->InsertConvert(
+                const_cast<milvus::proto::milvus::InsertRequest*>(r));
+        }
+    }
+
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
     Rows rows;
     auto insert_task = InsertTask(
@@ -210,6 +258,69 @@ MilvusProxy::Search(const ::milvus::proto::milvus::SearchRequest* r,
         LOG_ERROR(err);
         return Status::CollectionNotFound(err);
     }
+    bool is_bm25 = false;
+    for (int i = 0; i < r->search_params_size(); ++i) {
+        if (r->search_params(i).key() == "metric_type" &&
+            r->search_params(i).value() == "BM25") {
+            is_bm25 = true;
+            break;
+        }
+    }
+
+    if (is_bm25) {
+        auto& stat = bm25::StatDict::Instance();
+        auto it = stat.stats_dict.find(r->collection_name());
+        CHECK(it != stat.stats_dict.end());
+        auto& coll_stat = it->second;
+        auto ph_group =
+            std::make_unique<milvus::proto::common::PlaceholderGroup>();
+        ph_group->ParseFromString(r->placeholder_group());
+
+        CHECK(ph_group->placeholders_size() == 1);
+        const auto& ph = ph_group->mutable_placeholders(0);
+        CHECK(ph->type() == milvus::proto::common::PlaceholderType::VarChar);
+        CHECK(ph->values_size() == 1);
+
+        auto runner = CreateRunner(schema);
+        auto cont = runner->SearchConvert(ph->values(0));
+        auto pos = cont.data();
+        auto end = cont.data() + cont.size();
+        for (; pos < end; pos += 8) {
+            const uint32_t key = *(reinterpret_cast<uint32_t*>(pos));
+            const float freq = *(reinterpret_cast<float*>(pos + 4));
+            auto nq = coll_stat.rows_contain_token[key];
+            *(reinterpret_cast<float*>(pos + 4)) =
+                freq * log(1 + (float(coll_stat.rows_num) - float(nq) + 0.5) /
+                                   (float(nq) + 0.5));
+        }
+        ph->set_type(milvus::proto::common::PlaceholderType::SparseFloatVector);
+        ph->clear_values();
+        *ph->add_values() = cont;
+        const_cast<milvus::proto::milvus::SearchRequest*>(r)
+            ->set_placeholder_group(ph_group->SerializeAsString());
+        bool is_params_ready = false;
+        for (int i = 0; i < r->search_params_size(); ++i) {
+            auto params = const_cast<milvus::proto::milvus::SearchRequest*>(r)
+                              ->mutable_search_params(i);
+            if (params->key() == "params") {
+                auto j = nlohmann::json::parse(params->value());
+                j["bm25_avgdl"] =
+                    float(coll_stat.token_num) / float(coll_stat.rows_num);
+                *params->mutable_value() = j.dump();
+                is_params_ready = true;
+            }
+        }
+        if (!is_params_ready) {
+            auto params = const_cast<milvus::proto::milvus::SearchRequest*>(r)
+                              ->add_search_params();
+            params->set_key("params");
+            nlohmann::json j;
+            j["bm25_avgdl"] =
+                float(coll_stat.token_num) / float(coll_stat.rows_num);
+            params->set_value(j.dump());
+        }
+    }
+
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
 
     // get index

@@ -82,9 +82,9 @@ class Status {
  public:
     virtual ~Status() = default;
 
-    Status(const Status& rhs) = delete;
+    Status(const Status& rhs) = default;
     Status&
-    operator=(const Status& rhs) = delete;
+    operator=(const Status& rhs) = default;
 
     Status(Status&& rhs) : code_(rhs.code_) {
         msg_ = std::move(rhs.msg_);
