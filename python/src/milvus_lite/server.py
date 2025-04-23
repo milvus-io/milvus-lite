@@ -10,11 +10,12 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-from typing import List, Optional
+from typing import Optional
 import tempfile
 import os
 import subprocess
 import pathlib
+import signal
 import logging
 import fcntl
 import re
@@ -116,7 +117,13 @@ class Server:
             self._lock_fd = None
 
         if self._p is not None:
+            try:
+                self._p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._p.send_signal(signal.SIGKILL)
+                self._p.wait(timeout=3)
             self._p = None
+
         try:
             os.unlink(self._uds_path)
         except FileNotFoundError:

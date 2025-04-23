@@ -132,7 +132,10 @@ InsertTask::CheckDynamicFieldData() {
         }
     }
     dy_field->set_type(::milvus::proto::schema::DataType::JSON);
-    dy_field->mutable_scalars()->mutable_json_data()->add_data()->assign("{}");
+    for (uint32_t i = 0; i < insert_request_->num_rows(); i++) {
+        dy_field->mutable_scalars()->mutable_json_data()->add_data()->assign(
+            "{}");
+    }
     return true;
 }
 
