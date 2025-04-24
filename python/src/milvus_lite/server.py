@@ -95,7 +95,7 @@ class Server:
                 env={
                     "LD_LIBRARY_PATH": str(self._bin_path),
                     "DYLD_LIBRARY_PATH": str(self._bin_path)
-                },
+                }.update(os.environ.copy()),
                 cwd=str(self._work_dir),
             )
             try:
