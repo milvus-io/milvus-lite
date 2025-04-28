@@ -310,7 +310,7 @@ add_subdirectory(thirdparty/milvus/internal/core/src/indexbuilder)
 add_subdirectory(thirdparty/milvus/internal/core/src/futures)
 add_subdirectory(thirdparty/milvus/internal/core/src/monitor)
 
-add_library(milvus_core SHARED
+add_library(milvus_core STATIC
     $<TARGET_OBJECTS:milvus_log>
     $<TARGET_OBJECTS:milvus_config>
     $<TARGET_OBJECTS:milvus_common>
