@@ -28,6 +28,72 @@ index bd495fcd..bb0b70e8 100644
  
  add_library(knowhere SHARED ${KNOWHERE_SRCS})
  add_dependencies(knowhere ${KNOWHERE_LINKER_LIBS})
+diff --git a/cmake/libs/libfaiss.cmake b/cmake/libs/libfaiss.cmake
+index 8b77c606..067b1f22 100644
+--- a/cmake/libs/libfaiss.cmake
++++ b/cmake/libs/libfaiss.cmake
+@@ -52,6 +52,12 @@ if(__AARCH64)
+   target_link_libraries(knowhere_utils PUBLIC glog::glog)
+ endif()
+ 
++if(__RISCV64)
++  set(UTILS_SRC src/simd/hook.cc src/simd/distances_ref.cc)
++  add_library(knowhere_utils STATIC ${UTILS_SRC})
++  target_link_libraries(knowhere_utils PUBLIC glog::glog)
++endif()
++
+ # ToDo: Add distances_vsx.cc for powerpc64 SIMD acceleration
+ if(__PPC64)
+   set(UTILS_SRC src/simd/hook.cc src/simd/distances_ref.cc)
+@@ -132,6 +138,28 @@ if(__AARCH64)
+   target_compile_definitions(faiss PRIVATE FINTEGER=int)
+ endif()
+ 
++if(__RISCV64)
++  knowhere_file_glob(GLOB FAISS_AVX_SRCS thirdparty/faiss/faiss/impl/*avx.cpp)
++
++  list(REMOVE_ITEM FAISS_SRCS ${FAISS_AVX_SRCS})
++  add_library(faiss STATIC ${FAISS_SRCS})
++
++  target_compile_options(
++    faiss
++    PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
++            -Wno-sign-compare
++            -Wno-unused-variable
++            -Wno-reorder
++            -Wno-unused-local-typedefs
++            -Wno-unused-function
++            -Wno-strict-aliasing>)
++
++  add_dependencies(faiss knowhere_utils)
++  target_link_libraries(faiss PUBLIC OpenMP::OpenMP_CXX ${BLAS_LIBRARIES}
++                                     ${LAPACK_LIBRARIES} knowhere_utils)
++  target_compile_definitions(faiss PRIVATE FINTEGER=int)
++endif()
++
+ if(__PPC64)
+   knowhere_file_glob(GLOB FAISS_AVX_SRCS thirdparty/faiss/faiss/impl/*avx.cpp)
+ 
+diff --git a/cmake/utils/platform_check.cmake b/cmake/utils/platform_check.cmake
+index afc41d07..af8e92f6 100644
+--- a/cmake/utils/platform_check.cmake
++++ b/cmake/utils/platform_check.cmake
+@@ -4,11 +4,13 @@ macro(detect_target_arch)
+   check_symbol_exists(__aarch64__ "" __AARCH64)
+   check_symbol_exists(__x86_64__ "" __X86_64)
+   check_symbol_exists(__powerpc64__ "" __PPC64)
++  check_symbol_exists(__riscv "" __RISCV64)
+ 
+   if(NOT __AARCH64
+      AND NOT __X86_64
+-     AND NOT __PPC64)
+-    message(FATAL "knowhere only support amd64, ppc64 and arm64 architecture.")
++     AND NOT __PPC64
++     AND NOT __RISCV64)
++    message(FATAL "knowhere only support amd64, ppc64, riscv64 and arm64 architecture.")
+   endif()
+ endmacro()
+ 
 diff --git a/include/knowhere/comp/thread_pool.h b/include/knowhere/comp/thread_pool.h
 index b39bde99..6fd699f0 100644
 --- a/include/knowhere/comp/thread_pool.h
