@@ -223,6 +223,8 @@ MilvusServiceImpl::GetLoadingProgress(
     ::grpc::ServerContext* context,
     const ::milvus::proto::milvus::GetLoadingProgressRequest* request,
     ::milvus::proto::milvus::GetLoadingProgressResponse* response) {
+    Status s = Status::Ok();
+    Status2Response(s, response->mutable_status());
     response->set_progress(100);
     response->set_refresh_progress(100);
     return ::grpc::Status::OK;

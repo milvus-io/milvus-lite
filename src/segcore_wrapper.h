@@ -38,8 +38,9 @@ class SegcoreWrapper final : NonCopyableNonMovable {
         conf.cache_read_ahead_policy = "willneed";
         conf.mmap_path = data_path.c_str();
         conf.disk_limit = 1024;
-        // uint64_t(2) * uint64_t(1024) * uint64_t(1024) * uint64_t(1024);
-        // conf.fix_file_size = uint64_t(4) * uint64_t(1024) * uint64_t(1024);
+        conf.scalar_field_enable_mmap = false;
+        conf.vector_field_enable_mmap = false;
+        conf.vector_index_enable_mmap = false;
         conf.fix_file_size = 1024;
         InitMmapManager(conf);
     }
