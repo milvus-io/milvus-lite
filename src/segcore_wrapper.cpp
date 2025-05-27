@@ -215,9 +215,9 @@ SegcoreWrapper::Retrieve(const std::string& plan, RetrieveResult* result) {
         CRetrieveResult* tmp_result;
         auto rs = Status(future_leak_and_get(job, (void**)&(tmp_result)));
         future_destroy(job);
+        CHECK_STATUS(rs, "Retrieve failed, errs:");
         result->retrieve_result_.proto_blob = tmp_result->proto_blob;
         result->retrieve_result_.proto_size = tmp_result->proto_size;
-        CHECK_STATUS(rs, "Retrieve failed, errs:");
         return Status::Ok();
     } catch (std::exception& e) {
         LOG_ERROR("Retrieve failed, err: {}", e.what());
