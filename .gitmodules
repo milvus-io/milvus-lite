@@ -3,4 +3,4 @@
 	url = https://github.com/milvus-io/milvus-proto.git
 [submodule "thirdparty/milvus"]
 	path = thirdparty/milvus
-	url = https://github.com/Presburger/milvus.git
+	url = https://github.com/milvus-io/milvus.git

@@ -535,16 +535,36 @@ TranslateOutputFields(
             }
         }
     }
+
+    std::set<std::string> bm25_fields_outputs;
+
+    for (const auto& func : schema.functions()) {
+        if (func.type() == ::milvus::proto::schema::FunctionType::BM25) {
+            for (const auto& output_field : func.output_field_names()) {
+                bm25_fields_outputs.insert(output_field);
+            }
+        }
+    }
+
     if (add_primary) {
         result_field.insert(pk_name);
         user_output_field.insert(pk_name);
     }
+
+    // remove bm25 fields outputs
+    for (const auto& fname : bm25_fields_outputs) {
+        result_field.erase(fname);
+        user_output_field.erase(fname);
+    }
+
     for (const std::string& fname : result_field) {
         result_outputs->push_back(fname);
     }
+  
     for (const std::string& fname : user_output_field) {
         user_output_fields->push_back(fname);
     }
+
     return true;
 }
 
