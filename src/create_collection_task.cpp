@@ -274,6 +274,8 @@ CreateCollectionTask::ValidateSchema(
                          "");
         }
     }
+
+    // valid functions
     return Status::Ok();
 }
 

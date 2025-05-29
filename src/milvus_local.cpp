@@ -23,7 +23,6 @@
 #include "pb/segcore.pb.h"
 #include "schema_util.h"
 #include "status.h"
-#include "storage.h"
 #include "log/Log.h"
 #include "string_util.hpp"
 #include "bm25_stat.h"

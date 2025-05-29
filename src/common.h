@@ -37,6 +37,7 @@ namespace milvus::local {
     } while (0)
 
 using KVMap = std::map<std::string, std::string>;
+using SparseVector = std::map<uint32_t, float>;
 
 // system field id:
 // 0: unique row id

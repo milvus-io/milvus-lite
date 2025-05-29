@@ -23,7 +23,7 @@
 #include "index.h"
 #include "retrieve_result.h"
 #include "search_result.h"
-#include "storage.h"
+#include "storage/storage.h"
 #include "type.h"
 
 namespace milvus::local {

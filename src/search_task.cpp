@@ -19,6 +19,7 @@
 #include <tuple>
 #include <vector>
 #include "common.h"
+#include "function/function_executor.h"
 #include "pb/plan.pb.h"
 #include "antlr4-runtime.h"
 #include "parser/parser.h"
@@ -29,6 +30,8 @@
 #include "status.h"
 
 namespace milvus::local {
+
+using milvus::local::function::FunctionExecutor;
 
 SearchTask::SearchTask(::milvus::proto::milvus::SearchRequest* search_reques,
                        const ::milvus::proto::schema::CollectionSchema* schema,
@@ -178,6 +181,11 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
         return Status::ParameterInvalid();
     }
 
+    if (schema_util::HasFunction(*schema_)) {
+        auto [s, executor] = FunctionExecutor::Create(schema_, ann_field_);
+        CHECK_STATUS(s, "");
+        CHECK_STATUS(executor->ProcessSearch(search_request_), "");
+    }
     placeholder_group->assign(search_request_->placeholder_group());
     nqs->push_back(search_request_->nq());
     topks->push_back(vector_anns->query_info().topk());

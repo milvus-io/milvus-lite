@@ -31,7 +31,8 @@ namespace milvus::local {
 namespace test {
 
 std::string
-CreateCollection(const std::string& collection_name) {
+CreateCollection(const std::string& collection_name,
+                 const std::string& vec_type) {
     ::milvus::proto::schema::CollectionSchema schema;
 
     schema.set_name(collection_name);
@@ -42,19 +43,51 @@ CreateCollection(const std::string& collection_name) {
     field1->set_is_primary_key(true);
     field1->set_data_type(::milvus::proto::schema::DataType::Int64);
 
-    auto field2 = schema.add_fields();
-    field2->set_fieldid(VEC_ID);
-    field2->set_name(VEC_NAME);
-    field2->set_data_type(::milvus::proto::schema::DataType::FloatVector);
-    auto params = field2->add_type_params();
-    params->set_key(VEC_DIM_NAME);
-    params->set_value(std::to_string(VEC_DIM));
+    if (vec_type == "float_vector") {
+        auto field2 = schema.add_fields();
+        field2->set_fieldid(VEC_ID);
+        field2->set_name(VEC_NAME);
 
-    auto field3 = schema.add_fields();
-    field3->set_fieldid(SCALAR_ID);
-    field3->set_name(SCALAR_NAME);
-    field3->set_data_type(::milvus::proto::schema::DataType::Int32);
-    return schema.SerializeAsString();
+        field2->set_data_type(::milvus::proto::schema::DataType::FloatVector);
+        auto params = field2->add_type_params();
+        params->set_key(VEC_DIM_NAME);
+        params->set_value(std::to_string(VEC_DIM));
+        auto field3 = schema.add_fields();
+        field3->set_fieldid(SCALAR_ID);
+        field3->set_name(SCALAR_NAME);
+        field3->set_data_type(::milvus::proto::schema::DataType::Int32);
+        return schema.SerializeAsString();
+
+    } else {
+        auto field2 = schema.add_fields();
+        field2->set_fieldid(VEC_ID);
+        field2->set_name(SPARSE_VEC);
+        field2->set_data_type(
+            ::milvus::proto::schema::DataType::SparseFloatVector);
+        auto field3 = schema.add_fields();
+        field3->set_fieldid(SCALAR_ID);
+        field3->set_name(VARCHAR_SCALAR_NAME);
+        field3->set_data_type(::milvus::proto::schema::DataType::VarChar);
+        auto p1 = field3->add_type_params();
+        p1->set_key("enable_analyzer");
+        p1->set_value("true");
+        auto p2 = field3->add_type_params();
+        p2->set_key("max_length");
+        p2->set_value("1000");
+        return schema.SerializeAsString();
+    }
+}
+
+std::string
+CreateBM25Function(const std::string& name,
+                   const std::string& input_name,
+                   const std::string& output_name) {
+    ::milvus::proto::schema::FunctionSchema fschema;
+    fschema.set_name(name);
+    fschema.add_input_field_names(input_name);
+    fschema.add_output_field_names(output_name);
+    fschema.set_type(::milvus::proto::schema::FunctionType::BM25);
+    return fschema.SerializeAsString();
 }
 
 std::string

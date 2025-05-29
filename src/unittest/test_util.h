@@ -26,15 +26,21 @@ namespace test {
 #define PK_ID 200
 
 #define VEC_NAME "vec"
+#define SPARSE_VEC "sparse_vec"
 #define VEC_ID 201
 #define VEC_DIM_NAME "dim"
 #define VEC_DIM 3
 
 #define SCALAR_NAME "sc"
+#define VARCHAR_SCALAR_NAME "vsc"
 #define SCALAR_ID 202
 
 std::string
-CreateCollection(const std::string& collection_name = "test_schema");
+CreateCollection(const std::string& collection_name = "test_schema",
+                 const std::string& vec_type = "float_vector");
+
+std::string
+CreateBM25Function(const std::string&, const std::string&, const std::string&);
 
 std::string
 CreateVectorIndex();

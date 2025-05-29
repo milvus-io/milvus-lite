@@ -53,7 +53,21 @@ target_link_libraries(
   ${MILVUS_LOCAL_TEST_DEPS}
 )
 
+add_executable(
+  bm25_function_test
+  bm25_function_test.cpp
+  test_util.cpp
+)
 
+target_link_libraries(bm25_function_test
+  PRIVATE
+  ${MILVUS_LOCAL_TEST_DEPS}
+)
+
+add_test(
+  NAME bm25_function_test
+  COMMAND $<TARGET_FILE:bm25_function_test>
+)
 add_test(
   NAME server_test
   COMMAND $<TARGET_FILE:server_test>

@@ -25,7 +25,7 @@ namespace milvus::local {
 namespace bm25 {
 
 struct Stats {
-    Stats() {};
+    Stats(){};
     Stats(const std::string& name) : output_field_name(name) {
     }
     std::string output_field_name;
@@ -49,7 +49,7 @@ class StatDict {
     std::map<std::string, Stats> stats_dict;
 
  private:
-    StatDict() {};
+    StatDict(){};
 };
 
 inline void
