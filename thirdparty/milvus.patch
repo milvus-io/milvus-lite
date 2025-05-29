@@ -1,50 +1,96 @@
-diff --git a/internal/core/src/common/CMakeLists.txt b/internal/core/src/common/CMakeLists.txt
-index 4330b43f8..255a4c63c 100644
---- a/internal/core/src/common/CMakeLists.txt
-+++ b/internal/core/src/common/CMakeLists.txt
-@@ -26,7 +26,7 @@ set(COMMON_SRC
-         RegexQuery.cpp
-         )
+diff --git a/internal/core/cmake/Utils.cmake b/internal/core/cmake/Utils.cmake
+index 8facf7cccd..f0d75bf8be 100644
+--- a/internal/core/cmake/Utils.cmake
++++ b/internal/core/cmake/Utils.cmake
+@@ -101,12 +101,32 @@ macro(create_library)
+     target_compile_definitions(${L_TARGET} PRIVATE ${L_DEFS})
+ endmacro()
  
--add_library(milvus_common SHARED ${COMMON_SRC})
-+add_library(milvus_common ${COMMON_SRC})
++macro(add_source_at_current_directory)
++    file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cc" "*.cpp" "*.c" "*.cxx")
++    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory: ${SOURCE_FILES}")
++endmacro()
++
++macro(add_source_at_current_directory_with_exclude)
++    file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cc" "*.cpp" "*.c" "*.cxx")
++    # Exclude files matching patterns
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_test\\.cc$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_test\\.cpp$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_mock\\.cc$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_mock\\.cpp$")
++    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory: ${SOURCE_FILES}")
++endmacro()
++
+ macro(add_source_at_current_directory_recursively)
+     file(GLOB_RECURSE SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cc" "*.cpp" "*.c" "*.cxx")
+     message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory recursively: ${SOURCE_FILES}")
+ endmacro()
  
- target_link_libraries(milvus_common
-         milvus_bitset
+-macro(add_source_at_current_directory)
+-    file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cc" "*.cpp" "*.c" "*.cxx")
+-    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory: ${SOURCE_FILES}")
++macro(add_source_at_current_directory_recursively_with_exclude)
++    file(GLOB_RECURSE SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cc" "*.cpp" "*.c" "*.cxx")
++    # Exclude files matching patterns
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_test\\.cc$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_test\\.cpp$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_mock\\.cc$")
++    list(FILTER SOURCE_FILES EXCLUDE REGEX ".*_mock\\.cpp$")
++    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory recursively: ${SOURCE_FILES}")
+ endmacro()
 diff --git a/internal/core/src/common/Tracer.cpp b/internal/core/src/common/Tracer.cpp
-index 4711ef76a..a84c637fe 100644
+index c60f8ad3cb..c2ea1316d6 100644
 --- a/internal/core/src/common/Tracer.cpp
 +++ b/internal/core/src/common/Tracer.cpp
-@@ -17,6 +17,8 @@
- #include <vector>
+@@ -10,8 +10,11 @@
+ // or implied. See the License for the specific language governing permissions and limitations under the License
+ 
+ #include "Tracer.h"
++#ifndef MILVUS_LITE
+ #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
+ #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
++#endif
++
+ #include "log/Log.h"
+ 
+ #include <atomic>
+@@ -20,6 +23,7 @@
+ #include <iostream>
  #include <utility>
  
 +#ifndef MILVUS_LITE
-+
  #include "opentelemetry/exporters/jaeger/jaeger_exporter_factory.h"
  #include "opentelemetry/exporters/ostream/span_exporter_factory.h"
  #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
-@@ -29,8 +31,10 @@
- #include "opentelemetry/sdk/version/version.h"
- #include "opentelemetry/trace/span_context.h"
+@@ -34,7 +38,6 @@
  #include "opentelemetry/trace/span_metadata.h"
-+#endif
  
  namespace milvus::tracer {
-+#ifndef MILVUS_LITE
- 
+-
  namespace trace = opentelemetry::trace;
  namespace nostd = opentelemetry::nostd;
-@@ -170,5 +174,68 @@ GetSpanIDAsVector(const TraceContext* ctx) {
-         return {};
+ 
+@@ -276,5 +279,126 @@ AutoSpan::~AutoSpan() {
+         CloseRootSpan();
      }
  }
 +#endif
 +
 +#ifdef MILVUS_LITE
-+
++namespace milvus::tracer {
++static std::atomic<bool> enable_trace = true;
 +void
 +initTelemetry(const TraceConfig& cfg) {
++}
++
++std::string
++GetTraceID() {
++    return std::string();
++}
++
++std::string
++GetTraceIDAsHexStr(const TraceContext* ctx) {
++    return std::string();
 +}
 +
 +std::shared_ptr<trace::Tracer>
@@ -57,6 +103,11 @@ index 4711ef76a..a84c637fe 100644
 +    return std::make_shared<trace::Span>();
 +}
 +
++std::shared_ptr<trace::Span>
++StartSpan(const std::string& name, const std::shared_ptr<trace::Span>& span) {
++    return std::make_shared<trace::Span>();
++}
++
 +thread_local std::shared_ptr<trace::Span> local_span;
 +void
 +SetRootSpan(std::shared_ptr<trace::Span> span) {
@@ -64,6 +115,19 @@ index 4711ef76a..a84c637fe 100644
 +
 +void
 +CloseRootSpan() {
++}
++
++std::shared_ptr<trace::Span>
++GetRootSpan() {
++    if (enable_trace) {
++        return local_span;
++    }
++    return nullptr;
++}
++
++std::string
++GetSpanIDAsHexStr(const TraceContext* ctx) {
++    return std::string();
 +}
 +
 +void
@@ -101,18 +165,46 @@ index 4711ef76a..a84c637fe 100644
 +GetSpanIDAsVector(const TraceContext* ctx) {
 +    return {};
 +}
-+#endif
++
++AutoSpan::AutoSpan(const std::string& name,
++                   TraceContext* ctx,
++                   bool is_root_span)
++    : is_root_span_(is_root_span) {
++    span_ = StartSpan(name, ctx);
++    if (is_root_span) {
++        SetRootSpan(span_);
++    }
++}
++
++AutoSpan::AutoSpan(const std::string& name,
++                   const std::shared_ptr<trace::Span>& span)
++    : is_root_span_(false) {
++    span_ = StartSpan(name, span);
++}
  
++std::shared_ptr<trace::Span>
++AutoSpan::GetSpan() {
++    return span_;
++}
++
++AutoSpan::~AutoSpan() {
++    if (span_ != nullptr) {
++        span_->End();
++    }
++    if (is_root_span_) {
++        CloseRootSpan();
++    }
++}
  }  // namespace milvus::tracer
++#endif
+\ No newline at end of file
 diff --git a/internal/core/src/common/Tracer.h b/internal/core/src/common/Tracer.h
-index 3ecb0798f..7aadb0531 100644
+index fce14d393b..6ee06daa2b 100644
 --- a/internal/core/src/common/Tracer.h
 +++ b/internal/core/src/common/Tracer.h
-@@ -13,11 +13,34 @@
- 
+@@ -14,10 +14,32 @@
  #include <memory>
  #include <string>
-+#include <vector>
  
 +#ifndef MILVUS_LITE
  #include "opentelemetry/trace/provider.h"
@@ -143,7 +235,7 @@ index 3ecb0798f..7aadb0531 100644
  namespace milvus::tracer {
  
  struct TraceConfig {
-@@ -35,7 +58,10 @@ struct TraceContext {
+@@ -36,7 +58,10 @@ struct TraceContext {
      const uint8_t* spanID = nullptr;
      uint8_t traceFlags = 0;
  };
@@ -154,92 +246,81 @@ index 3ecb0798f..7aadb0531 100644
  
  void
  initTelemetry(const TraceConfig& cfg);
-diff --git a/internal/core/src/index/CMakeLists.txt b/internal/core/src/index/CMakeLists.txt
-index c49e9477f..2280a84bc 100644
---- a/internal/core/src/index/CMakeLists.txt
-+++ b/internal/core/src/index/CMakeLists.txt
-@@ -22,7 +22,7 @@ set(INDEX_FILES
-         )
+diff --git a/internal/core/src/index/JsonInvertedIndex.cpp b/internal/core/src/index/JsonInvertedIndex.cpp
+index 569819b443..d15dcb7d5c 100644
+--- a/internal/core/src/index/JsonInvertedIndex.cpp
++++ b/internal/core/src/index/JsonInvertedIndex.cpp
+@@ -137,7 +137,7 @@ JsonInvertedIndex<T>::build_index_for_json(
+                 } else {
+                     auto array_values = array_res.value();
+                     for (auto value : array_values) {
+-                        auto val = value.get<SIMDJSON_T>();
++                        auto val = value.template get<SIMDJSON_T>();
  
- milvus_add_pkg_config("milvus_index")
--add_library(milvus_index SHARED ${INDEX_FILES})
-+add_library(milvus_index ${INDEX_FILES})
- 
- target_link_libraries(milvus_index milvus_storage milvus-storage tantivy_binding)
- 
-diff --git a/internal/core/src/segcore/CMakeLists.txt b/internal/core/src/segcore/CMakeLists.txt
-index eb92f5657..ea5ca2b51 100644
---- a/internal/core/src/segcore/CMakeLists.txt
-+++ b/internal/core/src/segcore/CMakeLists.txt
-@@ -37,7 +37,7 @@ set(SEGCORE_FILES
-         TimestampIndex.cpp
-         Utils.cpp
-         ConcurrentVector.cpp)
--add_library(milvus_segcore SHARED ${SEGCORE_FILES})
-+add_library(milvus_segcore ${SEGCORE_FILES})
- 
- target_link_libraries(milvus_segcore milvus_query milvus_bitset milvus_exec ${OpenMP_CXX_FLAGS} milvus-storage)
- 
+                         if (val.error() == simdjson::SUCCESS) {
+                             values.push_back(static_cast<T>(val.value()));
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
-index ac600d945..9d82574af 100644
+index b88211bb87..a158becd37 100644
 --- a/internal/core/src/storage/CMakeLists.txt
 +++ b/internal/core/src/storage/CMakeLists.txt
-@@ -46,23 +46,29 @@ set(STORAGE_FILES
-     ThreadPool.cpp
-     prometheus_client.cpp
-     storage_c.cpp
--    ChunkManager.cpp
--    MinioChunkManager.cpp
--    AliyunSTSClient.cpp
--    AliyunCredentialsProvider.cpp
-     MemFileManagerImpl.cpp
-     LocalChunkManager.cpp
-     DiskFileManagerImpl.cpp
-     ThreadPools.cpp
-     ChunkCache.cpp
-+  )
+@@ -16,6 +16,14 @@
+ 
+ add_source_at_current_directory()
+ 
++# Exclude specific files
++list(FILTER SOURCE_FILES EXCLUDE REGEX "^Aliyun.*\\.cpp$")
++list(FILTER SOURCE_FILES EXCLUDE REGEX "^Minio.*\\.cpp$")
++list(FILTER SOURCE_FILES EXCLUDE REGEX "^ChunkManager.cpp$")
++list(FILTER SOURCE_FILES EXCLUDE REGEX "^TencentCloud.*\\.cpp$")
 +
-+if(NOT MILVUS_LITE)
-+  list(APPEND STORAGE_FILES
-+    ChunkManager.cpp
-+    MinioChunkManager.cpp
-+    AliyunSTSClient.cpp
-+    AliyunCredentialsProvider.cpp
-     TencentCloudCredentialsProvider.cpp
--    TencentCloudSTSClient.cpp)
-+    TencentCloudSTSClient.cpp
-+  )
-+endif()  
++message("SOURCE_FILES: ${SOURCE_FILES}")
++
+ if (ENABLE_GCP_NATIVE)
+     add_definitions(-DENABLE_GCP_NATIVE)
+     add_subdirectory(gcp-native-storage)
+diff --git a/internal/core/src/storage/ChunkManager.cpp b/internal/core/src/storage/ChunkManager.cpp
+index c6d8908625..c60bc74c6b 100644
+--- a/internal/core/src/storage/ChunkManager.cpp
++++ b/internal/core/src/storage/ChunkManager.cpp
+@@ -15,6 +15,7 @@
+ // limitations under the License.
  
- if(USE_OPENDAL)
-     list(APPEND STORAGE_FILES OpenDALChunkManager.cpp)
- endif()
+ #include <fstream>
++#ifndef MILVUS_LITE
+ #include <aws/core/auth/AWSCredentials.h>
+ #include <aws/core/auth/AWSCredentialsProviderChain.h>
+ #include <aws/core/auth/STSCredentialsProvider.h>
+@@ -28,11 +29,13 @@
+ #include <aws/s3/model/ListObjectsRequest.h>
+ #include <aws/s3/model/PutObjectRequest.h>
  
--add_library(milvus_storage SHARED ${STORAGE_FILES})
-+add_library(milvus_storage ${STORAGE_FILES})
++
+ #include "storage/MinioChunkManager.h"
+ #include "storage/AliyunSTSClient.h"
+ #include "storage/TencentCloudSTSClient.h"
+ #include "storage/AliyunCredentialsProvider.h"
+ #include "storage/TencentCloudCredentialsProvider.h"
++#endif
+ #include "common/Consts.h"
+ #include "common/EasyAssert.h"
+ #include "log/Log.h"
+diff --git a/internal/core/src/storage/LocalChunkManager.cpp b/internal/core/src/storage/LocalChunkManager.cpp
+index be97ee000b..57e4c77dcb 100644
+--- a/internal/core/src/storage/LocalChunkManager.cpp
++++ b/internal/core/src/storage/LocalChunkManager.cpp
+@@ -23,6 +23,7 @@
+ #include <boost/system/error_code.hpp>
+ #include <fstream>
+ #include <sstream>
++#include <thread>
  
- if (DEFINED AZURE_BUILD_DIR)
-     target_link_libraries(milvus_storage PUBLIC
-@@ -70,14 +76,12 @@ if (DEFINED AZURE_BUILD_DIR)
-             blob-chunk-manager
-             milvus_common
-             milvus-storage
--            pthread
-             ${CONAN_LIBS}
-             )
- else ()
-     target_link_libraries(milvus_storage PUBLIC
-             milvus_common
-             milvus-storage
--            pthread
-             ${CONAN_LIBS}
-             )
- endif()
+ #include "common/EasyAssert.h"
+ #include "common/Exception.h"
 diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
-index 0e714f0a9..46ebabf2e 100644
+index 85ec72152c..f0dbee476c 100644
 --- a/internal/core/src/storage/Util.cpp
 +++ b/internal/core/src/storage/Util.cpp
-@@ -34,7 +34,9 @@
+@@ -37,7 +37,9 @@
  #include "storage/InsertData.h"
  #include "storage/LocalChunkManager.h"
  #include "storage/MemFileManagerImpl.h"
@@ -247,9 +328,9 @@ index 0e714f0a9..46ebabf2e 100644
  #include "storage/MinioChunkManager.h"
 +#endif
  #ifdef USE_OPENDAL
- #include "storage/OpenDALChunkManager.h"
+ #include "storage/opendal/OpenDALChunkManager.h"
  #endif
-@@ -701,6 +703,7 @@ CreateChunkManager(const StorageConfig& storage_config) {
+@@ -750,6 +752,7 @@ CreateChunkManager(const StorageConfig& storage_config) {
              return std::make_shared<LocalChunkManager>(
                  storage_config.root_path);
          }
@@ -257,7 +338,23 @@ index 0e714f0a9..46ebabf2e 100644
          case ChunkManagerType::Minio: {
              return std::make_shared<MinioChunkManager>(storage_config);
          }
-@@ -731,6 +734,7 @@ CreateChunkManager(const StorageConfig& storage_config) {
+@@ -770,22 +773,19 @@ CreateChunkManager(const StorageConfig& storage_config) {
+                     return std::make_shared<TencentCloudChunkManager>(
+                         storage_config);
+                 }
+-#ifdef AZURE_BUILD_DIR
+                 case CloudProviderType::AZURE: {
+                     return std::make_shared<AzureChunkManager>(storage_config);
+                 }
+-#endif
+-#ifdef ENABLE_GCP_NATIVE
+                 case CloudProviderType::GCPNATIVE: {
+                     return std::make_shared<GcpNativeChunkManager>(
+                         storage_config);
+                 }
+-#endif
+                 default: {
+                     return std::make_shared<MinioChunkManager>(storage_config);
                  }
              }
          }
@@ -265,6 +362,20 @@ index 0e714f0a9..46ebabf2e 100644
  #ifdef USE_OPENDAL
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
+diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
+index 6520e9cc51..ba74b606db 100644
+--- a/internal/core/thirdparty/knowhere/CMakeLists.txt
++++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
+@@ -22,6 +22,8 @@ message(STATUS "Knowhere repo: ${GIT_REPOSITORY}")
+ message(STATUS "Building knowhere-${KNOWHERE_SOURCE_VER} from source")
+ message(STATUS ${CMAKE_BUILD_TYPE})
+ 
++set(WITH_LIGHT ON )
++
+ if ( BUILD_DISK_ANN STREQUAL "ON" )
+     set(WITH_DISKANN ON CACHE BOOL "" FORCE )
+ else ()
+
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
 index 745842432..3750f8c39 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
