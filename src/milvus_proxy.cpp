@@ -101,9 +101,17 @@ MilvusProxy::ReleaseCollection(const std::string& collection_name) {
 }
 
 Status
-MilvusProxy::HasCollection(const std::string& collection_name) {
+MilvusProxy::HasCollection(const std::string& collection_name,
+                           ::milvus::proto::milvus::BoolResponse* response) {
     std::string tmp;
-    return milvus_local_.GetCollection(collection_name, &tmp);
+    Status status = milvus_local_.GetCollection(collection_name, &tmp);
+    response->set_value(status.IsOk());
+    // If the collection does not exist, change Status code to ok, and the response bool value determines if it noexists.
+    if (status.Code() == ErrCode::ErrCollectionNotFound) {
+        LOG_INFO("HasCollection change error code from collection-not-found to ok.");
+        status = Status::Ok();
+    }
+    return status;
 }
 
 Status

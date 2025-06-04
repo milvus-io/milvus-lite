@@ -55,9 +55,8 @@ MilvusServiceImpl::HasCollection(
     ::grpc::ServerContext* context,
     const ::milvus::proto::milvus::HasCollectionRequest* request,
     ::milvus::proto::milvus::BoolResponse* response) {
-    Status s = proxy_.HasCollection(request->collection_name());
+    Status s = proxy_.HasCollection(request->collection_name(), response);
     Status2Response(s, response->mutable_status());
-    response->set_value(s.IsOk());
     return ::grpc::Status::OK;
 }
 
