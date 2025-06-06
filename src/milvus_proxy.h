@@ -43,7 +43,8 @@ class MilvusProxy : NonCopyableNonMovable {
         const ::milvus::proto::milvus::CreateCollectionRequest* request);
 
     Status
-    HasCollection(const std::string& collection_name);
+    HasCollection(const std::string& collection_name,
+                  ::milvus::proto::milvus::BoolResponse* response);
 
     Status
     GetLoadState(const std::string& collection_name,
