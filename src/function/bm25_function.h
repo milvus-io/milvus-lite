@@ -89,7 +89,7 @@ class BM25Function : public TransformFunctionBase {
  public:
     Status
     ProcessInsert(
-        const std::vector<milvus::proto::schema::FieldData*>& inputs,
+        const std::vector<const milvus::proto::schema::FieldData*>& inputs,
         std::vector<milvus::proto::schema::FieldData>* outputs) override;
 
     Status

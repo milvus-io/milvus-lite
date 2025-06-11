@@ -97,6 +97,17 @@ GenRandomString(const char* prefix) {
 
     return oss.str();
 }
+
+inline std::pair<bool, double>
+ToNumber(const std::string& s) {
+    try {
+        size_t pos;
+        auto n = std::stof(s, &pos);
+        return std::make_pair(pos == s.length(), n);
+    } catch (std::exception& e) {
+        return std::make_pair(false, 0.0);
+    }
+}
 }  // namespace string_util
 
 }  // namespace milvus::local

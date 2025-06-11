@@ -108,8 +108,9 @@ class TransformFunctionBase {
 
  public:
     virtual Status
-    ProcessInsert(const std::vector<milvus::proto::schema::FieldData*>& inputs,
-                  std::vector<milvus::proto::schema::FieldData>* outputs) = 0;
+    ProcessInsert(
+        const std::vector<const milvus::proto::schema::FieldData*>& inputs,
+        std::vector<milvus::proto::schema::FieldData>* outputs) = 0;
     virtual Status
     ProcessSearch(const milvus::proto::common::PlaceholderGroup& input_plg,
                   milvus::proto::common::PlaceholderGroup* output_plg) = 0;
@@ -124,13 +125,13 @@ class TransformFunctionBase {
         return meta_->input_fields_[i];
     }
 
-    const std::set<int64_t>
-    GetInputFieldIDs() {
-        std::set<int64_t> field_ids;
+    const std::set<std::string>
+    GetInputFieldNames() {
+        std::set<std::string> field_names;
         for (const auto& f : meta_->input_fields_) {
-            field_ids.insert(f->fieldid());
+            field_names.insert(f->name());
         }
-        return field_ids;
+        return field_names;
     }
 
  protected:

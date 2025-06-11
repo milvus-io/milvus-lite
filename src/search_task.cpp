@@ -181,6 +181,10 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
         return Status::ParameterInvalid();
     }
 
+    const ::milvus::proto::schema::FieldSchema* field;
+    auto s = schema_util::FindVectorField(*schema_, ann_field_, &field);
+    CHECK_STATUS(s, "");
+    ann_field_ = field->name();
     if (schema_util::HasFunction(*schema_)) {
         auto [s, executor] = FunctionExecutor::Create(schema_, ann_field_);
         CHECK_STATUS(s, "");
@@ -190,9 +194,6 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
     nqs->push_back(search_request_->nq());
     topks->push_back(vector_anns->query_info().topk());
 
-    const ::milvus::proto::schema::FieldSchema* field;
-    auto s = schema_util::FindVectorField(*schema_, ann_field_, &field);
-    CHECK_STATUS(s, "");
     vector_anns->set_field_id(field->fieldid());
     auto vtype = schema_util::DataTypeToVectorType(field->data_type());
     vector_anns->set_vector_type(*vtype);

@@ -20,6 +20,7 @@
 #include "common.h"
 #include "function/bm25_function.h"
 #include "function/function_util.h"
+#include "log/Log.h"
 #include "schema.pb.h"
 #include "status.h"
 
@@ -27,10 +28,10 @@ namespace milvus::local::function {
 
 std::pair<Status, std::unique_ptr<FunctionExecutor>>
 FunctionExecutor::Create(const milvus::proto::schema::CollectionSchema* schema,
-                         std::string function_name) {
-    for (const auto& f_schemn : schema->functions()) {
-        if (f_schemn.output_field_names(0) == function_name) {
-            auto [s, f] = CreateFunction(schema, &f_schemn);
+                         std::string field_name) {
+    for (const auto& f_schema : schema->functions()) {
+        if (f_schema.output_field_names(0) == field_name) {
+            auto [s, f] = CreateFunction(schema, &f_schema);
             if (!s.IsOk()) {
                 return std::make_pair(s, nullptr);
             }
@@ -38,10 +39,11 @@ FunctionExecutor::Create(const milvus::proto::schema::CollectionSchema* schema,
             functions_.emplace_back(std::move(f));
             std::unique_ptr<FunctionExecutor> executor(
                 new FunctionExecutor(std::move(functions_)));
+            return std::make_pair(Status::Ok(), std::move(executor));
         }
     }
     return std::make_pair(
-        Status::ParameterInvalid("No function's output is {}", function_name),
+        Status::ParameterInvalid("No function's output is {}", field_name),
         nullptr);
 }
 
@@ -93,16 +95,21 @@ Status
 FunctionExecutor::ProcessSingeFunction(
     milvus::proto::milvus::InsertRequest* insert,
     const std::unique_ptr<TransformFunctionBase>& f) {
-    auto field_ids = f->GetInputFieldIDs();
+    auto field_names = f->GetInputFieldNames();
 
-    std::vector<milvus::proto::schema::FieldData*> inputs;
-    for (auto field : insert->fields_data()) {
-        if (field_ids.find(field.field_id()) != field_ids.end()) {
-            inputs.emplace_back(&field);
+    std::vector<const milvus::proto::schema::FieldData*> inputs;
+    for (int i = 0; i < insert->fields_data_size(); i++) {
+        if (field_names.find(insert->fields_data(i).field_name()) !=
+            field_names.end()) {
+            inputs.emplace_back(&insert->fields_data(i));
         }
     }
     std::vector<milvus::proto::schema::FieldData> outputs;
-    return f->ProcessInsert(inputs, &outputs);
+    CHECK_STATUS(f->ProcessInsert(inputs, &outputs), "");
+    for (auto& field : outputs) {
+        insert->mutable_fields_data()->Add(std::move(field));
+    }
+    return Status::Ok();
 }
 
 Status

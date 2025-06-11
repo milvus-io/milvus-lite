@@ -33,7 +33,6 @@
 
 namespace milvus::local {
 
-using milvus::local::function::BM25Stats;
 using milvus::local::function::FunctionExecutor;
 
 using DType = ::milvus::proto::schema::DataType;
@@ -146,7 +145,7 @@ InsertTask::CheckDynamicFieldData() {
 
 Status
 InsertTask::Process(Rows* rows) {
-    if (!(AddSystemField() && CheckDynamicFieldData() && GenFieldMap())) {
+    if (!(AddSystemField() && CheckDynamicFieldData())) {
         return Status::ParameterInvalid();
     }
 
@@ -154,6 +153,10 @@ InsertTask::Process(Rows* rows) {
         auto [s, executor] = FunctionExecutor::Create(schema_);
         CHECK_STATUS(s, "");
         CHECK_STATUS(executor->ProcessInsert(insert_request_), "");
+    }
+
+    if (!GenFieldMap()) {
+        return Status::ParameterInvalid();
     }
     CHECK_STATUS(CheckOrSetVectorDim(), "");
 

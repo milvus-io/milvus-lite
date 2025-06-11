@@ -12,42 +12,74 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-#include "storage.h"
+#include "storage/storage.h"
+#include "storage/bm25_stats.h"
 #include <gtest/gtest.h>
-#include "test_util.h"
+#include <cstdint>
 
 namespace milvus::local {
 
 TEST(Storage, h) {
-    // auto schema_str = create_test_collection();
-    // auto index_str = create_test_index();
+    const char* db_path = "test.db";
+    auto db_ptr = std::make_unique<SQLite::Database>(
+        db_path,
+        SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX);
+    BM25Stats bm25_stats;
+    EXPECT_TRUE(bm25_stats.CreateTables(db_ptr.get()));
+    std::map<uint32_t, int32_t> tokens{};
+    EXPECT_TRUE(bm25_stats.AddTokenDoc(db_ptr.get(), "test", "sparse", tokens));
+    tokens[1] = 1;
+    tokens[2] = 2;
+    tokens[3] = 3;
+    EXPECT_TRUE(bm25_stats.AddTokenDoc(db_ptr.get(), "test", "sparse", tokens));
 
-    // ::milvus::proto::msg::InsertRequest insert;
-    // auto row_data = insert.add_row_data();
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 1),
+              1);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 2),
+              2);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 3),
+              3);
 
-    // const char* db_path = "test.db";
-    // {
-    //     Storage s(db_path);
-    //     s.open();
-    //     s.create_collection("test", schema_str);
-    //     s.create_index("test", "test_index", index_str);
-    // }
+    tokens.clear();
+    tokens[1] = 1;
+    tokens[2] = 2;
+    EXPECT_TRUE(bm25_stats.AddTokenDoc(db_ptr.get(), "test", "sparse", tokens));
 
-    // {
-    //     Storage s(db_path);
-    //     s.open();
-    //     std::string schema;
-    //     std::string index;
-    //     s.get_collection_schema("test", schema);
-    //     s.get_index("test", "test_index", &index);
-    //     ::milvus::proto::schema::CollectionSchema sc;
-    //     sc.ParseFromString(schema);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 1),
+              2);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 2),
+              4);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 3),
+              3);
 
-    //     milvus::proto::segcore::FieldIndexMeta index_mt;
-    //     index_mt.ParseFromString(index);
-    //     std::cout << index_mt.index_name();
-    // }
-    // std::remove(db_path);
+    EXPECT_TRUE(
+        bm25_stats.DeleteTokenDoc(db_ptr.get(), "test", "sparse", tokens));
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 1),
+              1);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 2),
+              2);
+    EXPECT_EQ(bm25_stats.GetTokenDocCount(db_ptr.get(), "test", "sparse", 3),
+              3);
+
+    EXPECT_TRUE(
+        bm25_stats.AddBM25Stats(db_ptr.get(), "test", "sparse", 100, 20));
+    {
+        auto [token, doc] =
+            bm25_stats.GetTokenNumAndDocNum(db_ptr.get(), "test", "sparse");
+        EXPECT_EQ(token, 100);
+        EXPECT_EQ(doc, 20);
+    }
+    EXPECT_TRUE(
+        bm25_stats.DeleteBM25Stats(db_ptr.get(), "test", "sparse", 20, 10));
+
+    {
+        auto [token, doc] =
+            bm25_stats.GetTokenNumAndDocNum(db_ptr.get(), "test", "sparse");
+        EXPECT_EQ(token, 80);
+        EXPECT_EQ(doc, 10);
+    }
+
+    std::remove(db_path);
 }
 
 }  // namespace milvus::local

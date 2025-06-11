@@ -17,12 +17,14 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 #include "status.h"
 #include "common.h"
 #include "index.h"
 #include "retrieve_result.h"
 #include "search_result.h"
+#include "storage/bm25_stats.h"
 #include "storage/storage.h"
 #include "type.h"
 
@@ -86,7 +88,8 @@ class MilvusLocal final : NonCopyableNonMovable {
     Status
     Insert(const std::string& collection_name,
            const Rows& rows,
-           std::vector<std::string>* ids);
+           std::vector<std::string>* ids,
+           const std::vector<std::string>& bm25_fields);
 
     Status
     Retrieve(const std::string& collection_name,
@@ -103,10 +106,20 @@ class MilvusLocal final : NonCopyableNonMovable {
     DeleteByIds(const std::string& collection_name,
                 const std::string& ids,
                 int64_t size,
-                const std::vector<std::string>& storage_id);
+                const std::vector<std::string>& storage_id,
+                const std::vector<std::string>& bm25_fields);
 
     Status
     GetNumRowsOfCollection(const std::string& collection_name, int64_t* num);
+
+    std::pair<uint32_t, int32_t>
+    GetBM25TokenAndDocCount(const std::string& collection_name,
+                            const std::string& field_name);
+
+    int32_t
+    GetTokenNQ(const std::string& collection_name,
+               const std::string& field_name,
+               uint32_t token);
 
  private:
     Status

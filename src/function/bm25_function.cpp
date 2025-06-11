@@ -12,6 +12,7 @@
 
 #include "function/bm25_function.h"
 #include "common.h"
+#include "log/Log.h"
 #include "schema_util.h"
 #include "common.pb.h"
 #include "schema.pb.h"
@@ -29,13 +30,16 @@ constexpr int substringLengthForCRC = 100;
 
 Status
 BM25Function::ProcessInsert(
-    const std::vector<milvus::proto::schema::FieldData*>& inputs,
+    const std::vector<const milvus::proto::schema::FieldData*>& inputs,
     std::vector<milvus::proto::schema::FieldData>* outputs) {
     if (inputs.size() != 1) {
-        return Status::ParameterInvalid("BM25Function inputs size must be 1");
+        return Status::ParameterInvalid(
+            "BM25Function inputs size must be 1, but got {}", inputs.size());
     }
 
     if (inputs[0]->type() != milvus::proto::schema::DataType::VarChar) {
+        std::cout << inputs[0]->field_name() << inputs[0]->type() << std::endl;
+
         return Status::ParameterInvalid(
             "BM25Function input type must be VarChar");
     }

@@ -43,6 +43,16 @@ class SearchTask final : NonCopyableNonMovable {
     PostProcess(const SearchResult& segcore_reaul,
                 ::milvus::proto::milvus::SearchResults* search_results);
 
+    const std::string
+    GetMetric() {
+        return metric_;
+    }
+
+    const std::string
+    GetAnnFieldName() {
+        return ann_field_;
+    }
+
  private:
     bool
     ParseSearchInfo(::milvus::proto::plan::QueryInfo* info);

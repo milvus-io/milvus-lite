@@ -25,7 +25,7 @@
 #include "status.h"
 #include "log/Log.h"
 #include "string_util.hpp"
-#include "bm25_stat.h"
+
 namespace milvus::local {
 
 #define CHECK_COLLECTION_EXIST(collection_name)                               \
@@ -240,19 +240,14 @@ MilvusLocal::DropIndex(const std::string& collection_name,
     if (!storage_.DropIndex(collection_name, index_name)) {
         return Status::ServiceInternal();
     }
-    auto& stat = bm25::StatDict::Instance();
-    auto it = stat.stats_dict.find(collection_name);
-    if (it != stat.stats_dict.end()) {
-        stat.stats_dict.erase(it);
-    }
-
     return Status::Ok();
 }
 
 Status
 MilvusLocal::Insert(const std::string& collection_name,
                     const Rows& rows,
-                    std::vector<std::string>* ids) {
+                    std::vector<std::string>* ids,
+                    const std::vector<std::string>& bm25_fields) {
     std::lock_guard<std::mutex> lock(mutex_);
     CHECK_COLLECTION_EXIST(collection_name);
     int64_t count = 0;
@@ -266,42 +261,7 @@ MilvusLocal::Insert(const std::string& collection_name,
     auto start = rows.begin();
     auto end = rows.begin() + count;
     std::vector<Row> rows_need_insert(start, end);
-    storage_.Insert(collection_name, rows_need_insert);
-    auto& stat = bm25::StatDict::Instance();
-
-    if (stat.stats_dict.find(collection_name) != stat.stats_dict.end()) {
-        auto& coll_stat = stat.stats_dict[collection_name];
-        for (auto& row : rows_need_insert) {
-            milvus::proto::segcore::InsertRecord record;
-            record.ParseFromString(std::get<1>(row));
-            for (int i = 0; i < record.fields_data_size(); ++i) {
-                auto data = record.fields_data(i);
-                if (data.type() ==
-                        milvus::proto::schema::DataType::SparseFloatVector &&
-                    data.field_name() == coll_stat.output_field_name) {
-                    CHECK(
-                        data.vectors().sparse_float_vector().contents_size() ==
-                        1);
-                    auto cont =
-                        data.vectors().sparse_float_vector().contents(0);
-                    auto pos = cont.c_str();
-                    auto end = cont.c_str() + cont.size();
-                    for (; pos < end; pos += 8) {
-                        const uint32_t key =
-                            *(reinterpret_cast<const uint32_t*>(pos));
-                        const float freq =
-                            *(reinterpret_cast<const float*>(pos + 4));
-                        coll_stat.rows_contain_token[key] += 1;
-                        coll_stat.token_num += int(freq);
-                    }
-                    coll_stat.rows_num += 1;
-                    coll_stat.contexts[std::get<0>(row)] =
-                        std::string(cont.begin(), cont.end());
-                }
-            }
-        }
-    }
-
+    storage_.Insert(collection_name, rows_need_insert, bm25_fields);
     return Status::Ok();
 }
 
@@ -328,65 +288,14 @@ Status
 MilvusLocal::DeleteByIds(const std::string& collection_name,
                          const std::string& ids,
                          int64_t size,
-                         const std::vector<std::string>& storage_ids) {
+                         const std::vector<std::string>& storage_ids,
+                         const std::vector<std::string>& bm25_fields) {
     std::lock_guard<std::mutex> lock(mutex_);
     CHECK_COLLECTION_EXIST(collection_name);
-    if (storage_.Delete(collection_name, storage_ids) == -1) {
+    if (storage_.Delete(collection_name, storage_ids, bm25_fields) == -1) {
         return Status::ServiceInternal();
     }
     CHECK_STATUS(index_.DeleteByIds(collection_name, ids, size), "");
-
-    auto& stat = bm25::StatDict::Instance();
-
-    if (stat.stats_dict.find(collection_name) != stat.stats_dict.end()) {
-        auto& coll_stat = stat.stats_dict[collection_name];
-        for (auto& id : storage_ids) {
-            auto it = coll_stat.contexts.find(id);
-            if (it != coll_stat.contexts.end()) {
-                const auto& cont = it->second;
-                auto pos = cont.c_str();
-                auto end = cont.c_str() + cont.size();
-                for (; pos < end; pos += 8) {
-                    const uint32_t key =
-                        *(reinterpret_cast<const uint32_t*>(pos));
-                    const float freq =
-                        *(reinterpret_cast<const float*>(pos + 4));
-                    auto key_it = coll_stat.rows_contain_token.find(key);
-                    if (key_it != coll_stat.rows_contain_token.end()) {
-                        key_it->second -= 1;
-                        if (key_it->second == 0)
-                            coll_stat.rows_contain_token.erase(key_it);
-                    }
-                    coll_stat.token_num -= int(freq);
-                }
-                coll_stat.rows_num -= 1;
-                coll_stat.contexts.erase(it);
-            }
-        }
-    }
-
-    /*
-    if (stat.stats_dict.find(collection_name) != stat.stats_dict.end()) {
-        auto& coll_stat = stat.stats_dict[collection_name];
-        for (auto it = coll_stat.rows_contain_token.begin();
-             it != coll_stat.rows_contain_token.end();) {
-            auto size_bf = it->second.size();
-            for (auto& ids : storage_ids) {
-                auto del_it = it->second.find(ids);
-                if (del_it != it->second.end())
-                    it->second.erase(del_it);
-            }
-            coll_stat.rows_num -= (size_bf - it->second.size());
-            if (it->second.empty()) {
-                it = coll_stat.rows_contain_token.erase(it);
-                coll_stat.token_num -= 1;
-            } else {
-                ++it;
-            }
-        }
-    }
-    */
-
     return Status::Ok();
 }
 
@@ -409,6 +318,19 @@ MilvusLocal::GetAllIndexs(const std::string& collection_name,
     CHECK_COLLECTION_EXIST(collection_name);
     storage_.GetAllIndex(collection_name, "", all_index_proto);
     return Status::Ok();
+}
+
+std::pair<uint32_t, int32_t>
+MilvusLocal::GetBM25TokenAndDocCount(const std::string& collection_name,
+                                     const std::string& field_name) {
+    return storage_.GetBM25TokenAndDocCount(collection_name, field_name);
+}
+
+int32_t
+MilvusLocal::GetTokenNQ(const std::string& collection_name,
+                        const std::string& field_name,
+                        uint32_t token) {
+    return storage_.GetTokenNQ(collection_name, field_name, token);
 }
 
 Status

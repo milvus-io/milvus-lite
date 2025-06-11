@@ -49,7 +49,7 @@ TEST(BM25FunctionTest, normal) {
                   ::milvus::proto::common::PlaceholderType::SparseFloatVector);
     }
     {
-        std::vector<milvus::proto::schema::FieldData*> inputs;
+        std::vector<const milvus::proto::schema::FieldData*> inputs;
         milvus::proto::schema::FieldData text_field;
         text_field.set_field_name(VARCHAR_SCALAR_NAME);
         text_field.set_is_dynamic(false);

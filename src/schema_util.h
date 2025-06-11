@@ -114,7 +114,8 @@ ReduceFieldByIDs(const ::milvus::proto::schema::IDs& ids,
 inline bool
 PositivelyRelated(const std::string& metrics_type) {
     auto upper_str = string_util::ToUpper(metrics_type);
-    return upper_str == KMetricsIPName || upper_str == kMetricsCosineName;
+    return upper_str == KMetricsIPName || upper_str == kMetricsCosineName ||
+           upper_str == kMetricsBM25Name;
 }
 
 std::string
@@ -171,10 +172,21 @@ HasFunction(const ::milvus::proto::schema::CollectionSchema& schema) {
     return !schema.functions().empty();
 }
 
-inline bool
-HasBM25Function(const ::milvus::proto::schema::CollectionSchema& schema) {
-    return true;
+inline std::vector<std::string>
+GetBM25SparseField(const ::milvus::proto::schema::CollectionSchema& schema) {
+    std::vector<std::string> fields;
+    for (const auto& f : schema.functions()) {
+        if (f.type() == milvus::proto::schema::FunctionType::BM25) {
+            fields.push_back(f.output_field_names(0));
+        }
+    }
+    return fields;
 }
+
+// inline bool
+// HasBM25Function(const ::milvus::proto::schema::CollectionSchema& schema) {
+//     return true;
+// }
 
 }  // namespace schema_util
 
