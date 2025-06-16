@@ -238,6 +238,65 @@ CreateCollectionTask::AppendSysFields(
 }
 
 Status
+VaildBM25Functions(const ::milvus::proto::schema::CollectionSchema& schema,
+                   const milvus::proto::schema::FunctionSchema& fs) {
+    if (fs.type() != milvus::proto::schema::FunctionType::BM25) {
+        return Status::ParameterInvalid(
+            "MilvusLite only supports BM25 function");
+    }
+    if (fs.input_field_names_size() != 1 || fs.output_field_names_size() != 1) {
+        return Status::ParameterInvalid(
+            "The input and output of the BM25 function must be 1");
+    }
+    bool found_input = false;
+    bool found_output = false;
+    for (const auto& field : schema.fields()) {
+        if (field.name() == fs.input_field_names(0)) {
+            found_input = true;
+            if (field.is_dynamic()) {
+                return Status::ParameterInvalid(
+                    "Function's input cannot be dynamic field");
+            }
+            if (field.data_type() != milvus::proto::schema::DataType::VarChar) {
+                return Status::ParameterInvalid(
+                    "BM25 funciton's input must be of VARCHAR type");
+            }
+            if (field.nullable()) {
+                return Status::ParameterInvalid(
+                    "Function's input cannot be nullable field");
+            }
+        }
+
+        if (field.name() == fs.output_field_names(0)) {
+            found_output = true;
+            if (field.is_dynamic()) {
+                return Status::ParameterInvalid(
+                    "Function's output cannot be dynamic field");
+            }
+            if (field.data_type() !=
+                milvus::proto::schema::DataType::SparseFloatVector) {
+                return Status::ParameterInvalid(
+                    "BM25 funciton's output must be of SparseFloatVector type");
+            }
+            if (field.nullable()) {
+                return Status::ParameterInvalid(
+                    "Function's output cannot be nullable field");
+            }
+        }
+    }
+    if (!found_input) {
+        return Status::ParameterInvalid("function's input {} not found",
+                                        fs.input_field_names(0));
+    }
+
+    if (!found_output) {
+        return Status::ParameterInvalid("function's output {} not found",
+                                        fs.output_field_names(0));
+    }
+    return Status::Ok();
+}
+
+Status
 CreateCollectionTask::ValidateSchema(
     const ::milvus::proto::schema::CollectionSchema& schema) {
     if (schema.fields_size() > kSchemaFieldLimit)
@@ -276,6 +335,9 @@ CreateCollectionTask::ValidateSchema(
     }
 
     // valid functions
+    for (const auto& f : schema.functions()) {
+        CHECK_STATUS(VaildBM25Functions(schema, f), "");
+    }
     return Status::Ok();
 }
 
