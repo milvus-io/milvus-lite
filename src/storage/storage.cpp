@@ -17,11 +17,17 @@
 #include <SQLiteCpp/Transaction.h>
 #include <cstdint>
 #include <exception>
+#include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 #include "collection_data.h"
 #include "log/Log.h"
 #include "pb/schema.pb.h"
+#include "segcore.pb.h"
+#include "storage/bm25_stats.h"
+#include "storage/collection_meta.h"
+#include "type.h"
 
 namespace milvus::local {
 
@@ -43,14 +49,17 @@ Storage::Open() {
         if (!cm_.Init(db_ptr_.get())) {
             return false;
         }
-        transaction.commit();
-
         std::vector<std::string> names;
         cm_.CollectionNames(&names);
         for (const auto& name : names) {
             collections_.emplace(
                 name, std::make_unique<CollectionData>(name.c_str()));
         }
+        bm25_stats_ = std::unique_ptr<BM25Stats>(new BM25Stats());
+        if (!bm25_stats_->CreateTables(db_ptr_.get())) {
+            return false;
+        }
+        transaction.commit();
         return true;
     } catch (std::exception& e) {
         LOG_ERROR("Open storage failed, err: {}", e.what());
@@ -88,6 +97,9 @@ Storage::DropCollection(const std::string& collection_name) {
         return false;
     }
     collections_.erase(collection_name);
+    if (!bm25_stats_->DropCollectionStats(db_ptr_.get(), collection_name)) {
+        return false;
+    }
     transaction.commit();
     return true;
 }
@@ -147,10 +159,79 @@ Storage::DropIndex(const std::string& collection_name,
     return true;
 }
 
+bool
+Storage::CollectBM25Stats(const std::vector<Row>& rows,
+                          const std::vector<std::string>& bm25_field_names,
+                          std::map<std::string, Stats>* stats) {
+    for (const auto& field_name : bm25_field_names) {
+        (*stats)[field_name] = Stats();
+        (*stats)[field_name].rows_num = rows.size();
+    }
+
+    for (const auto& row : rows) {
+        milvus::proto::segcore::InsertRecord r;
+        if (!r.ParseFromString(std::get<1>(row))) {
+            LOG_ERROR("Parse insert record failed");
+            return false;
+        }
+        std::map<const std::string, const milvus::proto::schema::FieldData*>
+            field_map;
+        for (const auto& field : r.fields_data()) {
+            if (field.type() ==
+                milvus::proto::schema::DataType::SparseFloatVector) {
+                field_map[field.field_name()] = &field;
+            }
+        }
+        for (const auto& field_name : bm25_field_names) {
+            if (field_map.find(field_name) == field_map.end()) {
+                LOG_ERROR("Field {} not found or not sparse vector field",
+                          field_name);
+                return false;
+            }
+            // The data has been split by row, so there will only be one sparse vector
+            auto vec =
+                field_map[field_name]->vectors().sparse_float_vector().contents(
+                    0);
+            auto pos = vec.c_str();
+            auto end = vec.c_str() + vec.size();
+            for (; pos < end; pos += 8) {
+                const uint32_t token =
+                    *(reinterpret_cast<const uint32_t*>(pos));
+                const float count = *(reinterpret_cast<const float*>(pos + 4));
+                (*stats)[field_name].token_doc_count[token] += 1;
+                (*stats)[field_name].token_num += int(count);
+            }
+        }
+    }
+    return true;
+}
+
 int
 Storage::Insert(const std::string collection_name,
-                const std::vector<Row>& rows) {
+                const std::vector<Row>& rows,
+                const std::vector<std::string>& bm25_field_names) {
     SQLite::Transaction transaction(*db_ptr_.get());
+    if (!bm25_field_names.empty()) {
+        std::map<std::string, Stats> stats;
+        if (!CollectBM25Stats(rows, bm25_field_names, &stats)) {
+            return -1;
+        }
+        for (const auto& [field_name, stats] : stats) {
+            if (!bm25_stats_->AddBM25Stats(db_ptr_.get(),
+                                           collection_name,
+                                           field_name,
+                                           stats.token_num,
+                                           stats.rows_num)) {
+                return -1;
+            }
+            if (!bm25_stats_->AddTokenDoc(db_ptr_.get(),
+                                          collection_name,
+                                          field_name,
+                                          stats.token_doc_count)) {
+                return -1;
+            }
+        }
+    }
     for (const auto& row : rows) {
         if (collections_[collection_name]->Insert(db_ptr_.get(),
                                                   std::get<0>(row).c_str(),
@@ -164,8 +245,35 @@ Storage::Insert(const std::string collection_name,
 
 int
 Storage::Delete(const std::string collection_name,
-                const std::vector<std::string>& ids) {
+                const std::vector<std::string>& ids,
+                const std::vector<std::string>& bm25_field_names) {
     SQLite::Transaction transaction(*db_ptr_.get());
+    if (!bm25_field_names.empty()) {
+        std::vector<Row> rows;
+        if (!collections_[collection_name]->GetByIDs(
+                db_ptr_.get(), ids, &rows)) {
+            return -1;
+        }
+        std::map<std::string, Stats> stats;
+        if (!CollectBM25Stats(rows, bm25_field_names, &stats)) {
+            return -1;
+        }
+        for (const auto& [field_name, stats] : stats) {
+            if (!bm25_stats_->DeleteBM25Stats(db_ptr_.get(),
+                                              collection_name,
+                                              field_name,
+                                              stats.token_num,
+                                              stats.rows_num)) {
+                return -1;
+            }
+            if (!bm25_stats_->DeleteTokenDoc(db_ptr_.get(),
+                                             collection_name,
+                                             field_name,
+                                             stats.token_doc_count)) {
+                return -1;
+            }
+        }
+    }
     int n = collections_[collection_name]->Delete(db_ptr_.get(), ids);
     transaction.commit();
     return n;

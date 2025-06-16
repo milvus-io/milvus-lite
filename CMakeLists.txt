@@ -203,6 +203,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src/parser/")
 include_directories("${CMAKE_SOURCE_DIR}/src/parser/antlr/")
 include_directories("${CMAKE_BINARY_DIR}/pb")
 include_directories("${CMAKE_BINARY_DIR}")
+include_directories(${PROTO_BINARY_DIR})
 
 add_library(
   parser STATIC

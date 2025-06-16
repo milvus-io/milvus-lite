@@ -560,7 +560,7 @@ TranslateOutputFields(
     for (const std::string& fname : result_field) {
         result_outputs->push_back(fname);
     }
-  
+
     for (const std::string& fname : user_output_field) {
         user_output_fields->push_back(fname);
     }

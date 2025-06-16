@@ -37,7 +37,7 @@ namespace milvus::local {
  *    BinaryVector:        BIN_FLAT                                        HAMMING, JACCARD, SUBSTRUCTURE, SUPERSTRUCTURE
  *    Float16Vector:       FLAT                                            L2, IP, COSINE
  *    BFloat16Vector:      FLAT                                            L2, IP, COSINE
- *    SparseFloatVector:   SPARSE_INVERTED_INDEX, SPARSE_WAND              IP 
+ *    SparseFloatVector:   SPARSE_INVERTED_INDEX, SPARSE_WAND              IP, BM25 
  */
 
 // metrics type
@@ -48,7 +48,6 @@ const char* kHamming = "HAMMING";
 const char* kJaccard = "JACCARD";
 const char* kSubStructure = "SUBSTRUCTURE";
 const char* kSuperStructure = "SUPERSTRUCTURE";
-const char* kBM25 = "BM25";
 
 // index_type
 const char* kAutoIndex = "AUTOINDEX";
@@ -63,6 +62,10 @@ const char* kSparseWand = "SPARSE_WAND";
 const char* kFloatVectorDefaultMetricType = kIP;
 const char* kSparseFloatVectorDefaultMetricType = kIP;
 const char* kBinaryVectorDefaultMetricType = kJaccard;
+
+//bm25 params
+const char* kBm25K1 = "bm25_k1";
+const char* kBm25B = "bm25_b";
 
 class AutoIndexConfig final : NonCopyableNonMovable {
  public:
@@ -211,7 +214,7 @@ class SparseFloatVectorChecker : public virtual IndexChecker {
         max_dim_ = -1;
         need_check_dim_ = false;
         supported_index_ = {kSparseInvertedIndex, kSparseWand};
-        supported_metric_ = {kIP, kBM25};
+        supported_metric_ = {kIP, kMetricsBM25Name};
     }
 
     virtual ~SparseFloatVectorChecker() = default;
@@ -277,6 +280,46 @@ CreateIndexTask::CheckTrain(const ::milvus::proto::schema::FieldSchema& field,
     auto index_type = index_params.at(kIndexTypeKey);
     if (!IsVectorIndex(field.data_type())) {
         return Status::Ok();
+    }
+    if (schema_util::IsSparseVectorType(field.data_type())) {
+        if (index_params[kMetricTypeKey] == kMetricsBM25Name) {
+            {
+                auto [succ, num] =
+                    string_util::ToNumber(index_params[kBM25AvgName]);
+                if (!succ) {
+                    return Status::ParameterInvalid("{}: {} is not a number",
+                                                    kBM25AvgName,
+                                                    index_params[kBM25AvgName]);
+                }
+            }
+            {
+                auto [succ, num] = string_util::ToNumber(index_params[kBm25K1]);
+                if (!succ) {
+                    return Status::ParameterInvalid("{}: {} is not a number",
+                                                    kBm25K1,
+                                                    index_params[kBm25K1]);
+                }
+                if (num < 0 || num > 3.0) {
+                    return Status::ParameterInvalid(
+                        "{}: {} should be in range [0.0, 3.0]",
+                        kBm25K1,
+                        index_params[kBm25K1]);
+                }
+            }
+            {
+                auto [succ, num] = string_util::ToNumber(index_params[kBm25B]);
+                if (!succ) {
+                    return Status::ParameterInvalid(
+                        "{}: {} is not a number", kBm25B, index_params[kBm25B]);
+                }
+                if (num < 0.0 || num > 1.0) {
+                    return Status::ParameterInvalid(
+                        "{}: {} should be in range [0.0, 1.0]",
+                        kBm25B,
+                        index_params[kBm25B]);
+                }
+            }
+        }
     }
     if (!schema_util::IsSparseVectorType(field.data_type())) {
         if (!FillDimension(field, &index_params)) {
@@ -360,6 +403,18 @@ CreateIndexTask::ParseIndexParams() {
             } else {
                 LOG_ERROR("Unkwon index data type: {}", field_ptr->data_type());
                 return Status::ParameterInvalid();
+            }
+        }
+
+        if (index_params[kMetricTypeKey] == kMetricsBM25Name) {
+            if (index_params.find(kBm25K1) == index_params.end()) {
+                index_params[kBm25K1] = "1.2";
+            }
+            if (index_params.find(kBm25B) == index_params.end()) {
+                index_params[kBm25B] = "0.75";
+            }
+            if (index_params.find(kBM25AvgName) == index_params.end()) {
+                index_params[kBM25AvgName] = "1000";
             }
         }
 
@@ -505,6 +560,7 @@ CreateIndexTask::Process(milvus::proto::segcore::FieldIndexMeta* field_meta) {
             kset.insert(param.key());
         }
     }
+
     return Status::Ok();
 }
 
