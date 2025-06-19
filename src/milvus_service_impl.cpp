@@ -27,7 +27,8 @@ Status2Response(Status& s, ::milvus::proto::common::Status* response) {
     response->set_code(s.Code());
     response->set_retriable(false);
     response->set_detail(s.Detail());
-    response->set_reason(s.Detail() + ": " + s.Msg());
+    std::string reason = s.Detail().empty() ? s.Msg() : s.Detail() + ": " + s.Msg();
+    response->set_reason(reason);
 }
 
 ::grpc::Status
