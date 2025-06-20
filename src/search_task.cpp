@@ -185,7 +185,7 @@ SearchTask::Process(::milvus::proto::plan::PlanNode* plan,
     auto s = schema_util::FindVectorField(*schema_, ann_field_, &field);
     CHECK_STATUS(s, "");
     ann_field_ = field->name();
-    if (schema_util::HasFunction(*schema_)) {
+    if (schema_util::HasFunction(*schema_, ann_field_)) {
         auto [s, executor] = FunctionExecutor::Create(schema_, ann_field_);
         CHECK_STATUS(s, "");
         CHECK_STATUS(executor->ProcessSearch(search_request_), "");

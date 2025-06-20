@@ -172,6 +172,17 @@ HasFunction(const ::milvus::proto::schema::CollectionSchema& schema) {
     return !schema.functions().empty();
 }
 
+inline bool
+HasFunction(const ::milvus::proto::schema::CollectionSchema& schema,
+            const std::string& ann_field) {
+    for (const auto& f : schema.functions()) {
+        if (f.output_field_names(0) == ann_field) {
+            return true;
+        }
+    }
+    return false;
+}
+
 inline std::vector<std::string>
 GetBM25SparseField(const ::milvus::proto::schema::CollectionSchema& schema) {
     std::vector<std::string> fields;
