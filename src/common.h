@@ -37,6 +37,7 @@ namespace milvus::local {
     } while (0)
 
 using KVMap = std::map<std::string, std::string>;
+using SparseVector = std::map<uint32_t, float>;
 
 // system field id:
 // 0: unique row id
@@ -91,7 +92,10 @@ const std::string kReduceStopForBestKey("reduce_stop_for_best");
 const std::string kLimitKey("limit");
 const std::string KMetricsIPName("IP");
 const std::string kMetricsCosineName("COSINE");
+const std::string kMetricsBM25Name("BM25");
 const std::string kMetricsL2Name("L2");
+
+const std::string kBM25AvgName("bm25_avgdl");
 
 const std::string kCountStr("count(*)");
 

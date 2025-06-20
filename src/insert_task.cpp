@@ -22,6 +22,8 @@
 #include <tuple>
 #include <vector>
 #include "common.h"
+#include "function/bm25_stat.h"
+#include "function/function_executor.h"
 #include "log/Log.h"
 #include "pb/schema.pb.h"
 #include "pb/segcore.pb.h"
@@ -30,6 +32,8 @@
 #include "string_util.hpp"
 
 namespace milvus::local {
+
+using milvus::local::function::FunctionExecutor;
 
 using DType = ::milvus::proto::schema::DataType;
 int64_t InsertTask::cur_id_ = 0;
@@ -141,7 +145,17 @@ InsertTask::CheckDynamicFieldData() {
 
 Status
 InsertTask::Process(Rows* rows) {
-    if (!(AddSystemField() && CheckDynamicFieldData() && GenFieldMap())) {
+    if (!(AddSystemField() && CheckDynamicFieldData())) {
+        return Status::ParameterInvalid();
+    }
+
+    if (schema_util::HasFunction(*schema_)) {
+        auto [s, executor] = FunctionExecutor::Create(schema_);
+        CHECK_STATUS(s, "");
+        CHECK_STATUS(executor->ProcessInsert(insert_request_), "");
+    }
+
+    if (!GenFieldMap()) {
         return Status::ParameterInvalid();
     }
     CHECK_STATUS(CheckOrSetVectorDim(), "");

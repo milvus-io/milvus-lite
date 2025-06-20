@@ -56,8 +56,8 @@ using SchemaInfo = std::string;
 using IndexInfo = std::map<const std::string, const std::string>;
 
 /*
- * CollectionMeta 存储所有collection的元信息，数据写入sqlite3中，内存中保存副本。
- * Collection 是否存在等检查，都在storage中，CollectionMeta不再进行相关检查。
+ * CollectionMeta stores metadata about all collections. The data is written to sqlite3 and a copy is saved in memory.
+ * Checks such as whether a collection exists are all in storage, and CollectionMeta no longer performs related checks.
  */
 
 class CollectionMeta final {

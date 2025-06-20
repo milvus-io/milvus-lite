@@ -86,6 +86,37 @@ CollectionData::Insert(SQLite::Database* db,
     }
 }
 
+bool
+CollectionData::GetByIDs(SQLite::Database* db,
+                         const std::vector<std::string>& milvus_ids,
+                         std::vector<Row>* rows) {
+    std::stringstream ss;
+    for (size_t i = 0; i < milvus_ids.size(); i++) {
+        ss << "'" << milvus_ids[i] << "'";
+        if (i < milvus_ids.size() - 1)
+            ss << ",";
+    }
+
+    std::string select_sql =
+        string_util::SFormat("SELECT {},{} FROM '{}' WHERE {} IN ({})",
+                             col_milvus_id_,
+                             col_data_,
+                             collection_name_,
+                             col_milvus_id_,
+                             ss.str());
+    try {
+        SQLite::Statement query(*db, select_sql);
+        while (query.executeStep()) {
+            rows->push_back(std::make_tuple(query.getColumn(0).getString(),
+                                            query.getColumn(1).getString()));
+        }
+        return true;
+    } catch (std::exception& e) {
+        LOG_ERROR("Get by ids failed, errs: {}", e.what());
+        return false;
+    }
+}
+
 void
 CollectionData::Load(SQLite::Database* db,
                      int64_t start,

@@ -42,10 +42,9 @@
 #include "timer.h"
 #include "type.h"
 #include "upsert_task.h"
-#include "function.h"
-#include "bm25_stat.h"
 #include <cmath>
 #include "nlohmann/json.hpp"
+
 namespace milvus::local {
 
 MilvusProxy::MilvusProxy(const char* work_dir) : milvus_local_(work_dir) {
@@ -139,50 +138,12 @@ MilvusProxy::CreateIndex(const ::milvus::proto::milvus::CreateIndexRequest* r) {
         LOG_ERROR(err);
         return Status::CollectionNotFound(err);
     }
-    // CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
-
     // get all index
-
     milvus::proto::segcore::FieldIndexMeta field_meta;
     CHECK_STATUS(CreateIndexTask(r, &schema).Process(&field_meta), "");
-    bool is_bm25 = false;
-    for (int i = 0; i < field_meta.index_params_size(); ++i) {
-        if (field_meta.index_params(i).key() == "metric_type" &&
-            field_meta.index_params(i).value() == "BM25") {
-            is_bm25 = true;
-            break;
-        }
-    }
-
-    if (is_bm25) {
-        auto kv = field_meta.add_index_params();
-        kv->set_key("bm25_avgdl");
-        kv->set_value("10000");  //default avgdl 10000
-    }
-    auto status = milvus_local_.CreateIndex(r->collection_name(),
-                                            field_meta.index_name(),
-                                            field_meta.SerializeAsString());
-
-    if (status.IsOk() && is_bm25) {
-        CHECK(schema.functions_size() == 1);
-        CHECK(schema.functions(0).output_field_names_size() == 1);
-        std::string out_field_name = schema.functions(0).output_field_names(0);
-        bool is_legal = false;
-        for (int i = 0; i < schema.fields_size(); ++i) {
-            if (schema.fields(i).name() == out_field_name) {
-                is_legal = true;
-                break;
-            }
-        }
-        CHECK(is_legal);
-
-        auto& stat = bm25::StatDict::Instance();
-        if (is_bm25) {
-            stat.stats_dict[r->collection_name()] = bm25::Stats(out_field_name);
-        }
-    }
-
-    return status;
+    return milvus_local_.CreateIndex(r->collection_name(),
+                                     field_meta.index_name(),
+                                     field_meta.SerializeAsString());
 }
 
 Status
@@ -195,21 +156,14 @@ MilvusProxy::Insert(const ::milvus::proto::milvus::InsertRequest* r,
         return Status::CollectionNotFound();
     }
 
-    if (schema.functions_size() != 0) {
-        auto runner = CreateRunner(schema);
-        if (runner) {
-            runner->InsertConvert(
-                const_cast<milvus::proto::milvus::InsertRequest*>(r));
-        }
-    }
-
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
     Rows rows;
     auto insert_task = InsertTask(
         const_cast<::milvus::proto::milvus::InsertRequest*>(r), &schema);
     CHECK_STATUS(insert_task.Process(&rows), "");
+    auto bm25_fields = schema_util::GetBM25SparseField(schema);
     std::vector<std::string> insert_ids;
-    milvus_local_.Insert(r->collection_name(), rows, &insert_ids);
+    milvus_local_.Insert(r->collection_name(), rows, &insert_ids, bm25_fields);
 
     if (insert_task.PkType() == ::milvus::proto::schema::DataType::Int64) {
         for (const auto& id : insert_ids) {
@@ -248,10 +202,12 @@ MilvusProxy::Upsert(const ::milvus::proto::milvus::UpsertRequest* r,
             storage_ids.push_back(id);
         }
     }
+    auto bm25_fields = schema_util::GetBM25SparseField(schema);
     CHECK_STATUS(milvus_local_.DeleteByIds(r->collection_name(),
                                            delete_ids.SerializeAsString(),
                                            storage_ids.size(),
-                                           storage_ids),
+                                           storage_ids,
+                                           bm25_fields),
                  "");
     return Insert(&insert_q, ids);
 }
@@ -265,68 +221,6 @@ MilvusProxy::Search(const ::milvus::proto::milvus::SearchRequest* r,
                                         r->collection_name());
         LOG_ERROR(err);
         return Status::CollectionNotFound(err);
-    }
-    bool is_bm25 = false;
-    for (int i = 0; i < r->search_params_size(); ++i) {
-        if (r->search_params(i).key() == "metric_type" &&
-            r->search_params(i).value() == "BM25") {
-            is_bm25 = true;
-            break;
-        }
-    }
-
-    if (is_bm25) {
-        auto& stat = bm25::StatDict::Instance();
-        auto it = stat.stats_dict.find(r->collection_name());
-        CHECK(it != stat.stats_dict.end());
-        auto& coll_stat = it->second;
-        auto ph_group =
-            std::make_unique<milvus::proto::common::PlaceholderGroup>();
-        ph_group->ParseFromString(r->placeholder_group());
-
-        CHECK(ph_group->placeholders_size() == 1);
-        const auto& ph = ph_group->mutable_placeholders(0);
-        CHECK(ph->type() == milvus::proto::common::PlaceholderType::VarChar);
-        CHECK(ph->values_size() == 1);
-
-        auto runner = CreateRunner(schema);
-        auto cont = runner->SearchConvert(ph->values(0));
-        auto pos = cont.data();
-        auto end = cont.data() + cont.size();
-        for (; pos < end; pos += 8) {
-            const uint32_t key = *(reinterpret_cast<uint32_t*>(pos));
-            const float freq = *(reinterpret_cast<float*>(pos + 4));
-            auto nq = coll_stat.rows_contain_token[key];
-            *(reinterpret_cast<float*>(pos + 4)) =
-                freq * log(1 + (float(coll_stat.rows_num) - float(nq) + 0.5) /
-                                   (float(nq) + 0.5));
-        }
-        ph->set_type(milvus::proto::common::PlaceholderType::SparseFloatVector);
-        ph->clear_values();
-        *ph->add_values() = cont;
-        const_cast<milvus::proto::milvus::SearchRequest*>(r)
-            ->set_placeholder_group(ph_group->SerializeAsString());
-        bool is_params_ready = false;
-        for (int i = 0; i < r->search_params_size(); ++i) {
-            auto params = const_cast<milvus::proto::milvus::SearchRequest*>(r)
-                              ->mutable_search_params(i);
-            if (params->key() == "params") {
-                auto j = nlohmann::json::parse(params->value());
-                j["bm25_avgdl"] =
-                    float(coll_stat.token_num) / float(coll_stat.rows_num);
-                *params->mutable_value() = j.dump();
-                is_params_ready = true;
-            }
-        }
-        if (!is_params_ready) {
-            auto params = const_cast<milvus::proto::milvus::SearchRequest*>(r)
-                              ->add_search_params();
-            params->set_key("params");
-            nlohmann::json j;
-            j["bm25_avgdl"] =
-                float(coll_stat.token_num) / float(coll_stat.rows_num);
-            params->set_value(j.dump());
-        }
     }
 
     CHECK_STATUS(milvus_local_.LoadCollection(r->collection_name()), "");
@@ -351,6 +245,40 @@ MilvusProxy::DoSearch(const ::milvus::proto::milvus::SearchRequest* r,
                     &schema,
                     &all_index);
     CHECK_STATUS(task.Process(&plan, &placeholder_group, &nqs, &topks), "");
+    if (task.GetMetric() == kMetricsBM25Name) {
+        auto [token_count, doc_count] = milvus_local_.GetBM25TokenAndDocCount(
+            schema.name(), task.GetAnnFieldName());
+        milvus::proto::common::PlaceholderGroup ph_group;
+        if (!ph_group.ParseFromString(placeholder_group)) {
+            return Status::ServiceInternal("Parse placeholder failed");
+        }
+        for (int i = 0; i < ph_group.placeholders(0).values_size(); i++) {
+            auto vec = ph_group.mutable_placeholders(0)->mutable_values(i);
+            auto pos = vec->data();
+            auto end = vec->data() + vec->size();
+            for (; pos < end; pos += 8) {
+                const uint32_t token = *(reinterpret_cast<uint32_t*>(pos));
+                const float freq = *(reinterpret_cast<float*>(pos + 4));
+                auto nq = milvus_local_.GetTokenNQ(
+                    schema.name(), task.GetAnnFieldName(), token);
+                *(reinterpret_cast<float*>(pos + 4)) =
+                    freq * log(1 + (float(doc_count) - float(nq) + 0.5) /
+                                       (float(nq) + 0.5));
+            }
+        }
+        placeholder_group = ph_group.SerializeAsString();
+        auto params_str = plan.mutable_vector_anns()
+                              ->mutable_query_info()
+                              ->mutable_search_params();
+
+        auto params = nlohmann::json::parse(params_str->c_str());
+        if (token_count == 0 || doc_count == 0) {
+            params[kBM25AvgName] = 0;
+        } else {
+            params[kBM25AvgName] = float(token_count) / float(doc_count);
+        }
+        params_str->assign(params.dump());
+    }
     RecordEvent("ParseProto");
     SearchResult result(nqs, topks);
     CHECK_STATUS(milvus_local_.Search(r->collection_name(),
@@ -476,10 +404,13 @@ MilvusProxy::Delete(const ::milvus::proto::milvus::DeleteRequest* r,
         }
     }
     if (storage_ids.size() != 0) {
-        CHECK_STATUS(
-            milvus_local_.DeleteByIds(
-                r->collection_name(), ids_str, storage_ids.size(), storage_ids),
-            "");
+        auto bm25_fields = schema_util::GetBM25SparseField(schema);
+        CHECK_STATUS(milvus_local_.DeleteByIds(r->collection_name(),
+                                               ids_str,
+                                               storage_ids.size(),
+                                               storage_ids,
+                                               bm25_fields),
+                     "");
     }
     response->set_delete_cnt(storage_ids.size());
     return Status::Ok();

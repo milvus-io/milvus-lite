@@ -71,6 +71,11 @@ class CollectionData final : NonCopyableNonMovable {
     // const char*
     // get(SQLite::Database* db, const std::string& milvus_id);
 
+    bool
+    GetByIDs(SQLite::Database* db,
+             const std::vector<std::string>& milvus_ids,
+             std::vector<Row>* rows);
+
     void
     Load(SQLite::Database* db,
          int64_t start,

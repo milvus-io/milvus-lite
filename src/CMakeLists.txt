@@ -14,9 +14,10 @@
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 add_library(milite ${LITE_BUILD_TYPE}
-  ${CMAKE_CURRENT_LIST_DIR}/collection_meta.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/collection_data.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/storage.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/storage/collection_meta.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/storage/collection_data.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/storage/bm25_stats.cpp  
+  ${CMAKE_CURRENT_LIST_DIR}/storage/storage.cpp
   ${CMAKE_CURRENT_LIST_DIR}/timer.cpp
   ${CMAKE_CURRENT_LIST_DIR}/index.cpp
   ${CMAKE_CURRENT_LIST_DIR}/milvus_local.cpp
@@ -32,7 +33,8 @@ add_library(milite ${LITE_BUILD_TYPE}
   ${CMAKE_CURRENT_LIST_DIR}/schema_util.cpp
   ${CMAKE_CURRENT_LIST_DIR}/re_scorer.cpp
   ${CMAKE_CURRENT_LIST_DIR}/hybrid_search_task.cpp
-  #${CMAKE_CURRENT_LIST_DIR}/function.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/function/function_executor.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/function/bm25_function.cpp
 )
 
 target_link_libraries(

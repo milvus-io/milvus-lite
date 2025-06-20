@@ -20,11 +20,21 @@
 #include <vector>
 #include "collection_data.h"
 #include "collection_meta.h"
+#include "bm25_stats.h"
 
 namespace milvus::local {
 
 class CollectionMeta;
 class CollectionData;
+
+struct Stats {
+    Stats() = default;
+    ~Stats() = default;
+
+    std::map<uint32_t, int32_t> token_doc_count;
+    int32_t token_num = 0;
+    int32_t rows_num = 0;
+};
 
 class Storage final {
  public:
@@ -54,11 +64,11 @@ class Storage final {
     }
 
     /*
-     * @brief 读取collection数据
+     * * @brief Read collection data
      *
-     * @collection collection 名字
-     * @size 一次读取的数量
-     * @out_rows 输出, 如果out_rows的size小于参数的size，说明已经读取完
+     * @collection collection name
+     * @size The number of rows to read at a time
+     * @out_rows Output, if the size of out_rows is less than the size of the parameter, it means that the data has been read
      */
     bool
     LoadCollecton(const std::string& collection_name,
@@ -102,11 +112,14 @@ class Storage final {
 
     // data interface
     int
-    Insert(const std::string collection_name, const std::vector<Row>& rows);
+    Insert(const std::string collection_name,
+           const std::vector<Row>& rows,
+           const std::vector<std::string>& bm25_field_names);
 
     int
     Delete(const std::string collection_name,
-           const std::vector<std::string>& ids);
+           const std::vector<std::string>& ids,
+           const std::vector<std::string>& bm25_field_names);
 
     bool
     CollectionExist(const std::string& collection_name) {
@@ -116,9 +129,31 @@ class Storage final {
     int64_t
     Count(const std::string& collection_name);
 
+    std::pair<uint32_t, int32_t>
+    GetBM25TokenAndDocCount(const std::string& collection_name,
+                            const std::string& field_name) {
+        return bm25_stats_->GetTokenNumAndDocNum(
+            db_ptr_.get(), collection_name, field_name);
+    }
+
+    int32_t
+    GetTokenNQ(const std::string& collection_name,
+               const std::string& field_name,
+               uint32_t token) {
+        return bm25_stats_->GetTokenDocCount(
+            db_ptr_.get(), collection_name, field_name, token);
+    }
+
+ private:
+    bool
+    CollectBM25Stats(const std::vector<Row>& rows,
+                     const std::vector<std::string>& bm25_field_names,
+                     std::map<std::string, Stats>* stats);
+
  private:
     CollectionMeta cm_;
     std::map<const std::string, std::unique_ptr<CollectionData>> collections_;
+    std::unique_ptr<BM25Stats> bm25_stats_;
 
  private:
     std::unique_ptr<SQLite::Database> db_ptr_;
