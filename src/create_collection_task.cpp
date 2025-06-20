@@ -43,6 +43,14 @@ CreateCollectionTask::HasSystemFields(
 }
 
 Status
+CheckFieldParams(const ::milvus::proto::schema::FieldSchema& field) {
+    if (field.nullable()) {
+        return Status::ParameterInvalid("MilvusLite doesn't support nullable");
+    }
+    return Status::Ok();
+}
+
+Status
 CreateCollectionTask::GetVarcharFieldMaxLength(
     const ::milvus::proto::schema::FieldSchema& field, uint64_t* max_len) {
     if (field.data_type() != DType::VarChar &&
@@ -57,7 +65,8 @@ CreateCollectionTask::GetVarcharFieldMaxLength(
                 auto length = std::stoll(kv_pair.value());
                 if (length <= 0 || length > kMaxLengthLimit) {
                     return Status::ParameterInvalid(
-                        "the maximum length specified for a VarChar should be "
+                        "the maximum length specified for a VarChar should "
+                        "be "
                         "in (0, 65535])");
                 } else {
                     *max_len = static_cast<uint64_t>(length);
@@ -76,7 +85,8 @@ CreateCollectionTask::GetVarcharFieldMaxLength(
                 auto length = std::stoll(kv_pair.value());
                 if (length <= 0 || length > kMaxLengthLimit) {
                     return Status::ParameterInvalid(
-                        "the maximum length specified for a VarChar should be "
+                        "the maximum length specified for a VarChar should "
+                        "be "
                         "in (0, 65535])");
 
                     return Status::Ok();
@@ -276,7 +286,8 @@ VaildBM25Functions(const ::milvus::proto::schema::CollectionSchema& schema,
             if (field.data_type() !=
                 milvus::proto::schema::DataType::SparseFloatVector) {
                 return Status::ParameterInvalid(
-                    "BM25 funciton's output must be of SparseFloatVector type");
+                    "BM25 funciton's output must be of SparseFloatVector "
+                    "type");
             }
             if (field.nullable()) {
                 return Status::ParameterInvalid(
@@ -326,6 +337,7 @@ CreateCollectionTask::ValidateSchema(
             return Status::ParameterInvalid(
                 "cannot explicitly set a field as a dynamic field");
         }
+        CHECK_STATUS(CheckFieldParams(field_schema), "");
         CHECK_STATUS(CheckFieldName(field_schema.name()), "");
         if (field_schema.data_type() == DType::VarChar) {
             uint64_t max_length = 0;
