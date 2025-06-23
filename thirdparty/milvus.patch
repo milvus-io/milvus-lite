@@ -246,19 +246,6 @@ index fce14d393b..6ee06daa2b 100644
  
  void
  initTelemetry(const TraceConfig& cfg);
-diff --git a/internal/core/src/index/JsonInvertedIndex.cpp b/internal/core/src/index/JsonInvertedIndex.cpp
-index 569819b443..d15dcb7d5c 100644
---- a/internal/core/src/index/JsonInvertedIndex.cpp
-+++ b/internal/core/src/index/JsonInvertedIndex.cpp
-@@ -137,7 +137,7 @@ JsonInvertedIndex<T>::build_index_for_json(
-                 } else {
-                     auto array_values = array_res.value();
-                     for (auto value : array_values) {
--                        auto val = value.get<SIMDJSON_T>();
-+                        auto val = value.template get<SIMDJSON_T>();
- 
-                         if (val.error() == simdjson::SUCCESS) {
-                             values.push_back(static_cast<T>(val.value()));
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
 index b88211bb87..a158becd37 100644
 --- a/internal/core/src/storage/CMakeLists.txt
@@ -363,10 +350,10 @@ index 85ec72152c..f0dbee476c 100644
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index 6520e9cc51..ba74b606db 100644
+index f06d350ed9..858d01874f 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
 +++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
-@@ -22,6 +22,8 @@ message(STATUS "Knowhere repo: ${GIT_REPOSITORY}")
+@@ -22,6 +22,8 @@ message(STATUS "Knowhere version: ${KNOWHERE_VERSION}")
  message(STATUS "Building knowhere-${KNOWHERE_SOURCE_VER} from source")
  message(STATUS ${CMAKE_BUILD_TYPE})
  
@@ -375,12 +362,7 @@ index 6520e9cc51..ba74b606db 100644
  if ( BUILD_DISK_ANN STREQUAL "ON" )
      set(WITH_DISKANN ON CACHE BOOL "" FORCE )
  else ()
-
-diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index 745842432..3750f8c39 100644
---- a/internal/core/thirdparty/knowhere/CMakeLists.txt
-+++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
-@@ -43,12 +43,35 @@ FetchContent_Declare(
+@@ -45,12 +47,35 @@ FetchContent_Declare(
          GIT_TAG         ${KNOWHERE_VERSION}
          SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
          BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
@@ -417,3 +399,15 @@ index 745842432..3750f8c39 100644
      # Adding the following target:
      # knowhere
      add_subdirectory( ${knowhere_SOURCE_DIR}
+diff --git a/internal/core/thirdparty/tantivy/tokenizer.h b/internal/core/thirdparty/tantivy/tokenizer.h
+index c4be0ee314..79536f1c7d 100644
+--- a/internal/core/thirdparty/tantivy/tokenizer.h
++++ b/internal/core/thirdparty/tantivy/tokenizer.h
+@@ -5,6 +5,7 @@
+ #include "rust-hashmap.h"
+ #include "tantivy/rust-array.h"
+ #include "token-stream.h"
++#include "common/EasyAssert.h"
+ 
+ namespace milvus::tantivy {
+ 
