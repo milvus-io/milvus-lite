@@ -88,8 +88,6 @@ CreateCollectionTask::GetVarcharFieldMaxLength(
                         "the maximum length specified for a VarChar should "
                         "be "
                         "in (0, 65535])");
-
-                    return Status::Ok();
                 } else {
                     *max_len = static_cast<uint64_t>(length);
                     return Status::Ok();
@@ -109,7 +107,7 @@ bool
 CreateCollectionTask::CheckDefaultValue(
     const ::milvus::proto::schema::CollectionSchema& schema) {
     for (const auto& f : schema.fields()) {
-        if (!f.has_default_value() || !f.has_default_value())
+        if (!f.has_default_value())
             continue;
         switch (f.default_value().data_case()) {
             case DCase::kBoolData:
