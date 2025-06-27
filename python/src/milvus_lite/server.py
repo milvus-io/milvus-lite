@@ -91,10 +91,15 @@ class Server:
         try:
             fcntl.lockf(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             start_env = {
-                    "LD_LIBRARY_PATH": str(self._bin_path),
-                    "DYLD_LIBRARY_PATH": str(self._bin_path)
+                    "LD_LIBRARY_PATH": str(self._bin_path) + ':' + os.environ.get('LD_LIBRARY_PATH', ''),
+                    "DYLD_LIBRARY_PATH": str(self._bin_path) + ':' + os.environ.get('LD_LIBRARY_PATH', '')
             }
-            start_env.update(os.environ.copy())
+            src_env = os.environ.copy()
+            if "LD_LIBRARY_PATH" in src_env:
+                del src_env["LD_LIBRARY_PATH"]
+            if "DYLD_LIBRARY_PATH" in src_env:
+                del src_env["DYLD_LIBRARY_PATH"]
+            start_env.update(src_env)
             self._p = subprocess.Popen(
                 args=self.args,
                 env=start_env,
