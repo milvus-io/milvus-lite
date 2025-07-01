@@ -131,3 +131,7 @@ dmypy.json
 .pyre/
 *.db
 compile_commands.json
+
+# CLion
+.idea/
+cmake-build-debug/

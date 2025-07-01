@@ -217,13 +217,13 @@ InsertTask::CheckOrSetVectorDim() {
             }
             int vect_size = field_data->vectors().float_vector().data_size();
             if (vect_size % dim != 0) {
-                return Status::Undefined(
+                return Status::ParameterInvalid(
                     "the length({}) of float data should divide the dim({})",
                     vect_size,
                     dim);
             }
 
-            int32_t vec_rows = vect_size / field_data->vectors().dim();
+            int64_t vec_rows = vect_size / dim;
 
             if (vec_rows != num_rows) {
                 return Status::ParameterInvalid(
