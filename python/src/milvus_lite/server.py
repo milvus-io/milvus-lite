@@ -92,7 +92,7 @@ class Server:
             fcntl.lockf(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             start_env = {
                     "LD_LIBRARY_PATH": str(self._bin_path) + ':' + os.environ.get('LD_LIBRARY_PATH', ''),
-                    "DYLD_LIBRARY_PATH": str(self._bin_path) + ':' + os.environ.get('LD_LIBRARY_PATH', '')
+                    "DYLD_LIBRARY_PATH": str(self._bin_path) + ':' + os.environ.get('DYLD_LIBRARY_PATH', '')
             }
             src_env = os.environ.copy()
             if "LD_LIBRARY_PATH" in src_env:

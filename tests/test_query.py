@@ -27,6 +27,16 @@ class TestQuery(unittest.TestCase):
     def tearDown(self):
         self.milvus_client.drop_collection(self.collection_name)
 
+    def test_query_empty(self):
+        self.milvus_client.query(self.collection_name, limit=3)
+        rows = [
+            {'id': 1, 'vector': [0.0, 1], 'a': 100},
+        ]
+        insert_result = self.milvus_client.insert(self.collection_name, rows)
+        self.assertEqual(insert_result['insert_count'], 1)
+        self.milvus_client.delete(self.collection_name, ids=[1])
+        self.milvus_client.query(self.collection_name, limit=3)
+
     def test_query(self):
         rows = [
             {'id': 1, 'vector': [0.0, 1], 'a': 100},
