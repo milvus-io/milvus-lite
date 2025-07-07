@@ -22,7 +22,6 @@
 #include <tuple>
 #include <vector>
 #include "common.h"
-#include "function/bm25_stat.h"
 #include "function/function_executor.h"
 #include "log/Log.h"
 #include "pb/schema.pb.h"

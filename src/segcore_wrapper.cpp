@@ -198,6 +198,17 @@ SegcoreWrapper::Retrieve(const std::string& plan, RetrieveResult* result) {
         auto status = Status(::CreateRetrievePlanByExpr(
             collection_, plan.c_str(), plan.size(), &retrieve_plan.plan_));
         CHECK_STATUS(status, "Create retrieve plan failed, invalid expr");
+        if (::GetRowCount(segment_) == 0) {
+            milvus::proto::segcore::RetrieveResults empty_ret;
+            auto serialized_results = empty_ret.SerializeAsString();
+            result->retrieve_result_.proto_blob =
+                new uint8_t[serialized_results.size()];
+            std::memcpy(const_cast<void*>(result->retrieve_result_.proto_blob),
+                        serialized_results.data(),
+                        serialized_results.size());
+            result->retrieve_result_.proto_size = serialized_results.size();
+            return Status::Ok();
+        }
         auto job = ::AsyncRetrieve({},
                                    segment_,
                                    retrieve_plan.plan_,
