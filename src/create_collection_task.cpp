@@ -47,6 +47,11 @@ CheckFieldParams(const ::milvus::proto::schema::FieldSchema& field) {
     if (field.nullable()) {
         return Status::ParameterInvalid("MilvusLite doesn't support nullable");
     }
+    // Treat the partition key as a normal field
+    if (field.is_partition_key()) {
+        auto f = const_cast<::milvus::proto::schema::FieldSchema*>(&field);
+        f->set_is_partition_key(false);
+    }
     return Status::Ok();
 }
 
