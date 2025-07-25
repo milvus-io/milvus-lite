@@ -23,6 +23,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(COMPILER_SUPPORTS_CXX17 True)
+if(LINUX)
+  # When building for Linux, tell the dynamic loader to load shared libraries
+  # from executable's directory. This also prevents CMake from leaking build
+  # paths into the distributed executable.
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN")
+endif()
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 endif()
