@@ -12,3 +12,37 @@ index b7870adf..0d8fc16c 100644
      src/index/index_node_data_mock_wrapper.cc
      src/index/index_static.cc
      src/index/index.cc
+diff --git a/cmake/libs/libfaiss.cmake b/cmake/libs/libfaiss.cmake
+index 2756fb57..635358a3 100644
+--- a/cmake/libs/libfaiss.cmake
++++ b/cmake/libs/libfaiss.cmake
+@@ -113,6 +113,7 @@ endif()
+ 
+ if(LINUX)
+   set(BLA_VENDOR OpenBLAS)
++  find_path(BLAS_INCLUDE_DIRS cblas.h PATH_SUFFIXES openblas)
+ endif()
+ 
+ if(APPLE)
+@@ -168,6 +169,7 @@ if(__X86_64)
+     faiss PUBLIC OpenMP::OpenMP_CXX ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES}
+                  faiss_avx2 faiss_avx512 knowhere_utils)
+   target_compile_definitions(faiss PRIVATE FINTEGER=int)
++  target_include_directories(faiss PUBLIC ${BLAS_INCLUDE_DIRS})
+ endif()
+ 
+ if(__AARCH64)
+@@ -190,6 +192,7 @@ if(__AARCH64)
+   target_link_libraries(faiss PUBLIC OpenMP::OpenMP_CXX ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES}
+                                      knowhere_utils)
+   target_compile_definitions(faiss PRIVATE FINTEGER=int)
++  target_include_directories(faiss PUBLIC ${BLAS_INCLUDE_DIRS})
+ endif()
+ 
+ if(__PPC64)
+@@ -217,4 +220,5 @@ if(__PPC64)
+   target_link_libraries(faiss PUBLIC OpenMP::OpenMP_CXX ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES}
+                                       knowhere_utils)
+   target_compile_definitions(faiss PRIVATE FINTEGER=int)
++  target_include_directories(faiss PUBLIC ${BLAS_INCLUDE_DIRS})
+ endif()
