@@ -31,7 +31,7 @@
 #include "segcore/segment_c.h"
 #include "storage/storage_c.h"
 namespace milvus::local {
-std::string GetDataPath() {
+inline std::string GetDataPath() {
     const char* home = std::getenv("HOME");
     if (home == nullptr) {
         throw std::runtime_error("HOME environment variable is not set. Please set HOME environment variable.");
