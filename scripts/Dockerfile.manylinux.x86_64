@@ -15,7 +15,7 @@ FROM quay.io/pypa/manylinux_2_28_x86_64:2024.07.07-1
 RUN  yum install -y openblas-devel libatomic-static git && cp /usr/lib/gcc/x86_64-redhat-linux/8/libatomic.a /usr/lib64/
 ENV PATH="/opt/_internal/cpython-3.8.19/bin:${PATH}"
 RUN pip3 install conan==1.63.0
-RUN curl https://sh.rustup.rs -sSf | bash -s -- --default-toolchain=1.73 -y
+RUN curl https://sh.rustup.rs -sSf | bash -s -- --default-toolchain=1.89 -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN mkdir -p /workspace
