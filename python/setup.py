@@ -97,16 +97,20 @@ class CMakeBuild(_bdist_wheel):
         extdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env = os.environ
         env['LD_LIBRARY_PATH'] = os.path.join(build_temp, 'lib')
-        subprocess.call(['conan', 'remote', 'add', 'default-conan-local', 'https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local'],
-                              cwd=build_temp, env=env)
-        if sys.platform.lower() == 'linux':
-            subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release', '-s', 'compiler.libcxx=libstdc++11'],
-                                  cwd=build_temp, env=env)
+        if env.get('USE_SYSTEM_DEPS'):
+            system_deps = '-DUSE_SYSTEM_DEPS=ON'
         else:
-            # macos
-            subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
+            system_deps = '-DUSE_SYSTEM_DEPS=OFF'
+            subprocess.call(['conan', 'remote', 'add', 'default-conan-local', 'https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local'],
+                                  cwd=build_temp, env=env)
+            if sys.platform.lower() == 'linux':
+                subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release', '-s', 'compiler.libcxx=libstdc++11'],
+                                      cwd=build_temp, env=env)
+            else:
+                # macos
+                subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
         # build
-        subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF'], cwd=build_temp, env=env)
+        subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF', system_deps], cwd=build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.', '--', '-j4'],
                               cwd=build_temp,
                               env=env,

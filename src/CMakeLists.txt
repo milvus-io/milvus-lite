@@ -47,10 +47,10 @@ target_link_libraries(
   roaring::roaring
   SQLiteCpp
   ${antlr4-cppruntime_LIBRARIES}
-  marisa::marisa
+  ${MARISA_LIBRARIES}
   TBB::tbb
-  protobuf::protobuf
-  arrow::arrow
+  ${PROTOBUF_LIBRARIES}
+  ${ARROW_LIBRARIES}
   simdjson
   tantivy_binding
 )
