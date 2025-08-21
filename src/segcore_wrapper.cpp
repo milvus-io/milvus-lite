@@ -19,6 +19,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <vector>
 #include "common.h"
 #include "common/type_c.h"
