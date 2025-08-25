@@ -10,6 +10,7 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
+import shlex
 import sys
 import os
 import pathlib
@@ -110,8 +111,10 @@ class CMakeBuild(_bdist_wheel):
                 # macos
                 subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
         # build
-        subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF', system_deps], cwd=build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.', '--', '-j4'],
+        extra_cmake_args = shlex.split(env.get('CMAKE_ARGS', ''))
+        extra_build_args = shlex.split(env.get('BUILD_ARGS', ''))
+        subprocess.check_call(['cmake', extdir, '-DENABLE_UNIT_TESTS=OFF', system_deps, *extra_cmake_args], cwd=build_temp, env=env)
+        subprocess.check_call(['cmake', '--build', '.', '--', '-j4', *extra_build_args],
                               cwd=build_temp,
                               env=env,
                               )
