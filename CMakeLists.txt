@@ -17,8 +17,9 @@ project(milvus-lite)
 
 option(ENABLE_UNIT_TESTS "Enable unit tests" ON)
 message(STATUS "Enable testing: ${ENABLE_UNIT_TESTS}")
+option(USE_SYSTEM_DEPS "Build with system dependencies rather than Conan" OFF)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/ ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -87,11 +88,17 @@ include_directories(${SQLiteCpp_INCLUDE_DIRS})
 find_package(antlr4-runtime REQUIRED)
 include_directories(${antlr4-cppruntime_INCLUDES})
 
-find_package(Protobuf REQUIRED)
-include_directories(${protobuf_INCLUDE_DIRS})
-
+# note: gRPC needs to be included before protobuf when using system dependencies.
 find_package(gRPC REQUIRED)
 include_directories(${gRPC_INCLUDE_DIRS})
+
+find_package(Protobuf REQUIRED)
+if(USE_SYSTEM_DEPS)
+  set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
+else()
+  set(PROTOBUF_LIBRARIES protobuf::protobuf)
+  include_directories(${protobuf_INCLUDE_DIRS})
+endif()
 
 find_package(TBB REQUIRED)
 include_directories(${TBB_tbb_INCLUDE_DIRS})
@@ -118,7 +125,13 @@ find_package(gflags REQUIRED)
 include_directories(${gflags_INCLUDE_DIRS})
 
 find_package(Arrow REQUIRED)
-include_directories(${arrow_INCLUDE_DIRS})
+if(USE_SYSTEM_DEPS)
+  find_package(Parquet REQUIRED)
+  set(ARROW_LIBRARIES Arrow::arrow_shared Parquet::parquet_shared)
+else()
+  set(ARROW_LIBRARIES arrow::arrow)
+  include_directories(${arrow_INCLUDE_DIRS})
+endif()
 
 find_package(re2 REQUIRED)
 include_directories(${re2_INCLUDE_DIRS})
@@ -128,10 +141,21 @@ find_package(double-conversion REQUIRED)
 include_directories(${double-conversion_INCLUDE_DIRS})
 
 find_package(prometheus-cpp REQUIRED)
-include_directories(${prometheus-cpp_INCLUDE_DIRS})
+if(USE_SYSTEM_DEPS)
+  set(PROMETHEUS_CPP_TARGETS prometheus-cpp::pull)
+else()
+  set(PROMETHEUS_CPP_TARGETS prometheus-cpp::prometheus-cpp)
+  include_directories(${prometheus-cpp_INCLUDE_DIRS})
+endif()
 
-find_package(marisa REQUIRED)
-include_directories(${marisa_INCLUDE_DIRS})
+if(USE_SYSTEM_DEPS)
+  find_package(Marisa REQUIRED)
+  set(MARISA_LIBRARIES Marisa::marisa)
+else()
+  find_package(marisa REQUIRED)
+  set(MARISA_LIBRARIES marisa::marisa)
+  include_directories(${marisa_INCLUDE_DIRS})
+endif()
 
 find_package(yaml-cpp REQUIRED)
 include_directories(${yaml-cpp_INCLUDE_DIRS})
@@ -145,7 +169,9 @@ include_directories(${roaring_INCLUDE_DIRS})
 find_package(prometheus-cpp REQUIRED)
 include_directories(${prometheus-cpp_INCLUDE_DIRS})
 
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+if(NOT USE_SYSTEM_DEPS)
+  include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+endif()
 
 FetchContent_Declare(
   simdjson
@@ -352,7 +378,7 @@ target_link_libraries(
   milvus_core
   PUBLIC
   milvus_proto
-  prometheus-cpp::prometheus-cpp
+  ${PROMETHEUS_CPP_TARGET}
   knowhere
 )
 
