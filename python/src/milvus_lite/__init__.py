@@ -12,11 +12,16 @@
 
 
 from contextlib import suppress
-from pkg_resources import DistributionNotFound, get_distribution
+
+try:
+    # Python 3.8+
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:  # fallback for older Python (<3.8)
+    from importlib_metadata import version, PackageNotFoundError  # needs backport
 
 
 __version__ = "0.0.0.dev"
 
 
 with suppress(DistributionNotFound):
-    __version__ = get_distribution("milvus_lite").version
+    __version__ = version("milvus_lite")
