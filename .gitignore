@@ -135,3 +135,6 @@ compile_commands.json
 # CLion
 .idea/
 cmake-build-debug/
+
+# Claude Code
+CLAUDE.md
