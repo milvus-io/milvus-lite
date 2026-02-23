@@ -22,6 +22,14 @@ namespace milvus::local {
 
 namespace {
 
+std::string
+Trim(const std::string& s) {
+    auto start = s.find_first_not_of(" \t\n\r");
+    if (start == std::string::npos)
+        return "";
+    return s.substr(start, s.find_last_not_of(" \t\n\r") - start + 1);
+}
+
 struct NullCheckInfo {
     std::string field_name;
     bool is_not_null;
@@ -37,15 +45,20 @@ ContainsNullCheck(const std::string& expr) {
 
 std::optional<NullCheckInfo>
 TryParseNullCheck(const std::string& fragment) {
+    std::string input = Trim(fragment);
+    while (input.size() >= 2 && input.front() == '(' && input.back() == ')') {
+        input = Trim(input.substr(1, input.size() - 2));
+    }
+
     static const std::regex kNotNull(
         R"(^\s*(\w+)\s+[iI][sS]\s+[nN][oO][tT]\s+[nN][uU][lL][lL]\s*$)");
     static const std::regex kNull(
         R"(^\s*(\w+)\s+[iI][sS]\s+[nN][uU][lL][lL]\s*$)");
 
     std::smatch m;
-    if (std::regex_match(fragment, m, kNotNull))
+    if (std::regex_match(input, m, kNotNull))
         return NullCheckInfo{m[1].str(), true};
-    if (std::regex_match(fragment, m, kNull))
+    if (std::regex_match(input, m, kNull))
         return NullCheckInfo{m[1].str(), false};
     return std::nullopt;
 }
@@ -72,14 +85,6 @@ struct Fragment {
     std::string text;
     LogicalConn conn;
 };
-
-std::string
-Trim(const std::string& s) {
-    auto start = s.find_first_not_of(" \t\n\r");
-    if (start == std::string::npos)
-        return "";
-    return s.substr(start, s.find_last_not_of(" \t\n\r") - start + 1);
-}
 
 std::vector<Fragment>
 SplitTopLevelLogical(const std::string& expr) {
@@ -217,25 +222,36 @@ ParserToMessage(milvus::proto::schema::CollectionSchema& schema,
     auto helper = CreateSchemaHelper(&schema);
     auto frags = SplitTopLevelLogical(exprstr);
 
-    std::string result;
-    for (size_t i = 0; i < frags.size(); i++) {
-        std::string part_ser;
-        auto null_info = TryParseNullCheck(frags[i].text);
+    std::vector<std::string> parsed;
+    for (auto& frag : frags) {
+        auto null_info = TryParseNullCheck(frag.text);
         if (null_info) {
             auto& field = helper.GetFieldFromName(null_info->field_name);
             auto op = null_info->is_not_null
                           ? proto::plan::NullExpr_NullOp_IsNotNull
                           : proto::plan::NullExpr_NullOp_IsNull;
-            part_ser = BuildNullExprSerialized(field, op);
+            parsed.push_back(BuildNullExprSerialized(field, op));
         } else {
-            part_ser = ParseFragmentWithAntlr(schema, helper, frags[i].text);
+            parsed.push_back(ParseFragmentWithAntlr(schema, helper, frag.text));
         }
+    }
 
-        if (i == 0) {
-            result = std::move(part_ser);
+    // AND binds tighter than OR: collapse AND-connected fragments first
+    std::vector<std::string> or_operands;
+    std::string current = parsed[0];
+    for (size_t i = 1; i < frags.size(); i++) {
+        if (frags[i].conn == LogicalConn::AND) {
+            current = CombineWithBinaryOp(current, parsed[i], LogicalConn::AND);
         } else {
-            result = CombineWithBinaryOp(result, part_ser, frags[i].conn);
+            or_operands.push_back(std::move(current));
+            current = parsed[i];
         }
+    }
+    or_operands.push_back(std::move(current));
+
+    std::string result = or_operands[0];
+    for (size_t i = 1; i < or_operands.size(); i++) {
+        result = CombineWithBinaryOp(result, or_operands[i], LogicalConn::OR);
     }
     return result;
 }

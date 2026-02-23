@@ -151,6 +151,31 @@ TEST(DecompactFieldData, AllNulls) {
 }
 
 // ---------------------------------------------------------------------------
+// GetFieldDataCount
+// ---------------------------------------------------------------------------
+
+TEST(GetFieldDataCount, BFloat16VectorUsesCorrectAccessor) {
+    ::milvus::proto::schema::FieldData fd;
+    fd.set_type(DType::BFloat16Vector);
+    fd.mutable_vectors()->set_dim(4);
+    // 2 rows of dim=4 bfloat16 => 2 * 4 * 2 = 16 bytes
+    std::string data(16, '\0');
+    fd.mutable_vectors()->set_bfloat16_vector(data);
+
+    EXPECT_EQ(schema_util::GetFieldDataCount(fd), 2);
+}
+
+TEST(GetFieldDataCount, Float16VectorUsesCorrectAccessor) {
+    ::milvus::proto::schema::FieldData fd;
+    fd.set_type(DType::Float16Vector);
+    fd.mutable_vectors()->set_dim(4);
+    std::string data(16, '\0');
+    fd.mutable_vectors()->set_float16_vector(data);
+
+    EXPECT_EQ(schema_util::GetFieldDataCount(fd), 2);
+}
+
+// ---------------------------------------------------------------------------
 // PickFieldDataByIndex - valid_data propagation
 // ---------------------------------------------------------------------------
 
@@ -235,8 +260,7 @@ TEST(SliceFieldData, PropagatesValidData) {
 
     ::milvus::proto::schema::FieldData dst;
     dst.set_type(DType::Int64);
-    // Slice [1:3)
-    std::vector<std::tuple<int64_t, int64_t>> ranges = {{1, 3}};
+    std::vector<std::tuple<int64_t, int64_t>> ranges = {{1, 2}};
     ASSERT_TRUE(schema_util::SliceFieldData(src, ranges, &dst));
 
     EXPECT_EQ(dst.scalars().long_data().data_size(), 2);

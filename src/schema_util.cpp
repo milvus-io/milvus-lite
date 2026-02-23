@@ -97,7 +97,7 @@ GetField(const ::milvus::proto::schema::FieldData& field_data,
     return nullptr;
 }
 
-static int64_t
+int64_t
 GetFieldDataCount(const ::milvus::proto::schema::FieldData& fd) {
     switch (fd.type()) {
         case DType::Bool:
@@ -132,13 +132,21 @@ GetFieldDataCount(const ::milvus::proto::schema::FieldData& fd) {
                              bytes_per_row
                        : 0;
         }
-        case DType::Float16Vector:
-        case DType::BFloat16Vector: {
+        case DType::Float16Vector: {
             int64_t dim = fd.vectors().dim();
             int64_t bytes_per_row = dim * 2;
             return bytes_per_row > 0
                        ? static_cast<int64_t>(
                              fd.vectors().float16_vector().size()) /
+                             bytes_per_row
+                       : 0;
+        }
+        case DType::BFloat16Vector: {
+            int64_t dim = fd.vectors().dim();
+            int64_t bytes_per_row = dim * 2;
+            return bytes_per_row > 0
+                       ? static_cast<int64_t>(
+                             fd.vectors().bfloat16_vector().size()) /
                              bytes_per_row
                        : 0;
         }
