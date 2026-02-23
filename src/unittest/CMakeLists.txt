@@ -83,6 +83,20 @@ add_test(
   NAME bm25_function_test
   COMMAND $<TARGET_FILE:bm25_function_test>
 )
+
+add_executable(
+  nullable_test
+  nullable_test.cpp
+)
+target_link_libraries(nullable_test
+  PRIVATE
+  ${MILVUS_LOCAL_TEST_DEPS}
+)
+
+add_test(
+  NAME nullable_test
+  COMMAND $<TARGET_FILE:nullable_test>
+)
 add_test(
   NAME server_test
   COMMAND $<TARGET_FILE:server_test>

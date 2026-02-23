@@ -55,13 +55,15 @@ CollectionMeta::LoadMeta(SQLite::Database* db) {
             }
             auto meta_type = query.getColumn(2).getString();
             if (meta_type == kSchemaStr) {
-                auto info =
-                    static_cast<const char*>(query.getColumn(3).getBlob());
+                auto col = query.getColumn(3);
+                std::string info(static_cast<const char*>(col.getBlob()),
+                                 col.getBytes());
                 auto pk_name = query.getColumn(4).getString();
                 collections_[collection_name]->AddSchema(info, pk_name);
             } else if (meta_type == kIndexStr) {
-                auto info =
-                    static_cast<const char*>(query.getColumn(3).getBlob());
+                auto col = query.getColumn(3);
+                std::string info(static_cast<const char*>(col.getBlob()),
+                                 col.getBytes());
                 auto index_name = query.getColumn(4).getString();
                 collections_[collection_name]->AddIndex(index_name, info);
             } else {
@@ -108,7 +110,7 @@ CollectionMeta::CreateCollection(SQLite::Database* db,
                                  const std::string& pk_name,
                                  const std::string& schema_proto) {
     collections_.emplace(collection_name, std::make_unique<CollectionInfo>());
-    collections_[collection_name]->AddSchema(schema_proto.c_str(), pk_name);
+    collections_[collection_name]->AddSchema(schema_proto, pk_name);
 
     // INSERT INTO {table_name} VALUES (NULL, {collection_name}, "schema", {data}, NULL)
     std::string insert_cmd = string_util::SFormat(
@@ -134,7 +136,7 @@ CollectionMeta::CreateIndex(SQLite::Database* db,
                             const std::string& index_name,
                             const std::string& index_proto) {
     // INSERT INTO {table_name} VALUES (NULL, {collection_name}, "schema", {data}, NULL)
-    collections_[collection_name]->AddIndex(index_name, index_proto.c_str());
+    collections_[collection_name]->AddIndex(index_name, index_proto);
     std::string insert_cmd = string_util::SFormat(
         "INSERT INTO {} VALUES (NULL, ?, 'index', ?, ?)", table_meta_name_);
     try {

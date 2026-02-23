@@ -44,8 +44,23 @@ CreateCollectionTask::HasSystemFields(
 
 Status
 CheckFieldParams(const ::milvus::proto::schema::FieldSchema& field) {
-    if (field.nullable()) {
-        return Status::ParameterInvalid("MilvusLite doesn't support nullable");
+    if (field.nullable() && field.is_primary_key()) {
+        return Status::ParameterInvalid(
+            "Primary key field {} cannot be nullable", field.name());
+    }
+    if (field.nullable() &&
+        (field.data_type() ==
+             ::milvus::proto::schema::DataType::FloatVector ||
+         field.data_type() ==
+             ::milvus::proto::schema::DataType::BinaryVector ||
+         field.data_type() ==
+             ::milvus::proto::schema::DataType::Float16Vector ||
+         field.data_type() ==
+             ::milvus::proto::schema::DataType::BFloat16Vector ||
+         field.data_type() ==
+             ::milvus::proto::schema::DataType::SparseFloatVector)) {
+        return Status::ParameterInvalid(
+            "Vector field {} cannot be nullable", field.name());
     }
     // Treat the partition key as a normal field
     if (field.is_partition_key()) {
