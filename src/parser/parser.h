@@ -1532,6 +1532,40 @@ class PlanCCVisitor : public PlanVisitor {
         return ExprWithDtype(expr, proto::schema::DataType::Bool, false);
     }
 
+    virtual std::any
+    visitIsNull(PlanParser::IsNullContext* ctx) override {
+        auto info =
+            getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
+        TRY_WITH_EXCEPTION(info != nullptr);
+        info->set_nullable(true);
+        auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
+            this->arena.get());
+        auto null_expr =
+            google::protobuf::Arena::CreateMessage<proto::plan::NullExpr>(
+                this->arena.get());
+        null_expr->unsafe_arena_set_allocated_column_info(info);
+        null_expr->set_op(proto::plan::NullExpr_NullOp_IsNull);
+        expr->unsafe_arena_set_allocated_null_expr(null_expr);
+        return ExprWithDtype(expr, proto::schema::DataType::Bool, false);
+    }
+
+    virtual std::any
+    visitIsNotNull(PlanParser::IsNotNullContext* ctx) override {
+        auto info =
+            getChildColumnInfo(ctx->Identifier(), ctx->JSONIdentifier());
+        TRY_WITH_EXCEPTION(info != nullptr);
+        info->set_nullable(true);
+        auto expr = google::protobuf::Arena::CreateMessage<proto::plan::Expr>(
+            this->arena.get());
+        auto null_expr =
+            google::protobuf::Arena::CreateMessage<proto::plan::NullExpr>(
+                this->arena.get());
+        null_expr->unsafe_arena_set_allocated_column_info(info);
+        null_expr->set_op(proto::plan::NullExpr_NullOp_IsNotNull);
+        expr->unsafe_arena_set_allocated_null_expr(null_expr);
+        return ExprWithDtype(expr, proto::schema::DataType::Bool, false);
+    }
+
     PlanCCVisitor(SchemaHelper* const helper)
         : helper(helper), arena(std::make_shared<google::protobuf::Arena>()) {
     }

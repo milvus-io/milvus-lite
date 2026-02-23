@@ -168,6 +168,18 @@ DecompactFieldData(::milvus::proto::schema::FieldData* fd) {
         return true;
     }
 
+    int64_t num_true = 0;
+    for (int64_t i = 0; i < num_valid; i++) {
+        if (fd->valid_data(i))
+            num_true++;
+    }
+    if (num_true != data_count) {
+        LOG_ERROR("DecompactFieldData: field '{}' valid_data true count ({}) "
+                  "does not match physical data count ({})",
+                  fd->field_name(), num_true, data_count);
+        return false;
+    }
+
     int64_t phys = 0;
     switch (fd->type()) {
         case DType::Bool: {

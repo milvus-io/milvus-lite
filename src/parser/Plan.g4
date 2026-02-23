@@ -31,7 +31,9 @@ expr:
 	| expr BOR expr											                     # BitOr
 	| expr AND expr											                     # LogicalAnd
 	| expr OR expr											                     # LogicalOr
-	| EXISTS expr                                                                # Exists;
+	| EXISTS expr                                                                # Exists
+	| (Identifier | JSONIdentifier) ISNULL                                       # IsNull
+	| (Identifier | JSONIdentifier) ISNOTNULL                                    # IsNotNull;
 
 // typeName: ty = (BOOL | INT8 | INT16 | INT32 | INT64 | FLOAT | DOUBLE);
 
@@ -67,6 +69,9 @@ BXOR: '^';
 
 AND: '&&' | 'and';
 OR: '||' | 'or';
+
+ISNULL: 'is null' | 'IS NULL';
+ISNOTNULL: 'is not null' | 'IS NOT NULL';
 
 BNOT: '~';
 NOT: '!' | 'not';

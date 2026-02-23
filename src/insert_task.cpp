@@ -72,36 +72,44 @@ InsertTask::AddSystemField() {
 }
 
 static void
-FillPlaceholderValues(::milvus::proto::schema::FieldData* fd,
-                      const ::milvus::proto::schema::FieldSchema& field,
-                      uint32_t count) {
+FillFieldValues(::milvus::proto::schema::FieldData* fd,
+                const ::milvus::proto::schema::FieldSchema& field,
+                uint32_t count) {
+    bool has_dv = field.has_default_value();
+    const auto& dv = field.default_value();
     switch (field.data_type()) {
         case DType::Bool:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_bool_data()->add_data(false);
+                fd->mutable_scalars()->mutable_bool_data()->add_data(
+                    has_dv ? dv.bool_data() : false);
             break;
         case DType::Int8:
         case DType::Int16:
         case DType::Int32:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_int_data()->add_data(0);
+                fd->mutable_scalars()->mutable_int_data()->add_data(
+                    has_dv ? dv.int_data() : 0);
             break;
         case DType::Int64:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_long_data()->add_data(0);
+                fd->mutable_scalars()->mutable_long_data()->add_data(
+                    has_dv ? dv.long_data() : 0);
             break;
         case DType::Float:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_float_data()->add_data(0.0f);
+                fd->mutable_scalars()->mutable_float_data()->add_data(
+                    has_dv ? dv.float_data() : 0.0f);
             break;
         case DType::Double:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_double_data()->add_data(0.0);
+                fd->mutable_scalars()->mutable_double_data()->add_data(
+                    has_dv ? dv.double_data() : 0.0);
             break;
         case DType::String:
         case DType::VarChar:
             for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_string_data()->add_data("");
+                fd->mutable_scalars()->mutable_string_data()->add_data(
+                    has_dv ? dv.string_data() : "");
             break;
         case DType::JSON:
             for (uint32_t i = 0; i < count; i++)
@@ -162,50 +170,6 @@ ApplyDefaultForInvalid(::milvus::proto::schema::FieldData* fd,
     }
 }
 
-static void
-FillDefaultValue(::milvus::proto::schema::FieldData* fd,
-                 const ::milvus::proto::schema::FieldSchema& field,
-                 uint32_t count) {
-    const auto& dv = field.default_value();
-    switch (field.data_type()) {
-        case DType::Bool:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_bool_data()->add_data(
-                    dv.bool_data());
-            break;
-        case DType::Int8:
-        case DType::Int16:
-        case DType::Int32:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_int_data()->add_data(
-                    dv.int_data());
-            break;
-        case DType::Int64:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_long_data()->add_data(
-                    dv.long_data());
-            break;
-        case DType::Float:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_float_data()->add_data(
-                    dv.float_data());
-            break;
-        case DType::Double:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_double_data()->add_data(
-                    dv.double_data());
-            break;
-        case DType::String:
-        case DType::VarChar:
-            for (uint32_t i = 0; i < count; i++)
-                fd->mutable_scalars()->mutable_string_data()->add_data(
-                    dv.string_data());
-            break;
-        default:
-            break;
-    }
-}
-
 bool
 InsertTask::GenFieldMap() {
     for (const auto& field : insert_request_->fields_data()) {
@@ -241,14 +205,11 @@ InsertTask::GenFieldMap() {
                 synth->set_field_name(field.name());
                 synth->set_field_id(field.fieldid());
                 synth->set_type(field.data_type());
-                if (field.has_default_value()) {
-                    FillDefaultValue(synth, field, num_rows_);
+                FillFieldValues(synth, field, num_rows_);
+                if (field.nullable()) {
+                    bool valid = field.has_default_value();
                     for (uint32_t i = 0; i < num_rows_; i++)
-                        synth->add_valid_data(true);
-                } else {
-                    FillPlaceholderValues(synth, field, num_rows_);
-                    for (uint32_t i = 0; i < num_rows_; i++)
-                        synth->add_valid_data(false);
+                        synth->add_valid_data(valid);
                 }
                 field_data_map_.emplace(field.name(), synth);
             } else {
@@ -311,6 +272,12 @@ InsertTask::Process(Rows* rows) {
     for (int i = 0; i < insert_request_->fields_data_size(); i++) {
         auto* fd = insert_request_->mutable_fields_data(i);
         if (fd->valid_data_size() > 0) {
+            if (schema_util::IsVectorField(fd->type())) {
+                LOG_ERROR("Nullable vectors are not supported: field '{}'",
+                          fd->field_name());
+                return Status::ParameterInvalid(
+                    "nullable vectors are not supported");
+            }
             if (!schema_util::DecompactFieldData(fd)) {
                 LOG_ERROR("Failed to decompact field {}", fd->field_name());
                 return Status::ParameterInvalid();

@@ -1,5 +1,5 @@
 
-// Generated from Plan.g4 by ANTLR 4.13.1
+// Generated from Plan.g4 by ANTLR 4.13.2
 
 #pragma once
 
@@ -30,6 +30,8 @@ public:
     virtual std::any visitJSONContainsAll(PlanParser::JSONContainsAllContext *context) = 0;
 
     virtual std::any visitLogicalOr(PlanParser::LogicalOrContext *context) = 0;
+
+    virtual std::any visitIsNotNull(PlanParser::IsNotNullContext *context) = 0;
 
     virtual std::any visitMulDivMod(PlanParser::MulDivModContext *context) = 0;
 
@@ -76,6 +78,8 @@ public:
     virtual std::any visitBitAnd(PlanParser::BitAndContext *context) = 0;
 
     virtual std::any visitEmptyTerm(PlanParser::EmptyTermContext *context) = 0;
+
+    virtual std::any visitIsNull(PlanParser::IsNullContext *context) = 0;
 
     virtual std::any visitPower(PlanParser::PowerContext *context) = 0;
 

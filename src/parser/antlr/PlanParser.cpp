@@ -1,5 +1,5 @@
 
-// Generated from Plan.g4 by ANTLR 4.13.1
+// Generated from Plan.g4 by ANTLR 4.13.2
 
 
 #include "PlanVisitor.h"
@@ -40,7 +40,7 @@ struct PlanParserStaticData final {
 #if ANTLR4_USE_THREAD_LOCAL_CACHE
 static thread_local
 #endif
-PlanParserStaticData *planParserStaticData = nullptr;
+std::unique_ptr<PlanParserStaticData> planParserStaticData = nullptr;
 
 void planParserInitialize() {
 #if ANTLR4_USE_THREAD_LOCAL_CACHE
@@ -57,64 +57,67 @@ void planParserInitialize() {
     std::vector<std::string>{
       "", "'('", "')'", "'['", "','", "']'", "'<'", "'<='", "'>'", "'>='", 
       "'=='", "'!='", "", "", "'+'", "'-'", "'*'", "'/'", "'%'", "'**'", 
-      "'<<'", "'>>'", "'&'", "'|'", "'^'", "", "", "'~'", "", "'in'", "'not in'"
+      "'<<'", "'>>'", "'&'", "'|'", "'^'", "", "", "", "", "'~'", "", "'in'", 
+      "'not in'"
     },
     std::vector<std::string>{
       "", "", "", "", "", "", "LT", "LE", "GT", "GE", "EQ", "NE", "LIKE", 
       "EXISTS", "ADD", "SUB", "MUL", "DIV", "MOD", "POW", "SHL", "SHR", 
-      "BAND", "BOR", "BXOR", "AND", "OR", "BNOT", "NOT", "IN", "NIN", "EmptyTerm", 
-      "JSONContains", "JSONContainsAll", "JSONContainsAny", "ArrayContains", 
-      "ArrayContainsAll", "ArrayContainsAny", "ArrayLength", "BooleanConstant", 
-      "IntegerConstant", "FloatingConstant", "Identifier", "StringLiteral", 
-      "JSONIdentifier", "Whitespace", "Newline"
+      "BAND", "BOR", "BXOR", "AND", "OR", "ISNULL", "ISNOTNULL", "BNOT", 
+      "NOT", "IN", "NIN", "EmptyTerm", "JSONContains", "JSONContainsAll", 
+      "JSONContainsAny", "ArrayContains", "ArrayContainsAll", "ArrayContainsAny", 
+      "ArrayLength", "BooleanConstant", "IntegerConstant", "FloatingConstant", 
+      "Identifier", "StringLiteral", "JSONIdentifier", "Whitespace", "Newline"
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,46,129,2,0,7,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+  	4,1,48,133,2,0,7,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
   	0,1,0,1,0,5,0,18,8,0,10,0,12,0,21,9,0,1,0,3,0,24,8,0,1,0,1,0,1,0,1,0,
   	1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-  	0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,3,0,57,8,0,1,0,1,0,1,0,1,0,1,0,
+  	0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,3,0,61,8,0,1,0,
   	1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
   	0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,
-  	1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,5,0,111,8,0,10,0,12,0,
-  	114,9,0,1,0,3,0,117,8,0,1,0,1,0,1,0,1,0,1,0,5,0,124,8,0,10,0,12,0,127,
-  	9,0,1,0,0,1,0,1,0,0,13,2,0,14,15,27,28,2,0,32,32,35,35,2,0,33,33,36,36,
-  	2,0,34,34,37,37,2,0,42,42,44,44,1,0,16,18,1,0,14,15,1,0,20,21,1,0,6,7,
-  	1,0,8,9,1,0,6,9,1,0,10,11,1,0,29,30,160,0,56,1,0,0,0,2,3,6,0,-1,0,3,57,
-  	5,40,0,0,4,57,5,41,0,0,5,57,5,39,0,0,6,57,5,43,0,0,7,57,5,42,0,0,8,57,
-  	5,44,0,0,9,10,5,1,0,0,10,11,3,0,0,0,11,12,5,2,0,0,12,57,1,0,0,0,13,14,
-  	5,3,0,0,14,19,3,0,0,0,15,16,5,4,0,0,16,18,3,0,0,0,17,15,1,0,0,0,18,21,
-  	1,0,0,0,19,17,1,0,0,0,19,20,1,0,0,0,20,23,1,0,0,0,21,19,1,0,0,0,22,24,
-  	5,4,0,0,23,22,1,0,0,0,23,24,1,0,0,0,24,25,1,0,0,0,25,26,5,5,0,0,26,57,
-  	1,0,0,0,27,28,7,0,0,0,28,57,3,0,0,20,29,30,7,1,0,0,30,31,5,1,0,0,31,32,
-  	3,0,0,0,32,33,5,4,0,0,33,34,3,0,0,0,34,35,5,2,0,0,35,57,1,0,0,0,36,37,
-  	7,2,0,0,37,38,5,1,0,0,38,39,3,0,0,0,39,40,5,4,0,0,40,41,3,0,0,0,41,42,
-  	5,2,0,0,42,57,1,0,0,0,43,44,7,3,0,0,44,45,5,1,0,0,45,46,3,0,0,0,46,47,
-  	5,4,0,0,47,48,3,0,0,0,48,49,5,2,0,0,49,57,1,0,0,0,50,51,5,38,0,0,51,52,
-  	5,1,0,0,52,53,7,4,0,0,53,57,5,2,0,0,54,55,5,13,0,0,55,57,3,0,0,1,56,2,
-  	1,0,0,0,56,4,1,0,0,0,56,5,1,0,0,0,56,6,1,0,0,0,56,7,1,0,0,0,56,8,1,0,
-  	0,0,56,9,1,0,0,0,56,13,1,0,0,0,56,27,1,0,0,0,56,29,1,0,0,0,56,36,1,0,
-  	0,0,56,43,1,0,0,0,56,50,1,0,0,0,56,54,1,0,0,0,57,125,1,0,0,0,58,59,10,
-  	21,0,0,59,60,5,19,0,0,60,124,3,0,0,22,61,62,10,19,0,0,62,63,7,5,0,0,63,
-  	124,3,0,0,20,64,65,10,18,0,0,65,66,7,6,0,0,66,124,3,0,0,19,67,68,10,17,
-  	0,0,68,69,7,7,0,0,69,124,3,0,0,18,70,71,10,10,0,0,71,72,7,8,0,0,72,73,
-  	7,4,0,0,73,74,7,8,0,0,74,124,3,0,0,11,75,76,10,9,0,0,76,77,7,9,0,0,77,
-  	78,7,4,0,0,78,79,7,9,0,0,79,124,3,0,0,10,80,81,10,8,0,0,81,82,7,10,0,
-  	0,82,124,3,0,0,9,83,84,10,7,0,0,84,85,7,11,0,0,85,124,3,0,0,8,86,87,10,
-  	6,0,0,87,88,5,22,0,0,88,124,3,0,0,7,89,90,10,5,0,0,90,91,5,24,0,0,91,
-  	124,3,0,0,6,92,93,10,4,0,0,93,94,5,23,0,0,94,124,3,0,0,5,95,96,10,3,0,
-  	0,96,97,5,25,0,0,97,124,3,0,0,4,98,99,10,2,0,0,99,100,5,26,0,0,100,124,
-  	3,0,0,3,101,102,10,22,0,0,102,103,5,12,0,0,103,124,5,43,0,0,104,105,10,
-  	16,0,0,105,106,7,12,0,0,106,107,5,3,0,0,107,112,3,0,0,0,108,109,5,4,0,
-  	0,109,111,3,0,0,0,110,108,1,0,0,0,111,114,1,0,0,0,112,110,1,0,0,0,112,
-  	113,1,0,0,0,113,116,1,0,0,0,114,112,1,0,0,0,115,117,5,4,0,0,116,115,1,
-  	0,0,0,116,117,1,0,0,0,117,118,1,0,0,0,118,119,5,5,0,0,119,124,1,0,0,0,
-  	120,121,10,15,0,0,121,122,7,12,0,0,122,124,5,31,0,0,123,58,1,0,0,0,123,
-  	61,1,0,0,0,123,64,1,0,0,0,123,67,1,0,0,0,123,70,1,0,0,0,123,75,1,0,0,
-  	0,123,80,1,0,0,0,123,83,1,0,0,0,123,86,1,0,0,0,123,89,1,0,0,0,123,92,
-  	1,0,0,0,123,95,1,0,0,0,123,98,1,0,0,0,123,101,1,0,0,0,123,104,1,0,0,0,
-  	123,120,1,0,0,0,124,127,1,0,0,0,125,123,1,0,0,0,125,126,1,0,0,0,126,1,
-  	1,0,0,0,127,125,1,0,0,0,7,19,23,56,112,116,123,125
+  	1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,5,0,115,
+  	8,0,10,0,12,0,118,9,0,1,0,3,0,121,8,0,1,0,1,0,1,0,1,0,1,0,5,0,128,8,0,
+  	10,0,12,0,131,9,0,1,0,0,1,0,1,0,0,13,2,0,14,15,29,30,2,0,34,34,37,37,
+  	2,0,35,35,38,38,2,0,36,36,39,39,2,0,44,44,46,46,1,0,16,18,1,0,14,15,1,
+  	0,20,21,1,0,6,7,1,0,8,9,1,0,6,9,1,0,10,11,1,0,31,32,166,0,60,1,0,0,0,
+  	2,3,6,0,-1,0,3,61,5,42,0,0,4,61,5,43,0,0,5,61,5,41,0,0,6,61,5,45,0,0,
+  	7,61,5,44,0,0,8,61,5,46,0,0,9,10,5,1,0,0,10,11,3,0,0,0,11,12,5,2,0,0,
+  	12,61,1,0,0,0,13,14,5,3,0,0,14,19,3,0,0,0,15,16,5,4,0,0,16,18,3,0,0,0,
+  	17,15,1,0,0,0,18,21,1,0,0,0,19,17,1,0,0,0,19,20,1,0,0,0,20,23,1,0,0,0,
+  	21,19,1,0,0,0,22,24,5,4,0,0,23,22,1,0,0,0,23,24,1,0,0,0,24,25,1,0,0,0,
+  	25,26,5,5,0,0,26,61,1,0,0,0,27,28,7,0,0,0,28,61,3,0,0,22,29,30,7,1,0,
+  	0,30,31,5,1,0,0,31,32,3,0,0,0,32,33,5,4,0,0,33,34,3,0,0,0,34,35,5,2,0,
+  	0,35,61,1,0,0,0,36,37,7,2,0,0,37,38,5,1,0,0,38,39,3,0,0,0,39,40,5,4,0,
+  	0,40,41,3,0,0,0,41,42,5,2,0,0,42,61,1,0,0,0,43,44,7,3,0,0,44,45,5,1,0,
+  	0,45,46,3,0,0,0,46,47,5,4,0,0,47,48,3,0,0,0,48,49,5,2,0,0,49,61,1,0,0,
+  	0,50,51,5,40,0,0,51,52,5,1,0,0,52,53,7,4,0,0,53,61,5,2,0,0,54,55,5,13,
+  	0,0,55,61,3,0,0,3,56,57,7,4,0,0,57,61,5,27,0,0,58,59,7,4,0,0,59,61,5,
+  	28,0,0,60,2,1,0,0,0,60,4,1,0,0,0,60,5,1,0,0,0,60,6,1,0,0,0,60,7,1,0,0,
+  	0,60,8,1,0,0,0,60,9,1,0,0,0,60,13,1,0,0,0,60,27,1,0,0,0,60,29,1,0,0,0,
+  	60,36,1,0,0,0,60,43,1,0,0,0,60,50,1,0,0,0,60,54,1,0,0,0,60,56,1,0,0,0,
+  	60,58,1,0,0,0,61,129,1,0,0,0,62,63,10,23,0,0,63,64,5,19,0,0,64,128,3,
+  	0,0,24,65,66,10,21,0,0,66,67,7,5,0,0,67,128,3,0,0,22,68,69,10,20,0,0,
+  	69,70,7,6,0,0,70,128,3,0,0,21,71,72,10,19,0,0,72,73,7,7,0,0,73,128,3,
+  	0,0,20,74,75,10,12,0,0,75,76,7,8,0,0,76,77,7,4,0,0,77,78,7,8,0,0,78,128,
+  	3,0,0,13,79,80,10,11,0,0,80,81,7,9,0,0,81,82,7,4,0,0,82,83,7,9,0,0,83,
+  	128,3,0,0,12,84,85,10,10,0,0,85,86,7,10,0,0,86,128,3,0,0,11,87,88,10,
+  	9,0,0,88,89,7,11,0,0,89,128,3,0,0,10,90,91,10,8,0,0,91,92,5,22,0,0,92,
+  	128,3,0,0,9,93,94,10,7,0,0,94,95,5,24,0,0,95,128,3,0,0,8,96,97,10,6,0,
+  	0,97,98,5,23,0,0,98,128,3,0,0,7,99,100,10,5,0,0,100,101,5,25,0,0,101,
+  	128,3,0,0,6,102,103,10,4,0,0,103,104,5,26,0,0,104,128,3,0,0,5,105,106,
+  	10,24,0,0,106,107,5,12,0,0,107,128,5,45,0,0,108,109,10,18,0,0,109,110,
+  	7,12,0,0,110,111,5,3,0,0,111,116,3,0,0,0,112,113,5,4,0,0,113,115,3,0,
+  	0,0,114,112,1,0,0,0,115,118,1,0,0,0,116,114,1,0,0,0,116,117,1,0,0,0,117,
+  	120,1,0,0,0,118,116,1,0,0,0,119,121,5,4,0,0,120,119,1,0,0,0,120,121,1,
+  	0,0,0,121,122,1,0,0,0,122,123,5,5,0,0,123,128,1,0,0,0,124,125,10,17,0,
+  	0,125,126,7,12,0,0,126,128,5,33,0,0,127,62,1,0,0,0,127,65,1,0,0,0,127,
+  	68,1,0,0,0,127,71,1,0,0,0,127,74,1,0,0,0,127,79,1,0,0,0,127,84,1,0,0,
+  	0,127,87,1,0,0,0,127,90,1,0,0,0,127,93,1,0,0,0,127,96,1,0,0,0,127,99,
+  	1,0,0,0,127,102,1,0,0,0,127,105,1,0,0,0,127,108,1,0,0,0,127,124,1,0,0,
+  	0,128,131,1,0,0,0,129,127,1,0,0,0,129,130,1,0,0,0,130,1,1,0,0,0,131,129,
+  	1,0,0,0,7,19,23,60,116,120,127,129
   };
   staticData->serializedATN = antlr4::atn::SerializedATNView(serializedATNSegment, sizeof(serializedATNSegment) / sizeof(serializedATNSegment[0]));
 
@@ -126,7 +129,7 @@ void planParserInitialize() {
   for (size_t i = 0; i < count; i++) { 
     staticData->decisionToDFA.emplace_back(staticData->atn->getDecisionState(i), i);
   }
-  planParserStaticData = staticData.release();
+  planParserStaticData = std::move(staticData);
 }
 
 }
@@ -285,6 +288,29 @@ PlanParser::LogicalOrContext::LogicalOrContext(ExprContext *ctx) { copyFrom(ctx)
 std::any PlanParser::LogicalOrContext::accept(tree::ParseTreeVisitor *visitor) {
   if (auto parserVisitor = dynamic_cast<PlanVisitor*>(visitor))
     return parserVisitor->visitLogicalOr(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- IsNotNullContext ------------------------------------------------------------------
+
+tree::TerminalNode* PlanParser::IsNotNullContext::ISNOTNULL() {
+  return getToken(PlanParser::ISNOTNULL, 0);
+}
+
+tree::TerminalNode* PlanParser::IsNotNullContext::Identifier() {
+  return getToken(PlanParser::Identifier, 0);
+}
+
+tree::TerminalNode* PlanParser::IsNotNullContext::JSONIdentifier() {
+  return getToken(PlanParser::JSONIdentifier, 0);
+}
+
+PlanParser::IsNotNullContext::IsNotNullContext(ExprContext *ctx) { copyFrom(ctx); }
+
+
+std::any PlanParser::IsNotNullContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<PlanVisitor*>(visitor))
+    return parserVisitor->visitIsNotNull(this);
   else
     return visitor->visitChildren(this);
 }
@@ -881,6 +907,29 @@ std::any PlanParser::EmptyTermContext::accept(tree::ParseTreeVisitor *visitor) {
   else
     return visitor->visitChildren(this);
 }
+//----------------- IsNullContext ------------------------------------------------------------------
+
+tree::TerminalNode* PlanParser::IsNullContext::ISNULL() {
+  return getToken(PlanParser::ISNULL, 0);
+}
+
+tree::TerminalNode* PlanParser::IsNullContext::Identifier() {
+  return getToken(PlanParser::Identifier, 0);
+}
+
+tree::TerminalNode* PlanParser::IsNullContext::JSONIdentifier() {
+  return getToken(PlanParser::JSONIdentifier, 0);
+}
+
+PlanParser::IsNullContext::IsNullContext(ExprContext *ctx) { copyFrom(ctx); }
+
+
+std::any PlanParser::IsNullContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<PlanVisitor*>(visitor))
+    return parserVisitor->visitIsNull(this);
+  else
+    return visitor->visitChildren(this);
+}
 //----------------- PowerContext ------------------------------------------------------------------
 
 std::vector<PlanParser::ExprContext *> PlanParser::PowerContext::expr() {
@@ -930,262 +979,296 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
   try {
     size_t alt;
     enterOuterAlt(_localctx, 1);
-    setState(56);
+    setState(60);
     _errHandler->sync(this);
-    switch (_input->LA(1)) {
-      case PlanParser::IntegerConstant: {
-        _localctx = _tracker.createInstance<IntegerContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
+    switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 2, _ctx)) {
+    case 1: {
+      _localctx = _tracker.createInstance<IntegerContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
 
-        setState(3);
-        match(PlanParser::IntegerConstant);
-        break;
-      }
+      setState(3);
+      match(PlanParser::IntegerConstant);
+      break;
+    }
 
-      case PlanParser::FloatingConstant: {
-        _localctx = _tracker.createInstance<FloatingContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(4);
-        match(PlanParser::FloatingConstant);
-        break;
-      }
+    case 2: {
+      _localctx = _tracker.createInstance<FloatingContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(4);
+      match(PlanParser::FloatingConstant);
+      break;
+    }
 
-      case PlanParser::BooleanConstant: {
-        _localctx = _tracker.createInstance<BooleanContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(5);
-        match(PlanParser::BooleanConstant);
-        break;
-      }
+    case 3: {
+      _localctx = _tracker.createInstance<BooleanContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(5);
+      match(PlanParser::BooleanConstant);
+      break;
+    }
 
-      case PlanParser::StringLiteral: {
-        _localctx = _tracker.createInstance<StringContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(6);
-        match(PlanParser::StringLiteral);
-        break;
-      }
+    case 4: {
+      _localctx = _tracker.createInstance<StringContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(6);
+      match(PlanParser::StringLiteral);
+      break;
+    }
 
-      case PlanParser::Identifier: {
-        _localctx = _tracker.createInstance<IdentifierContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(7);
-        match(PlanParser::Identifier);
-        break;
-      }
+    case 5: {
+      _localctx = _tracker.createInstance<IdentifierContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(7);
+      match(PlanParser::Identifier);
+      break;
+    }
 
-      case PlanParser::JSONIdentifier: {
-        _localctx = _tracker.createInstance<JSONIdentifierContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(8);
-        match(PlanParser::JSONIdentifier);
-        break;
-      }
+    case 6: {
+      _localctx = _tracker.createInstance<JSONIdentifierContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(8);
+      match(PlanParser::JSONIdentifier);
+      break;
+    }
 
-      case PlanParser::T__0: {
-        _localctx = _tracker.createInstance<ParensContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(9);
-        match(PlanParser::T__0);
-        setState(10);
-        expr(0);
-        setState(11);
-        match(PlanParser::T__1);
-        break;
-      }
+    case 7: {
+      _localctx = _tracker.createInstance<ParensContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(9);
+      match(PlanParser::T__0);
+      setState(10);
+      expr(0);
+      setState(11);
+      match(PlanParser::T__1);
+      break;
+    }
 
-      case PlanParser::T__2: {
-        _localctx = _tracker.createInstance<ArrayContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(13);
-        match(PlanParser::T__2);
-        setState(14);
-        expr(0);
-        setState(19);
+    case 8: {
+      _localctx = _tracker.createInstance<ArrayContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(13);
+      match(PlanParser::T__2);
+      setState(14);
+      expr(0);
+      setState(19);
+      _errHandler->sync(this);
+      alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 0, _ctx);
+      while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
+        if (alt == 1) {
+          setState(15);
+          match(PlanParser::T__3);
+          setState(16);
+          expr(0); 
+        }
+        setState(21);
         _errHandler->sync(this);
         alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 0, _ctx);
-        while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
-          if (alt == 1) {
-            setState(15);
-            match(PlanParser::T__3);
-            setState(16);
-            expr(0); 
-          }
-          setState(21);
-          _errHandler->sync(this);
-          alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 0, _ctx);
-        }
-        setState(23);
-        _errHandler->sync(this);
-
-        _la = _input->LA(1);
-        if (_la == PlanParser::T__3) {
-          setState(22);
-          match(PlanParser::T__3);
-        }
-        setState(25);
-        match(PlanParser::T__4);
-        break;
       }
+      setState(23);
+      _errHandler->sync(this);
 
-      case PlanParser::ADD:
-      case PlanParser::SUB:
-      case PlanParser::BNOT:
-      case PlanParser::NOT: {
-        _localctx = _tracker.createInstance<UnaryContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(27);
-        antlrcpp::downCast<UnaryContext *>(_localctx)->op = _input->LT(1);
-        _la = _input->LA(1);
-        if (!((((_la & ~ 0x3fULL) == 0) &&
-          ((1ULL << _la) & 402702336) != 0))) {
-          antlrcpp::downCast<UnaryContext *>(_localctx)->op = _errHandler->recoverInline(this);
-        }
-        else {
-          _errHandler->reportMatch(this);
-          consume();
-        }
-        setState(28);
-        expr(20);
-        break;
-      }
-
-      case PlanParser::JSONContains:
-      case PlanParser::ArrayContains: {
-        _localctx = _tracker.createInstance<JSONContainsContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(29);
-        _la = _input->LA(1);
-        if (!(_la == PlanParser::JSONContains
-
-        || _la == PlanParser::ArrayContains)) {
-        _errHandler->recoverInline(this);
-        }
-        else {
-          _errHandler->reportMatch(this);
-          consume();
-        }
-        setState(30);
-        match(PlanParser::T__0);
-        setState(31);
-        expr(0);
-        setState(32);
+      _la = _input->LA(1);
+      if (_la == PlanParser::T__3) {
+        setState(22);
         match(PlanParser::T__3);
-        setState(33);
-        expr(0);
-        setState(34);
-        match(PlanParser::T__1);
-        break;
       }
+      setState(25);
+      match(PlanParser::T__4);
+      break;
+    }
 
-      case PlanParser::JSONContainsAll:
-      case PlanParser::ArrayContainsAll: {
-        _localctx = _tracker.createInstance<JSONContainsAllContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(36);
-        _la = _input->LA(1);
-        if (!(_la == PlanParser::JSONContainsAll
-
-        || _la == PlanParser::ArrayContainsAll)) {
-        _errHandler->recoverInline(this);
-        }
-        else {
-          _errHandler->reportMatch(this);
-          consume();
-        }
-        setState(37);
-        match(PlanParser::T__0);
-        setState(38);
-        expr(0);
-        setState(39);
-        match(PlanParser::T__3);
-        setState(40);
-        expr(0);
-        setState(41);
-        match(PlanParser::T__1);
-        break;
+    case 9: {
+      _localctx = _tracker.createInstance<UnaryContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(27);
+      antlrcpp::downCast<UnaryContext *>(_localctx)->op = _input->LT(1);
+      _la = _input->LA(1);
+      if (!((((_la & ~ 0x3fULL) == 0) &&
+        ((1ULL << _la) & 1610661888) != 0))) {
+        antlrcpp::downCast<UnaryContext *>(_localctx)->op = _errHandler->recoverInline(this);
       }
-
-      case PlanParser::JSONContainsAny:
-      case PlanParser::ArrayContainsAny: {
-        _localctx = _tracker.createInstance<JSONContainsAnyContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(43);
-        _la = _input->LA(1);
-        if (!(_la == PlanParser::JSONContainsAny
-
-        || _la == PlanParser::ArrayContainsAny)) {
-        _errHandler->recoverInline(this);
-        }
-        else {
-          _errHandler->reportMatch(this);
-          consume();
-        }
-        setState(44);
-        match(PlanParser::T__0);
-        setState(45);
-        expr(0);
-        setState(46);
-        match(PlanParser::T__3);
-        setState(47);
-        expr(0);
-        setState(48);
-        match(PlanParser::T__1);
-        break;
+      else {
+        _errHandler->reportMatch(this);
+        consume();
       }
+      setState(28);
+      expr(22);
+      break;
+    }
 
-      case PlanParser::ArrayLength: {
-        _localctx = _tracker.createInstance<ArrayLengthContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(50);
-        match(PlanParser::ArrayLength);
-        setState(51);
-        match(PlanParser::T__0);
-        setState(52);
-        _la = _input->LA(1);
-        if (!(_la == PlanParser::Identifier
+    case 10: {
+      _localctx = _tracker.createInstance<JSONContainsContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(29);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::JSONContains
 
-        || _la == PlanParser::JSONIdentifier)) {
-        _errHandler->recoverInline(this);
-        }
-        else {
-          _errHandler->reportMatch(this);
-          consume();
-        }
-        setState(53);
-        match(PlanParser::T__1);
-        break;
+      || _la == PlanParser::ArrayContains)) {
+      _errHandler->recoverInline(this);
       }
-
-      case PlanParser::EXISTS: {
-        _localctx = _tracker.createInstance<ExistsContext>(_localctx);
-        _ctx = _localctx;
-        previousContext = _localctx;
-        setState(54);
-        match(PlanParser::EXISTS);
-        setState(55);
-        expr(1);
-        break;
+      else {
+        _errHandler->reportMatch(this);
+        consume();
       }
+      setState(30);
+      match(PlanParser::T__0);
+      setState(31);
+      expr(0);
+      setState(32);
+      match(PlanParser::T__3);
+      setState(33);
+      expr(0);
+      setState(34);
+      match(PlanParser::T__1);
+      break;
+    }
+
+    case 11: {
+      _localctx = _tracker.createInstance<JSONContainsAllContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(36);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::JSONContainsAll
+
+      || _la == PlanParser::ArrayContainsAll)) {
+      _errHandler->recoverInline(this);
+      }
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(37);
+      match(PlanParser::T__0);
+      setState(38);
+      expr(0);
+      setState(39);
+      match(PlanParser::T__3);
+      setState(40);
+      expr(0);
+      setState(41);
+      match(PlanParser::T__1);
+      break;
+    }
+
+    case 12: {
+      _localctx = _tracker.createInstance<JSONContainsAnyContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(43);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::JSONContainsAny
+
+      || _la == PlanParser::ArrayContainsAny)) {
+      _errHandler->recoverInline(this);
+      }
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(44);
+      match(PlanParser::T__0);
+      setState(45);
+      expr(0);
+      setState(46);
+      match(PlanParser::T__3);
+      setState(47);
+      expr(0);
+      setState(48);
+      match(PlanParser::T__1);
+      break;
+    }
+
+    case 13: {
+      _localctx = _tracker.createInstance<ArrayLengthContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(50);
+      match(PlanParser::ArrayLength);
+      setState(51);
+      match(PlanParser::T__0);
+      setState(52);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::Identifier
+
+      || _la == PlanParser::JSONIdentifier)) {
+      _errHandler->recoverInline(this);
+      }
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(53);
+      match(PlanParser::T__1);
+      break;
+    }
+
+    case 14: {
+      _localctx = _tracker.createInstance<ExistsContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(54);
+      match(PlanParser::EXISTS);
+      setState(55);
+      expr(3);
+      break;
+    }
+
+    case 15: {
+      _localctx = _tracker.createInstance<IsNullContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(56);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::Identifier
+
+      || _la == PlanParser::JSONIdentifier)) {
+      _errHandler->recoverInline(this);
+      }
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(57);
+      match(PlanParser::ISNULL);
+      break;
+    }
+
+    case 16: {
+      _localctx = _tracker.createInstance<IsNotNullContext>(_localctx);
+      _ctx = _localctx;
+      previousContext = _localctx;
+      setState(58);
+      _la = _input->LA(1);
+      if (!(_la == PlanParser::Identifier
+
+      || _la == PlanParser::JSONIdentifier)) {
+      _errHandler->recoverInline(this);
+      }
+      else {
+        _errHandler->reportMatch(this);
+        consume();
+      }
+      setState(59);
+      match(PlanParser::ISNOTNULL);
+      break;
+    }
 
     default:
-      throw NoViableAltException(this);
+      break;
     }
     _ctx->stop = _input->LT(-1);
-    setState(125);
+    setState(129);
     _errHandler->sync(this);
     alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 6, _ctx);
     while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
@@ -1193,20 +1276,20 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
         if (!_parseListeners.empty())
           triggerExitRuleEvent();
         previousContext = _localctx;
-        setState(123);
+        setState(127);
         _errHandler->sync(this);
         switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 5, _ctx)) {
         case 1: {
           auto newContext = _tracker.createInstance<PowerContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(58);
+          setState(62);
 
-          if (!(precpred(_ctx, 21))) throw FailedPredicateException(this, "precpred(_ctx, 21)");
-          setState(59);
+          if (!(precpred(_ctx, 23))) throw FailedPredicateException(this, "precpred(_ctx, 23)");
+          setState(63);
           match(PlanParser::POW);
-          setState(60);
-          expr(22);
+          setState(64);
+          expr(24);
           break;
         }
 
@@ -1214,10 +1297,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<MulDivModContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(61);
+          setState(65);
 
-          if (!(precpred(_ctx, 19))) throw FailedPredicateException(this, "precpred(_ctx, 19)");
-          setState(62);
+          if (!(precpred(_ctx, 21))) throw FailedPredicateException(this, "precpred(_ctx, 21)");
+          setState(66);
           antlrcpp::downCast<MulDivModContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!((((_la & ~ 0x3fULL) == 0) &&
@@ -1228,8 +1311,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(63);
-          expr(20);
+          setState(67);
+          expr(22);
           break;
         }
 
@@ -1237,10 +1320,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<AddSubContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(64);
+          setState(68);
 
-          if (!(precpred(_ctx, 18))) throw FailedPredicateException(this, "precpred(_ctx, 18)");
-          setState(65);
+          if (!(precpred(_ctx, 20))) throw FailedPredicateException(this, "precpred(_ctx, 20)");
+          setState(69);
           antlrcpp::downCast<AddSubContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::ADD
@@ -1252,8 +1335,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(66);
-          expr(19);
+          setState(70);
+          expr(21);
           break;
         }
 
@@ -1261,10 +1344,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<ShiftContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(67);
+          setState(71);
 
-          if (!(precpred(_ctx, 17))) throw FailedPredicateException(this, "precpred(_ctx, 17)");
-          setState(68);
+          if (!(precpred(_ctx, 19))) throw FailedPredicateException(this, "precpred(_ctx, 19)");
+          setState(72);
           antlrcpp::downCast<ShiftContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::SHL
@@ -1276,8 +1359,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(69);
-          expr(18);
+          setState(73);
+          expr(20);
           break;
         }
 
@@ -1285,10 +1368,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<RangeContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(70);
+          setState(74);
 
-          if (!(precpred(_ctx, 10))) throw FailedPredicateException(this, "precpred(_ctx, 10)");
-          setState(71);
+          if (!(precpred(_ctx, 12))) throw FailedPredicateException(this, "precpred(_ctx, 12)");
+          setState(75);
           antlrcpp::downCast<RangeContext *>(_localctx)->op1 = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::LT
@@ -1300,7 +1383,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(72);
+          setState(76);
           _la = _input->LA(1);
           if (!(_la == PlanParser::Identifier
 
@@ -1311,7 +1394,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(73);
+          setState(77);
           antlrcpp::downCast<RangeContext *>(_localctx)->op2 = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::LT
@@ -1323,8 +1406,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(74);
-          expr(11);
+          setState(78);
+          expr(13);
           break;
         }
 
@@ -1332,10 +1415,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<ReverseRangeContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(75);
+          setState(79);
 
-          if (!(precpred(_ctx, 9))) throw FailedPredicateException(this, "precpred(_ctx, 9)");
-          setState(76);
+          if (!(precpred(_ctx, 11))) throw FailedPredicateException(this, "precpred(_ctx, 11)");
+          setState(80);
           antlrcpp::downCast<ReverseRangeContext *>(_localctx)->op1 = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::GT
@@ -1347,7 +1430,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(77);
+          setState(81);
           _la = _input->LA(1);
           if (!(_la == PlanParser::Identifier
 
@@ -1358,7 +1441,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(78);
+          setState(82);
           antlrcpp::downCast<ReverseRangeContext *>(_localctx)->op2 = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::GT
@@ -1370,8 +1453,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(79);
-          expr(10);
+          setState(83);
+          expr(12);
           break;
         }
 
@@ -1379,10 +1462,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<RelationalContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(80);
+          setState(84);
 
-          if (!(precpred(_ctx, 8))) throw FailedPredicateException(this, "precpred(_ctx, 8)");
-          setState(81);
+          if (!(precpred(_ctx, 10))) throw FailedPredicateException(this, "precpred(_ctx, 10)");
+          setState(85);
           antlrcpp::downCast<RelationalContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!((((_la & ~ 0x3fULL) == 0) &&
@@ -1393,8 +1476,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(82);
-          expr(9);
+          setState(86);
+          expr(11);
           break;
         }
 
@@ -1402,10 +1485,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<EqualityContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(83);
+          setState(87);
 
-          if (!(precpred(_ctx, 7))) throw FailedPredicateException(this, "precpred(_ctx, 7)");
-          setState(84);
+          if (!(precpred(_ctx, 9))) throw FailedPredicateException(this, "precpred(_ctx, 9)");
+          setState(88);
           antlrcpp::downCast<EqualityContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::EQ
@@ -1417,8 +1500,8 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(85);
-          expr(8);
+          setState(89);
+          expr(10);
           break;
         }
 
@@ -1426,13 +1509,13 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<BitAndContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(86);
+          setState(90);
 
-          if (!(precpred(_ctx, 6))) throw FailedPredicateException(this, "precpred(_ctx, 6)");
-          setState(87);
+          if (!(precpred(_ctx, 8))) throw FailedPredicateException(this, "precpred(_ctx, 8)");
+          setState(91);
           match(PlanParser::BAND);
-          setState(88);
-          expr(7);
+          setState(92);
+          expr(9);
           break;
         }
 
@@ -1440,13 +1523,13 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<BitXorContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(89);
+          setState(93);
 
-          if (!(precpred(_ctx, 5))) throw FailedPredicateException(this, "precpred(_ctx, 5)");
-          setState(90);
+          if (!(precpred(_ctx, 7))) throw FailedPredicateException(this, "precpred(_ctx, 7)");
+          setState(94);
           match(PlanParser::BXOR);
-          setState(91);
-          expr(6);
+          setState(95);
+          expr(8);
           break;
         }
 
@@ -1454,13 +1537,13 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<BitOrContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(92);
+          setState(96);
 
-          if (!(precpred(_ctx, 4))) throw FailedPredicateException(this, "precpred(_ctx, 4)");
-          setState(93);
+          if (!(precpred(_ctx, 6))) throw FailedPredicateException(this, "precpred(_ctx, 6)");
+          setState(97);
           match(PlanParser::BOR);
-          setState(94);
-          expr(5);
+          setState(98);
+          expr(7);
           break;
         }
 
@@ -1468,13 +1551,13 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<LogicalAndContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(95);
+          setState(99);
 
-          if (!(precpred(_ctx, 3))) throw FailedPredicateException(this, "precpred(_ctx, 3)");
-          setState(96);
+          if (!(precpred(_ctx, 5))) throw FailedPredicateException(this, "precpred(_ctx, 5)");
+          setState(100);
           match(PlanParser::AND);
-          setState(97);
-          expr(4);
+          setState(101);
+          expr(6);
           break;
         }
 
@@ -1482,13 +1565,13 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<LogicalOrContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(98);
+          setState(102);
 
-          if (!(precpred(_ctx, 2))) throw FailedPredicateException(this, "precpred(_ctx, 2)");
-          setState(99);
+          if (!(precpred(_ctx, 4))) throw FailedPredicateException(this, "precpred(_ctx, 4)");
+          setState(103);
           match(PlanParser::OR);
-          setState(100);
-          expr(3);
+          setState(104);
+          expr(5);
           break;
         }
 
@@ -1496,12 +1579,12 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<LikeContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(101);
+          setState(105);
 
-          if (!(precpred(_ctx, 22))) throw FailedPredicateException(this, "precpred(_ctx, 22)");
-          setState(102);
+          if (!(precpred(_ctx, 24))) throw FailedPredicateException(this, "precpred(_ctx, 24)");
+          setState(106);
           match(PlanParser::LIKE);
-          setState(103);
+          setState(107);
           match(PlanParser::StringLiteral);
           break;
         }
@@ -1510,10 +1593,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<TermContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(104);
+          setState(108);
 
-          if (!(precpred(_ctx, 16))) throw FailedPredicateException(this, "precpred(_ctx, 16)");
-          setState(105);
+          if (!(precpred(_ctx, 18))) throw FailedPredicateException(this, "precpred(_ctx, 18)");
+          setState(109);
           antlrcpp::downCast<TermContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::IN
@@ -1526,33 +1609,33 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             consume();
           }
 
-          setState(106);
+          setState(110);
           match(PlanParser::T__2);
-          setState(107);
+          setState(111);
           expr(0);
-          setState(112);
+          setState(116);
           _errHandler->sync(this);
           alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 3, _ctx);
           while (alt != 2 && alt != atn::ATN::INVALID_ALT_NUMBER) {
             if (alt == 1) {
-              setState(108);
+              setState(112);
               match(PlanParser::T__3);
-              setState(109);
+              setState(113);
               expr(0); 
             }
-            setState(114);
+            setState(118);
             _errHandler->sync(this);
             alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 3, _ctx);
           }
-          setState(116);
+          setState(120);
           _errHandler->sync(this);
 
           _la = _input->LA(1);
           if (_la == PlanParser::T__3) {
-            setState(115);
+            setState(119);
             match(PlanParser::T__3);
           }
-          setState(118);
+          setState(122);
           match(PlanParser::T__4);
           break;
         }
@@ -1561,10 +1644,10 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           auto newContext = _tracker.createInstance<EmptyTermContext>(_tracker.createInstance<ExprContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpr);
-          setState(120);
+          setState(124);
 
-          if (!(precpred(_ctx, 15))) throw FailedPredicateException(this, "precpred(_ctx, 15)");
-          setState(121);
+          if (!(precpred(_ctx, 17))) throw FailedPredicateException(this, "precpred(_ctx, 17)");
+          setState(125);
           antlrcpp::downCast<EmptyTermContext *>(_localctx)->op = _input->LT(1);
           _la = _input->LA(1);
           if (!(_la == PlanParser::IN
@@ -1576,7 +1659,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
             _errHandler->reportMatch(this);
             consume();
           }
-          setState(122);
+          setState(126);
           match(PlanParser::EmptyTerm);
           break;
         }
@@ -1585,7 +1668,7 @@ PlanParser::ExprContext* PlanParser::expr(int precedence) {
           break;
         } 
       }
-      setState(127);
+      setState(131);
       _errHandler->sync(this);
       alt = getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 6, _ctx);
     }
@@ -1610,22 +1693,22 @@ bool PlanParser::sempred(RuleContext *context, size_t ruleIndex, size_t predicat
 
 bool PlanParser::exprSempred(ExprContext *_localctx, size_t predicateIndex) {
   switch (predicateIndex) {
-    case 0: return precpred(_ctx, 21);
-    case 1: return precpred(_ctx, 19);
-    case 2: return precpred(_ctx, 18);
-    case 3: return precpred(_ctx, 17);
-    case 4: return precpred(_ctx, 10);
-    case 5: return precpred(_ctx, 9);
-    case 6: return precpred(_ctx, 8);
-    case 7: return precpred(_ctx, 7);
-    case 8: return precpred(_ctx, 6);
-    case 9: return precpred(_ctx, 5);
-    case 10: return precpred(_ctx, 4);
-    case 11: return precpred(_ctx, 3);
-    case 12: return precpred(_ctx, 2);
-    case 13: return precpred(_ctx, 22);
-    case 14: return precpred(_ctx, 16);
-    case 15: return precpred(_ctx, 15);
+    case 0: return precpred(_ctx, 23);
+    case 1: return precpred(_ctx, 21);
+    case 2: return precpred(_ctx, 20);
+    case 3: return precpred(_ctx, 19);
+    case 4: return precpred(_ctx, 12);
+    case 5: return precpred(_ctx, 11);
+    case 6: return precpred(_ctx, 10);
+    case 7: return precpred(_ctx, 9);
+    case 8: return precpred(_ctx, 8);
+    case 9: return precpred(_ctx, 7);
+    case 10: return precpred(_ctx, 6);
+    case 11: return precpred(_ctx, 5);
+    case 12: return precpred(_ctx, 4);
+    case 13: return precpred(_ctx, 24);
+    case 14: return precpred(_ctx, 18);
+    case 15: return precpred(_ctx, 17);
 
   default:
     break;
