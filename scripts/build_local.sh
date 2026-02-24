@@ -64,9 +64,6 @@ conan remote add default-conan-local \
     https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local \
     --insert 0 >> $LOG 2>&1 || true
 
-# Perl modules needed if openssl must be built from source
-yum install -y perl-IPC-Cmd perl-Digest-SHA >> $LOG 2>&1 || true
-
 cd /workspace/milvus-lite/python
 echo "==> Starting wheel build..." | tee -a $LOG
 python3 -m build --wheel --no-isolation >> $LOG 2>&1 \
