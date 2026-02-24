@@ -1,5 +1,5 @@
 diff --git a/internal/core/cmake/Utils.cmake b/internal/core/cmake/Utils.cmake
-index 8facf7cccd..f0d75bf8be 100644
+index 8facf7c..f0d75bf 100644
 --- a/internal/core/cmake/Utils.cmake
 +++ b/internal/core/cmake/Utils.cmake
 @@ -101,12 +101,32 @@ macro(create_library)
@@ -39,7 +39,7 @@ index 8facf7cccd..f0d75bf8be 100644
 +    message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}  add new source files at current directory recursively: ${SOURCE_FILES}")
  endmacro()
 diff --git a/internal/core/src/common/Tracer.cpp b/internal/core/src/common/Tracer.cpp
-index c60f8ad3cb..c2ea1316d6 100644
+index c60f8ad..c2ea131 100644
 --- a/internal/core/src/common/Tracer.cpp
 +++ b/internal/core/src/common/Tracer.cpp
 @@ -10,8 +10,11 @@
@@ -199,7 +199,7 @@ index c60f8ad3cb..c2ea1316d6 100644
 +#endif
 \ No newline at end of file
 diff --git a/internal/core/src/common/Tracer.h b/internal/core/src/common/Tracer.h
-index fce14d393b..6ee06daa2b 100644
+index fce14d3..6ee06da 100644
 --- a/internal/core/src/common/Tracer.h
 +++ b/internal/core/src/common/Tracer.h
 @@ -14,10 +14,32 @@
@@ -247,7 +247,7 @@ index fce14d393b..6ee06daa2b 100644
  void
  initTelemetry(const TraceConfig& cfg);
 diff --git a/internal/core/src/storage/CMakeLists.txt b/internal/core/src/storage/CMakeLists.txt
-index b88211bb87..a158becd37 100644
+index b88211b..a158bec 100644
 --- a/internal/core/src/storage/CMakeLists.txt
 +++ b/internal/core/src/storage/CMakeLists.txt
 @@ -16,6 +16,14 @@
@@ -266,7 +266,7 @@ index b88211bb87..a158becd37 100644
      add_definitions(-DENABLE_GCP_NATIVE)
      add_subdirectory(gcp-native-storage)
 diff --git a/internal/core/src/storage/ChunkManager.cpp b/internal/core/src/storage/ChunkManager.cpp
-index c6d8908625..c60bc74c6b 100644
+index c6d8908..c60bc74 100644
 --- a/internal/core/src/storage/ChunkManager.cpp
 +++ b/internal/core/src/storage/ChunkManager.cpp
 @@ -15,6 +15,7 @@
@@ -292,7 +292,7 @@ index c6d8908625..c60bc74c6b 100644
  #include "common/EasyAssert.h"
  #include "log/Log.h"
 diff --git a/internal/core/src/storage/LocalChunkManager.cpp b/internal/core/src/storage/LocalChunkManager.cpp
-index be97ee000b..57e4c77dcb 100644
+index be97ee0..57e4c77 100644
 --- a/internal/core/src/storage/LocalChunkManager.cpp
 +++ b/internal/core/src/storage/LocalChunkManager.cpp
 @@ -23,6 +23,7 @@
@@ -304,7 +304,7 @@ index be97ee000b..57e4c77dcb 100644
  #include "common/EasyAssert.h"
  #include "common/Exception.h"
 diff --git a/internal/core/src/storage/Util.cpp b/internal/core/src/storage/Util.cpp
-index 85ec72152c..f0dbee476c 100644
+index 85ec721..f0dbee4 100644
 --- a/internal/core/src/storage/Util.cpp
 +++ b/internal/core/src/storage/Util.cpp
 @@ -37,7 +37,9 @@
@@ -350,7 +350,7 @@ index 85ec72152c..f0dbee476c 100644
          case ChunkManagerType::OpenDAL: {
              return std::make_shared<OpenDALChunkManager>(storage_config);
 diff --git a/internal/core/thirdparty/knowhere/CMakeLists.txt b/internal/core/thirdparty/knowhere/CMakeLists.txt
-index f06d350ed9..858d01874f 100644
+index f06d350..be8198a 100644
 --- a/internal/core/thirdparty/knowhere/CMakeLists.txt
 +++ b/internal/core/thirdparty/knowhere/CMakeLists.txt
 @@ -22,6 +22,8 @@ message(STATUS "Knowhere version: ${KNOWHERE_VERSION}")
@@ -362,7 +362,7 @@ index f06d350ed9..858d01874f 100644
  if ( BUILD_DISK_ANN STREQUAL "ON" )
      set(WITH_DISKANN ON CACHE BOOL "" FORCE )
  else ()
-@@ -45,12 +47,35 @@ FetchContent_Declare(
+@@ -45,12 +47,55 @@ FetchContent_Declare(
          GIT_TAG         ${KNOWHERE_VERSION}
          SOURCE_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
          BINARY_DIR      ${CMAKE_CURRENT_BINARY_DIR}/knowhere-build
@@ -374,25 +374,45 @@ index f06d350ed9..858d01874f 100644
  if ( NOT knowhere_POPULATED )
      FetchContent_Populate( knowhere )
  
-+    execute_process(COMMAND git diff --quiet
-+      WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
-+      RESULT_VARIABLE KNOWHERE_CHECK_RESULT
-+    )
-+
-+    if(${KNOWHERE_CHECK_RESULT} EQUAL 0)
-+      if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
-+          "aarch64")
++    if(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_SYSTEM_PROCESSOR STREQUAL
++        "aarch64")
++      execute_process(COMMAND git diff --quiet
++        WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
++        RESULT_VARIABLE KNOWHERE_CHECK_RESULT)
++      if(${KNOWHERE_CHECK_RESULT} EQUAL 0)
 +        message("Apply knowhere android patch...")
 +        execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere-android.patch
 +          WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
-+          OUTPUT_VARIABLE result
-+        )
-+      else()
-+        message("Apply knowhere patch...")
-+        execute_process(COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/knowhere.patch
-+          WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/knowhere-src
-+          OUTPUT_VARIABLE result
-+        )
++          OUTPUT_VARIABLE result)
++      endif()
++    else()
++      # Patch knowhere source using file() instead of git-apply so the changes
++      # are applied reliably even when the working tree is dirty.
++      set(_KW_CMAKE "${knowhere_SOURCE_DIR}/CMakeLists.txt")
++      file(READ "${_KW_CMAKE}" _KW_CMAKE_CONTENT)
++      string(FIND "${_KW_CMAKE_CONTENT}" "src/index/ivf/*.cc" _KW_ALREADY_PATCHED)
++      if(_KW_ALREADY_PATCHED EQUAL -1)
++        message(STATUS "Patching knowhere CMakeLists.txt (WITH_LIGHT source list)")
++        string(REPLACE "src/index/ivf/ivf.cc"
++                       "src/index/ivf/*.cc\n    src/index/refine/*.cc"
++                       _KW_CMAKE_CONTENT "${_KW_CMAKE_CONTENT}")
++        file(WRITE "${_KW_CMAKE}" "${_KW_CMAKE_CONTENT}")
++      endif()
++
++      set(_KW_FAISS "${knowhere_SOURCE_DIR}/cmake/libs/libfaiss.cmake")
++      file(READ "${_KW_FAISS}" _KW_FAISS_CONTENT)
++      string(FIND "${_KW_FAISS_CONTENT}" "BLAS_INCLUDE_DIRS" _FAISS_ALREADY_PATCHED)
++      if(_FAISS_ALREADY_PATCHED EQUAL -1)
++        message(STATUS "Patching knowhere libfaiss.cmake (cblas.h include path)")
++        string(REPLACE
++          "set(BLA_VENDOR OpenBLAS)"
++          "set(BLA_VENDOR OpenBLAS)\n  find_path(BLAS_INCLUDE_DIRS cblas.h PATH_SUFFIXES openblas)"
++          _KW_FAISS_CONTENT "${_KW_FAISS_CONTENT}")
++        string(REPLACE
++          "target_compile_definitions(faiss PRIVATE FINTEGER=int)"
++          "target_compile_definitions(faiss PRIVATE FINTEGER=int)\n  target_include_directories(faiss PUBLIC \${BLAS_INCLUDE_DIRS})"
++          _KW_FAISS_CONTENT "${_KW_FAISS_CONTENT}")
++        file(WRITE "${_KW_FAISS}" "${_KW_FAISS_CONTENT}")
 +      endif()
 +    endif()
 +
@@ -400,7 +420,7 @@ index f06d350ed9..858d01874f 100644
      # knowhere
      add_subdirectory( ${knowhere_SOURCE_DIR}
 diff --git a/internal/core/thirdparty/tantivy/tokenizer.h b/internal/core/thirdparty/tantivy/tokenizer.h
-index c4be0ee314..79536f1c7d 100644
+index c4be0ee..79536f1 100644
 --- a/internal/core/thirdparty/tantivy/tokenizer.h
 +++ b/internal/core/thirdparty/tantivy/tokenizer.h
 @@ -5,6 +5,7 @@
