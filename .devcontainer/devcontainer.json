@@ -1,0 +1,21 @@
+{
+  "name": "milvus-lite",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "mounts": [
+    "source=milvus-lite-conan-cache,target=/root/.conan,type=volume"
+  ],
+  "postCreateCommand": "conan remote add default-conan-local https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local 2>/dev/null || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "xaver.clang-format",
+        "ms-python.python",
+        "ms-python.pylint"
+      ]
+    }
+  }
+}
