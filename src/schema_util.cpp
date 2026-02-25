@@ -97,6 +97,219 @@ GetField(const ::milvus::proto::schema::FieldData& field_data,
     return nullptr;
 }
 
+int64_t
+GetFieldDataCount(const ::milvus::proto::schema::FieldData& fd) {
+    switch (fd.type()) {
+        case DType::Bool:
+            return fd.scalars().bool_data().data_size();
+        case DType::Int8:
+        case DType::Int16:
+        case DType::Int32:
+            return fd.scalars().int_data().data_size();
+        case DType::Int64:
+            return fd.scalars().long_data().data_size();
+        case DType::Float:
+            return fd.scalars().float_data().data_size();
+        case DType::Double:
+            return fd.scalars().double_data().data_size();
+        case DType::String:
+        case DType::VarChar:
+            return fd.scalars().string_data().data_size();
+        case DType::JSON:
+            return fd.scalars().json_data().data_size();
+        case DType::Array:
+            return fd.scalars().array_data().data_size();
+        case DType::FloatVector: {
+            int64_t dim = fd.vectors().dim();
+            return dim > 0 ? fd.vectors().float_vector().data_size() / dim : 0;
+        }
+        case DType::BinaryVector: {
+            int64_t dim = fd.vectors().dim();
+            int64_t bytes_per_row = dim / 8;
+            return bytes_per_row > 0
+                       ? static_cast<int64_t>(
+                             fd.vectors().binary_vector().size()) /
+                             bytes_per_row
+                       : 0;
+        }
+        case DType::Float16Vector: {
+            int64_t dim = fd.vectors().dim();
+            int64_t bytes_per_row = dim * 2;
+            return bytes_per_row > 0
+                       ? static_cast<int64_t>(
+                             fd.vectors().float16_vector().size()) /
+                             bytes_per_row
+                       : 0;
+        }
+        case DType::BFloat16Vector: {
+            int64_t dim = fd.vectors().dim();
+            int64_t bytes_per_row = dim * 2;
+            return bytes_per_row > 0
+                       ? static_cast<int64_t>(
+                             fd.vectors().bfloat16_vector().size()) /
+                             bytes_per_row
+                       : 0;
+        }
+        case DType::SparseFloatVector:
+            return fd.vectors().sparse_float_vector().contents_size();
+        default:
+            return 0;
+    }
+}
+
+bool
+DecompactFieldData(::milvus::proto::schema::FieldData* fd) {
+    int64_t num_valid = fd->valid_data_size();
+    if (num_valid == 0) {
+        return true;
+    }
+    int64_t data_count = GetFieldDataCount(*fd);
+    if (data_count == num_valid) {
+        return true;
+    }
+
+    int64_t num_true = 0;
+    for (int64_t i = 0; i < num_valid; i++) {
+        if (fd->valid_data(i))
+            num_true++;
+    }
+    if (num_true != data_count) {
+        LOG_ERROR("DecompactFieldData: field '{}' valid_data true count ({}) "
+                  "does not match physical data count ({})",
+                  fd->field_name(), num_true, data_count);
+        return false;
+    }
+
+    int64_t phys = 0;
+    switch (fd->type()) {
+        case DType::Bool: {
+            auto* src = fd->mutable_scalars()->mutable_bool_data();
+            std::vector<bool> expanded(num_valid, false);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::Int8:
+        case DType::Int16:
+        case DType::Int32: {
+            auto* src = fd->mutable_scalars()->mutable_int_data();
+            std::vector<int32_t> expanded(num_valid, 0);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::Int64: {
+            auto* src = fd->mutable_scalars()->mutable_long_data();
+            std::vector<int64_t> expanded(num_valid, 0);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::Float: {
+            auto* src = fd->mutable_scalars()->mutable_float_data();
+            std::vector<float> expanded(num_valid, 0.0f);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::Double: {
+            auto* src = fd->mutable_scalars()->mutable_double_data();
+            std::vector<double> expanded(num_valid, 0.0);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::String:
+        case DType::VarChar: {
+            auto* src = fd->mutable_scalars()->mutable_string_data();
+            std::vector<std::string> expanded(num_valid);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto& v : expanded) src->add_data(std::move(v));
+        } break;
+        case DType::JSON: {
+            auto* src = fd->mutable_scalars()->mutable_json_data();
+            std::vector<std::string> expanded(num_valid);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    expanded[i] = src->data(phys++);
+                }
+            }
+            src->Clear();
+            for (auto& v : expanded) src->add_data(std::move(v));
+        } break;
+        case DType::Array: {
+            auto* src = fd->mutable_scalars()->mutable_array_data();
+            ::milvus::proto::schema::ArrayArray tmp;
+            tmp.set_element_type(src->element_type());
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    tmp.add_data()->CopyFrom(src->data(phys++));
+                } else {
+                    tmp.add_data();
+                }
+            }
+            src->CopyFrom(tmp);
+        } break;
+        case DType::FloatVector: {
+            int64_t dim = fd->vectors().dim();
+            auto* src = fd->mutable_vectors()->mutable_float_vector();
+            std::vector<float> expanded(num_valid * dim, 0.0f);
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    for (int64_t d = 0; d < dim; d++) {
+                        expanded[i * dim + d] = src->data(phys * dim + d);
+                    }
+                    phys++;
+                }
+            }
+            src->Clear();
+            for (auto v : expanded) src->add_data(v);
+        } break;
+        case DType::SparseFloatVector: {
+            auto* sp = fd->mutable_vectors()->mutable_sparse_float_vector();
+            ::milvus::proto::schema::SparseFloatArray tmp;
+            tmp.set_dim(sp->dim());
+            for (int64_t i = 0; i < num_valid; i++) {
+                if (fd->valid_data(i)) {
+                    tmp.add_contents(sp->contents(phys++));
+                } else {
+                    tmp.add_contents("");
+                }
+            }
+            sp->CopyFrom(tmp);
+        } break;
+        default:
+            LOG_ERROR("DecompactFieldData: unknown type {}", fd->type());
+            return false;
+    }
+    return true;
+}
+
 bool
 IsVectorField(::milvus::proto::schema::DataType dtype) {
     return dtype == ::milvus::proto::schema::DataType::FloatVector ||
@@ -452,6 +665,11 @@ PickFieldDataByIndex(const ::milvus::proto::schema::FieldData& src_data,
                           src_data.field_id(),
                           src_data.type());
                 return false;
+        }
+    }
+    if (src_data.valid_data_size() > 0) {
+        for (int64_t i : indexes) {
+            dst->add_valid_data(src_data.valid_data(i));
         }
     }
     return true;

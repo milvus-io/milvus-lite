@@ -37,6 +37,12 @@ std::any
 GetField(const ::milvus::proto::schema::FieldData& field_data,
          uint32_t field_index);
 
+int64_t
+GetFieldDataCount(const ::milvus::proto::schema::FieldData& fd);
+
+bool
+DecompactFieldData(::milvus::proto::schema::FieldData* fd);
+
 bool
 IsVectorField(::milvus::proto::schema::DataType dtype);
 

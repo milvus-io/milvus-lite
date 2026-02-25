@@ -23,5 +23,5 @@ except ImportError:  # fallback for older Python (<3.8)
 __version__ = "0.0.0.dev"
 
 
-with suppress(DistributionNotFound):
+with suppress(PackageNotFoundError):
     __version__ = version("milvus_lite")

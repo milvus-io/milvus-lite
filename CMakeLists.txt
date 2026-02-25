@@ -248,6 +248,21 @@ add_library(
 
 target_link_libraries(parser milvus_proto ${antlr4-cppruntime_LIBRARIES})
 
+execute_process(
+  COMMAND git diff --quiet
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+  RESULT_VARIABLE CHECK_RESULT)
+
+if(${CHECK_RESULT} EQUAL 0)
+  message("Apply milvus patch...")
+  execute_process(
+    COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
+    OUTPUT_VARIABLE result)
+else()
+  message("Milvus not need applying patch...")
+endif()
+
 include(thirdparty/milvus/internal/core/cmake/BuildUtils.cmake)
 include(thirdparty/milvus/internal/core/cmake/Utils.cmake)
 set(WITH_LIGHT ON CACHE BOOL "" FORCE)
@@ -328,21 +343,6 @@ set_target_properties(
 )
 
 add_dependencies(tantivy_binding tantivy_binding_target)
-
-execute_process(
-  COMMAND git diff --quiet
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-  RESULT_VARIABLE CHECK_RESULT)
-
-if(${CHECK_RESULT} EQUAL 0)
-  message("Apply milvus patch...")
-  execute_process(
-    COMMAND git apply ${CMAKE_SOURCE_DIR}/thirdparty/milvus.patch
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/milvus
-    OUTPUT_VARIABLE result)
-else()
-  message("Milvus not need applying patch...")
-endif()
 
 set(MILVUS_ENGINE_SRC "${CMAKE_SOURCE_DIR}/thirdparty/milvus/internal/core/src")
 

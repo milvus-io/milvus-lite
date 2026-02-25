@@ -1,5 +1,5 @@
 
-// Generated from Plan.g4 by ANTLR 4.13.1
+// Generated from Plan.g4 by ANTLR 4.13.2
 
 #pragma once
 
@@ -36,6 +36,10 @@ public:
   }
 
   virtual std::any visitLogicalOr(PlanParser::LogicalOrContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitIsNotNull(PlanParser::IsNotNullContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -128,6 +132,10 @@ public:
   }
 
   virtual std::any visitEmptyTerm(PlanParser::EmptyTermContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitIsNull(PlanParser::IsNullContext *ctx) override {
     return visitChildren(ctx);
   }
 

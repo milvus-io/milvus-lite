@@ -1,5 +1,5 @@
 
-// Generated from Plan.g4 by ANTLR 4.13.1
+// Generated from Plan.g4 by ANTLR 4.13.2
 
 #pragma once
 
@@ -15,11 +15,12 @@ public:
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, LT = 6, LE = 7, GT = 8, 
     GE = 9, EQ = 10, NE = 11, LIKE = 12, EXISTS = 13, ADD = 14, SUB = 15, 
     MUL = 16, DIV = 17, MOD = 18, POW = 19, SHL = 20, SHR = 21, BAND = 22, 
-    BOR = 23, BXOR = 24, AND = 25, OR = 26, BNOT = 27, NOT = 28, IN = 29, 
-    NIN = 30, EmptyTerm = 31, JSONContains = 32, JSONContainsAll = 33, JSONContainsAny = 34, 
-    ArrayContains = 35, ArrayContainsAll = 36, ArrayContainsAny = 37, ArrayLength = 38, 
-    BooleanConstant = 39, IntegerConstant = 40, FloatingConstant = 41, Identifier = 42, 
-    StringLiteral = 43, JSONIdentifier = 44, Whitespace = 45, Newline = 46
+    BOR = 23, BXOR = 24, AND = 25, OR = 26, ISNULL = 27, ISNOTNULL = 28, 
+    BNOT = 29, NOT = 30, IN = 31, NIN = 32, EmptyTerm = 33, JSONContains = 34, 
+    JSONContainsAll = 35, JSONContainsAny = 36, ArrayContains = 37, ArrayContainsAll = 38, 
+    ArrayContainsAny = 39, ArrayLength = 40, BooleanConstant = 41, IntegerConstant = 42, 
+    FloatingConstant = 43, Identifier = 44, StringLiteral = 45, JSONIdentifier = 46, 
+    Whitespace = 47, Newline = 48
   };
 
   explicit PlanLexer(antlr4::CharStream *input);

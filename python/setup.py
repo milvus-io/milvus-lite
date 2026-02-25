@@ -105,11 +105,16 @@ class CMakeBuild(_bdist_wheel):
             subprocess.call(['conan', 'remote', 'add', 'default-conan-local', 'https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local'],
                                   cwd=build_temp, env=env)
             if sys.platform.lower() == 'linux':
-                subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release', '-s', 'compiler.libcxx=libstdc++11'],
+                subprocess.check_call(['conan', 'install', extdir,
+                                       '--build=missing', '--update',
+                                       '--build=bison', '--build=flex',
+                                       '--build=libtool', '--build=openssl',
+                                       '-s', 'build_type=Release',
+                                       '-s', 'compiler.libcxx=libstdc++11'],
                                       cwd=build_temp, env=env)
             else:
                 # macos
-                subprocess.check_call(['conan', 'install', extdir, '--build=missing', '-s', 'build_type=Release'], cwd=build_temp, env=env)
+                subprocess.check_call(['conan', 'install', extdir, '--build=missing', '--update', '-s', 'build_type=Release'], cwd=build_temp, env=env)
         # build
         extra_cmake_args = shlex.split(env.get('CMAKE_ARGS', ''))
         extra_build_args = shlex.split(env.get('BUILD_ARGS', ''))

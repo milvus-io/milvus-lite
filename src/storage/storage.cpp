@@ -116,7 +116,7 @@ Storage::LoadCollecton(const std::string& collection_name,
 bool
 Storage::GetCollectionSchema(const std::string& collection_name,
                              std::string* output_info_str) {
-    output_info_str->assign(cm_.GetCollectionSchema(collection_name).c_str());
+    *output_info_str = cm_.GetCollectionSchema(collection_name);
     return true;
 }
 

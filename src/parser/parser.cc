@@ -29,17 +29,16 @@ ParserToMessage(milvus::proto::schema::CollectionSchema& schema,
         expr->unsafe_arena_set_allocated_always_true_expr(alway_true_expr);
         return expr->SerializeAsString();
     }
+
     antlr4::ANTLRInputStream input(exprstr);
     PlanLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     PlanParser parser(&tokens);
-
     PlanParser::ExprContext* tree = parser.expr();
-
     auto helper = milvus::local::CreateSchemaHelper(&schema);
-
     milvus::local::PlanCCVisitor visitor(&helper);
-    auto res = std::any_cast<milvus::local::ExprWithDtype>(visitor.visit(tree));
+    auto res =
+        std::any_cast<milvus::local::ExprWithDtype>(visitor.visit(tree));
     return res.expr->SerializeAsString();
 }
 

@@ -75,8 +75,8 @@ class CollectionMeta final {
 
      public:
         void
-        AddSchema(const char* info, const std::string& pk_name) {
-            schema_info_.assign(info);
+        AddSchema(const std::string& info, const std::string& pk_name) {
+            schema_info_ = info;
             pk_name_ = pk_name;
         }
 
@@ -85,7 +85,7 @@ class CollectionMeta final {
             return schema_info_;
         }
         bool
-        AddIndex(const std::string& index_name, const char* index) {
+        AddIndex(const std::string& index_name, const std::string& index) {
             if (index_info_.find(index_name) != index_info_.end()) {
                 LOG_ERROR("Index: {} already exist", index_name);
                 return false;
@@ -99,7 +99,7 @@ class CollectionMeta final {
             if (index_info_.find(index_name) == index_info_.end()) {
                 return false;
             }
-            index->assign(index_info_[index_name].c_str());
+            *index = index_info_[index_name];
             return true;
         }
 
