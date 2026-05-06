@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "milvus-lite"
+version = "3.0"
+description = "Lightweight version of Milvus for local development and testing"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Milvus Contributors"},
+]
+keywords = ["vector", "database", "embedding", "milvus", "search", "bm25"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pyarrow>=15.0",
+    "numpy>=1.24",
+    "faiss-cpu>=1.7.4",
+    "grpcio>=1.50",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.urls]
+Homepage = "https://github.com/milvus-io/milvus-lite"
+Repository = "https://github.com/milvus-io/milvus-lite"
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+chinese = [
+    "jieba>=0.42",
+]
+[project.scripts]
+milvus-lite = "milvus_lite.cmdline:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["milvus_lite"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running tests that exercise resource boundedness over many ops",
+    "soak: very large scale soak tests; run explicitly with MILVUS_LITE_RUN_SOAK=1",
+]
