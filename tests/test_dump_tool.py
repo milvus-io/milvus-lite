@@ -1,175 +1,288 @@
-# Copyright (C) 2019-2023 Zilliz. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+"""Tests for the milvus-lite dump command."""
+
+from __future__ import annotations
+
+import runpy
+import sys
+from types import SimpleNamespace
+
+import pytest
+
+from milvus_lite import cmdline
 
 
-import unittest
-import json
-import os
-import random
-import pandas as pd
-import numpy as np
-import tempfile
+class _FakeIterator:
+    def __init__(self, batches):
+        self._batches = list(batches)
+        self.closed = False
+
+    def next(self):
+        if self._batches:
+            return self._batches.pop(0)
+        return []
+
+    def close(self):
+        self.closed = True
 
 
-from pymilvus import (
-    MilvusClient,
-    FieldSchema, CollectionSchema, DataType
-)
+class _FakeCollection:
+    last = None
+
+    def __init__(self, name, using=None):
+        self.name = name
+        self.using = using
+        self.primary_field = SimpleNamespace(name="id", auto_id=True)
+        self.schema = SimpleNamespace(fields=[
+            SimpleNamespace(name="id", dtype="INT64"),
+            SimpleNamespace(name="vec", dtype="FLOAT_VECTOR"),
+            SimpleNamespace(name="text", dtype="VARCHAR"),
+        ])
+        self.loaded = False
+        self.iterator = _FakeIterator([
+            [
+                {"id": 10, "vec": [1.0, 0.0], "text": "a"},
+                {"id": 11, "vec": [0.0, 1.0], "text": "b"},
+            ],
+            [
+                {"id": 12, "vec": [0.5, 0.5], "text": "c"},
+            ],
+        ])
+        _FakeCollection.last = self
+
+    def load(self):
+        self.loaded = True
+
+    def query(self, expr, output_fields=None):
+        assert expr == ""
+        assert output_fields == ["count(*)"]
+        return [{"count(*)": 3}]
+
+    def query_iterator(self, batch_size=None, output_fields=None):
+        assert batch_size == 2
+        assert output_fields == ["*"]
+        return self.iterator
 
 
-from milvus_lite.cmdline import dump_collection
+class _FakeConnections:
+    def __init__(self):
+        self.connected = []
+        self.disconnected = []
 
-DIM = 512
-DATA_FILE = os.path.join(os.path.dirname(__file__), 'data', 'train_embeddings.csv')
+    def connect(self, alias, uri=None):
+        self.connected.append((alias, uri))
 
-def gen_binary_vector():
-    raw_vector = [random.randint(0, 1) for i in range(DIM)]
-    binary_vectors = np.packbits(raw_vector, axis=-1).tolist()
-    return binary_vectors
-
-def gen_float_vector():
-    return [random.random() for _ in range(DIM)]
-
-def all_types_data(bin_vec: bool)->list:
-    rows = []
-    count = 100
-    for i in range(count):
-        row = {
-            "id": i,
-            "bool": True if i%5 == 0 else False,
-            "int8": i%128,
-            "int16": i%1000,
-            "int32": i%100000,
-            "int64": i,
-            "float": i/3,
-            "double": i/7,
-            "varchar": f"varchar_{i}",
-            "json": {"dummy": i, "ok": f"name_{i}"},
-            "vector": gen_binary_vector() if bin_vec else gen_float_vector(),
-            f"dynamic_{i}": i,
-            # bulkinsert doesn't support import npy with array field, the below values will be stored into dynamic field
-            "array_str": [f"str_{k}" for k in range(5)],
-            "array_int": [k for k in range(10)],
-        }
-        rows.append(row)
-    return rows
+    def disconnect(self, alias):
+        self.disconnected.append(alias)
 
 
-class TestDumpTool(unittest.TestCase):
-    def setUp(self):
-        self.collection_name = 'hello_milvus'
-        self.milvus_client = MilvusClient('./local_test.db')
-        has_collection = self.milvus_client.has_collection(self.collection_name, timeout=5)
-        if has_collection:
-            self.milvus_client.drop_collection(self.collection_name)
-
-    def tearDown(self):
-        # self.milvus_client.drop_collection(self.collection_name)
-        pass
-
-    @unittest.skip("")
-    def test_simple_collection(self):
-        has_collection = self.milvus_client.has_collection(self.collection_name)
-        if has_collection:
-            self.milvus_client.drop_collection(self.collection_name)
-        fields = [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-            FieldSchema(name="path", dtype=DataType.VARCHAR, max_length=512),
-            FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=DIM),
-            FieldSchema(name="label", dtype=DataType.VARCHAR, max_length=512),
-        ]
-        schema = CollectionSchema(fields=fields)
-        index_params = self.milvus_client.prepare_index_params()
-        index_params.add_index(field_name = "vector", metric_type="L2")
-        self.milvus_client.create_collection(self.collection_name, schema=schema, index_params=index_params, consistency_level="Strong")
-
-        csv_data = pd.read_csv(DATA_FILE)
-        for i in range(csv_data.shape[0]):
-            row = {}
-            for col in csv_data.columns.values:
-                if col == "vector":
-                    vec = json.loads(csv_data[col][i]) # convert the string format vector to List[float]
-                    row[col] = vec
-                else:
-                    row[col] = csv_data[col][i]
-            self.milvus_client.insert(self.collection_name, row)
-
-        # dump
-        with tempfile.TemporaryDirectory() as temp_dir:
-            dump_collection('./local_test.db', self.collection_name, temp_dir)
-
-    @unittest.skip("")            
-    def test_all_type_collection(self):
-        has_collection = self.milvus_client.has_collection(self.collection_name)
-        if has_collection:
-            self.milvus_client.drop_collection(self.collection_name)        
-        fields = [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=False),
-            FieldSchema(name="bool", dtype=DataType.BOOL),
-            FieldSchema(name="int8", dtype=DataType.INT8),
-            FieldSchema(name="int16", dtype=DataType.INT16),
-            FieldSchema(name="int32", dtype=DataType.INT32),
-            FieldSchema(name="int64", dtype=DataType.INT64),
-            FieldSchema(name="float", dtype=DataType.FLOAT),
-            FieldSchema(name="double", dtype=DataType.DOUBLE),
-            FieldSchema(name="varchar", dtype=DataType.VARCHAR, max_length=512),
-            FieldSchema(name="json", dtype=DataType.JSON),
-            FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=DIM)
-        ]
-
-        fields.append(FieldSchema(name="array_str", dtype=DataType.ARRAY, max_capacity=100, element_type=DataType.VARCHAR, max_length=128))
-        fields.append(FieldSchema(name="array_int", dtype=DataType.ARRAY, max_capacity=100, element_type=DataType.INT64))
-        schema = CollectionSchema(fields=fields, enable_dynamic_field=True)
-        index_params = self.milvus_client.prepare_index_params()
-        index_params.add_index(field_name = "vector", metric_type="L2")
-        self.milvus_client.create_collection(self.collection_name, schema=schema, index_params=index_params, consistency_level="Strong")
-        rows = all_types_data(False)
-        self.milvus_client.insert(self.collection_name, rows)
-        # dump
-        with tempfile.TemporaryDirectory() as temp_dir:
-            dump_collection('./local_test.db', self.collection_name, temp_dir)
-
-    def test_all_type_bin_vec_collection(self):
-        has_collection = self.milvus_client.has_collection(self.collection_name)
-        if has_collection:
-            self.milvus_client.drop_collection(self.collection_name)                
-        fields = [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=False),
-            FieldSchema(name="bool", dtype=DataType.BOOL),
-            FieldSchema(name="int8", dtype=DataType.INT8),
-            FieldSchema(name="int16", dtype=DataType.INT16),
-            FieldSchema(name="int32", dtype=DataType.INT32),
-            FieldSchema(name="int64", dtype=DataType.INT64),
-            FieldSchema(name="float", dtype=DataType.FLOAT),
-            FieldSchema(name="double", dtype=DataType.DOUBLE),
-            FieldSchema(name="varchar", dtype=DataType.VARCHAR, max_length=512),
-            FieldSchema(name="json", dtype=DataType.JSON),
-            FieldSchema(name="vector", dtype=DataType.BINARY_VECTOR, dim=DIM)
-        ]
-
-        fields.append(FieldSchema(name="array_str", dtype=DataType.ARRAY, max_capacity=100, element_type=DataType.VARCHAR, max_length=128))
-        fields.append(FieldSchema(name="array_int", dtype=DataType.ARRAY, max_capacity=100, element_type=DataType.INT64))
-        schema = CollectionSchema(fields=fields, enable_dynamic_field=True)
-        self.milvus_client.create_collection(self.collection_name, schema=schema, consistency_level="Strong")
-        index_params = self.milvus_client.prepare_index_params()
-        index_params.add_index("vector", "BIN_FLAT", metric_type="HAMMING")
-        # index_params = [{"index_type": "BIN_FLAT", "metric_type": "HAMMING"}]
-        self.milvus_client.create_index(self.collection_name, index_params=index_params)
-        rows = all_types_data(True)
-        self.milvus_client.insert(self.collection_name, rows)
-        # dump
-        with tempfile.TemporaryDirectory() as temp_dir:            
-            dump_collection('./local_test.db', self.collection_name, temp_dir)
+class _FakeUtility:
+    def has_collection(self, name, using=None):
+        return name == "docs" and using == cmdline.DUMP_ALIAS
 
 
-if __name__ == '__main__':
-    unittest.main()
+class _FakeDataType:
+    BFLOAT16_VECTOR = "BFLOAT16_VECTOR"
+    BINARY_VECTOR = "BINARY_VECTOR"
+
+
+class _FakeBulkFileType:
+    JSON = "json"
+
+
+class _FakeWriter:
+    instances = []
+
+    def __init__(self, schema, local_path, chunk_size, file_type):
+        self.schema = schema
+        self.local_path = local_path
+        self.chunk_size = chunk_size
+        self.file_type = file_type
+        self.rows = []
+        self.committed = False
+        _FakeWriter.instances.append(self)
+
+    def append_row(self, row):
+        self.rows.append(row)
+
+    def commit(self):
+        self.committed = True
+
+
+@pytest.fixture
+def fake_dump_deps(monkeypatch):
+    connections = _FakeConnections()
+    api = SimpleNamespace(
+        Collection=_FakeCollection,
+        DataType=_FakeDataType,
+        connections=connections,
+        utility=_FakeUtility(),
+    )
+    _FakeWriter.instances = []
+    monkeypatch.setattr(cmdline, "_load_pymilvus_api", lambda: api)
+    monkeypatch.setattr(
+        cmdline,
+        "_load_bulk_writer",
+        lambda: (_FakeWriter, _FakeBulkFileType),
+    )
+    return connections
+
+
+def test_dump_collection_writes_rows_and_drops_auto_id(tmp_path, fake_dump_deps):
+    db_path = tmp_path / "demo.db"
+    db_path.mkdir()
+    out_path = tmp_path / "dump"
+
+    summary = cmdline.dump_collection(
+        str(db_path),
+        "docs",
+        str(out_path),
+        batch_size=2,
+        chunk_size=1024,
+    )
+
+    assert summary == {
+        "collection": "docs",
+        "path": str(out_path),
+        "row_count": 3,
+    }
+    assert fake_dump_deps.connected == [
+        (cmdline.DUMP_ALIAS, str(db_path)),
+    ]
+    assert fake_dump_deps.disconnected == [cmdline.DUMP_ALIAS]
+    assert _FakeCollection.last.loaded is True
+    assert _FakeCollection.last.iterator.closed is True
+
+    writer = _FakeWriter.instances[0]
+    assert writer.local_path == str(out_path)
+    assert writer.chunk_size == 1024
+    assert writer.file_type == _FakeBulkFileType.JSON
+    assert writer.committed is True
+    assert writer.rows == [
+        {"vec": [1.0, 0.0], "text": "a"},
+        {"vec": [0.0, 1.0], "text": "b"},
+        {"vec": [0.5, 0.5], "text": "c"},
+    ]
+
+
+def test_dump_collection_accepts_uri_without_local_path(tmp_path, fake_dump_deps):
+    out_path = tmp_path / "dump"
+
+    summary = cmdline.dump_collection(
+        None,
+        "docs",
+        str(out_path),
+        uri="http://127.0.0.1:19530",
+        batch_size=2,
+    )
+
+    assert summary["row_count"] == 3
+    assert fake_dump_deps.connected == [
+        (cmdline.DUMP_ALIAS, "http://127.0.0.1:19530"),
+    ]
+
+
+def test_dump_collection_rejects_missing_db_file(tmp_path):
+    with pytest.raises(RuntimeError, match="not exists"):
+        cmdline.dump_collection(
+            str(tmp_path / "missing.db"),
+            "docs",
+            str(tmp_path / "dump"),
+        )
+
+
+def test_dump_collection_rejects_unknown_collection(tmp_path, monkeypatch):
+    db_path = tmp_path / "demo.db"
+    db_path.mkdir()
+    connections = _FakeConnections()
+    api = SimpleNamespace(
+        Collection=_FakeCollection,
+        DataType=_FakeDataType,
+        connections=connections,
+        utility=SimpleNamespace(has_collection=lambda name, using=None: False),
+    )
+    monkeypatch.setattr(cmdline, "_load_pymilvus_api", lambda: api)
+    monkeypatch.setattr(
+        cmdline,
+        "_load_bulk_writer",
+        lambda: (_FakeWriter, _FakeBulkFileType),
+    )
+
+    with pytest.raises(RuntimeError, match="Collection: docs not exists"):
+        cmdline.dump_collection(str(db_path), "docs", str(tmp_path / "dump"))
+
+    assert connections.disconnected == [cmdline.DUMP_ALIAS]
+
+
+def test_main_dispatches_dump(monkeypatch, tmp_path, capsys):
+    calls = []
+
+    def fake_dump_collection(db_file, collection_name, path, **kwargs):
+        calls.append((db_file, collection_name, path, kwargs))
+        return {"collection": collection_name, "path": path, "row_count": 7}
+
+    monkeypatch.setattr(cmdline, "dump_collection", fake_dump_collection)
+
+    rc = cmdline.main([
+        "dump",
+        "-d", str(tmp_path / "demo.db"),
+        "-c", "docs",
+        "-p", str(tmp_path / "dump"),
+        "--batch-size", "9",
+        "--chunk-size", "123",
+    ])
+
+    assert rc == 0
+    assert calls == [(
+        str(tmp_path / "demo.db"),
+        "docs",
+        str(tmp_path / "dump"),
+        {"uri": None, "batch_size": 9, "chunk_size": 123},
+    )]
+    assert "Dump collection docs success: 7 rows" in capsys.readouterr().out
+
+
+def test_main_dispatches_server(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_server(data_dir, host, port, max_workers):
+        calls.append({
+            "data_dir": data_dir,
+            "host": host,
+            "port": port,
+            "max_workers": max_workers,
+        })
+
+    monkeypatch.setattr(cmdline, "run_server", fake_run_server)
+
+    rc = cmdline.main([
+        "server",
+        "--data-dir", str(tmp_path / "data"),
+        "--host", "127.0.0.1",
+        "--port", "19531",
+        "--max-workers", "3",
+    ])
+
+    assert rc == 0
+    assert calls == [{
+        "data_dir": str(tmp_path / "data"),
+        "host": "127.0.0.1",
+        "port": 19531,
+        "max_workers": 3,
+    }]
+
+
+def test_package_module_main_delegates_to_cmdline(monkeypatch):
+    calls = []
+
+    def fake_main():
+        calls.append(True)
+        return 23
+
+    monkeypatch.setattr(cmdline, "main", fake_main)
+    monkeypatch.setitem(sys.modules, "milvus_lite.cmdline", cmdline)
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("milvus_lite.__main__", run_name="__main__")
+
+    assert exc_info.value.code == 23
+    assert calls == [True]

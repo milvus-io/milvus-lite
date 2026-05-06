@@ -9,11 +9,11 @@ The Milvus-lite project is written in Python. To set up the development environm
 
 The main dependencies for build Milvus-lite is to install dependencies of milvis, so generally you could refer to Milvus's [install_deps.sh](https://github.com/milvus-io/milvus/blob/master/scripts/install_deps.sh) as a reference. Please note, you should follow the related branch of Milvus. For example, if you want to build Milvus-lite with Milvus 2.4.0, you should checkout the branch of Milvus 2.4.0.
 
-For python3 build wheel, we use the build module and requires newer version of setuptools. So you should install the latest version of setuptools and build.
+For Python package builds, we use the `build` module with the Hatchling backend configured in `pyproject.toml`.
 
 ## Build Milvus-lite
 ```bash
-python3 setup.py bdist_wheel
+python3 -m build
 ```
 
-After build, you shoud have wheel package under dist folder.
+After build, you should have a wheel package and source distribution under the `dist/` folder. You can also run `make build` from the repository root.

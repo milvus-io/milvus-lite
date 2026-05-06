@@ -1,188 +1,325 @@
 <div align="center">
-    <img src="https://raw.githubusercontent.com/milvus-io/milvus-lite/refs/heads/main/milvus_lite_logo.png#gh-light-mode-only" width="60%"/>
+    <img src="https://raw.githubusercontent.com/milvus-io/milvus-lite/refs/heads/main/milvus_lite_logo.png" width="60%"/>
 </div>
 
 <h3 align="center">
-    <p style="text-align: center;"> <span style="font-weight: bold; font: Arial, sans-serif;"></span>A lightweight version of Milvus</p>
+    Milvus Lite - a lightweight, local Milvus for development and testing
 </h3>
 
-<div class="column" align="middle">
-  <a href="https://www.apache.org/licenses/LICENSE-2.0">
-    <img src="https://img.shields.io/badge/license-apache2.0-green?style=flat" alt="license"/>
-  </a>
-  <a href="https://pypi.org/project/milvus-lite/">
-    <img src="https://img.shields.io/pypi/v/milvus-lite?label=Release&color&logo=Python" alt="github actions">
-  </a>
-    <a href="https://pypi.org/project/milvus-lite/">
-    <img src="https://img.shields.io/pypi/dm/milvus-lite.svg?color=bright-green&logo=Pypi" alt="github actions">
-  </a>
-</div>
+<p align="center">
+    <a href="https://github.com/milvus-io/milvus-lite/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
+    <a href="https://pypi.org/project/milvus-lite/"><img src="https://img.shields.io/pypi/v/milvus-lite?label=PyPI" alt="PyPI"></a>
+    <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python">
+</p>
 
+# Milvus Lite
 
-# Introduction
-Milvus Lite is the lightweight version of [Milvus](https://github.com/milvus-io/milvus), a high-performance vector database that powers AI applications with vector similarity search. This repo contains the core components of Milvus Lite. 
+Milvus Lite is a lightweight version of [Milvus](https://github.com/milvus-io/milvus) for local development, notebooks, tests, and small-scale AI applications. It exposes the familiar `pymilvus` API through a local `.db` file or an embedded gRPC server, so code written against Milvus Lite can move to Milvus Standalone, Milvus Distributed, or Zilliz Cloud with minimal changes.
 
-With Milvus Lite, you can start building an AI application with vector similarity search within minutes! Milvus Lite is good for running in the following environment:
-- Jupyter Notebook / Google Colab
-- Laptops
-- Edge Devices
+This generation of Milvus Lite is rebuilt from scratch in pure Python. Instead of wrapping the full C++ Milvus core, it uses a local LSM-style storage engine with WAL, in-memory memtables, immutable Parquet segments, segment-level FAISS indexes, scalar filtering, BM25 full text search, and a Milvus-compatible gRPC adapter.
 
-Milvus Lite can be imported into your Python application, providing the core vector search functionality of Milvus. Milvus Lite is already included in the [Python SDK of Milvus](https://github.com/milvus-io/pymilvus). To use it, you just need `pip install pymilvus`. 
+Milvus Lite is intended for prototyping and local workloads. For large-scale production deployments, use [Milvus Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone), [Milvus Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed), or [Zilliz Cloud](https://zilliz.com/cloud).
 
-Milvus Lite uses the same API as Milvus Standalone and Distributed, providing a consistent experience across environments. Develop your GenAI applications once and run them anywhere: on a laptop or Jupyter Notebook with Milvus Lite, in a Docker container with Milvus Standalone, or on a K8s cluster with Milvus Distributed for large-scale production.
+## Highlights
 
-<div align="center">
-    <img src="https://milvus.io/docs/v2.5.x/assets/select-deployment-option.png" width="80%"/>
-</div>
+- Drop-in local usage with `MilvusClient("./demo.db")`.
+- Pure Python implementation with inspectable code and Python stack traces.
+- Dense vector search, sparse BM25 search, and hybrid search.
+- FAISS-backed indexes: `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, plus `FLAT` / `BRUTE_FORCE` / `AUTOINDEX`.
+- Milvus-style scalar filters, dynamic fields, JSON fields, array fields, partitions, aliases, iterators, and group-by search.
+- Optional schema functions for BM25 and text embedding.
+- Standalone local gRPC server for multi-client development.
 
-Milvus Lite is only suitable for small scale prototyping (usually less than a million vectors) or edge devices. For large scale production, we recommend using [Milvus Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone) or [Milvus Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed). You can also consider the fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
+## Requirements
 
-# Requirements
-Milvus Lite currently supports the following environments:
-- Ubuntu >= 20.04 (x86_64 and arm64)
-- MacOS >= 11.0 (Apple Silicon M1/M2 and x86_64)
+- Python 3.10 or newer
+- macOS, Linux, or Windows where the Python dependencies are available
 
-***Note:*** Windows is not yet supported.
+Core dependencies are installed by default: `pyarrow`, `numpy`, `faiss-cpu`, and `grpcio`. `pymilvus` is intentionally not a dependency of `milvus-lite`; it installs Milvus Lite as its local backend.
 
-# Installation
-```shell
-pip install -U pymilvus[milvus-lite]
-```
-We recommend using `pymilvus`. You can `pip install` with `-U` to force update to the latest version and `milvus-lite` will be automatically installed.
+## Installation
 
-If you want to explicitly install `milvus-lite` package, or you have installed an older version of `milvus-lite` and would like to update it, you can do `pip install -U milvus-lite`.
+Install Milvus Lite directly:
 
-# Usage
-In `pymilvus`, specify a local file name as uri parameter of MilvusClient will use Milvus Lite.
-```python
-from pymilvus import MilvusClient
-client = MilvusClient("./milvus_demo.db")
+```bash
+pip install -U milvus-lite
 ```
 
-> **_NOTE:_**  Note that the same API also applies to Milvus Standalone, Milvus Distributed and Zilliz Cloud, the only difference is to replace local file name to remote server endpoint and credentials, e.g. 
-`client = MilvusClient(uri="http://localhost:19530", token="username:password")` for self-hosted Milvus server.
+Most users install Milvus Lite through the `pymilvus` extra:
 
-# Examples
-Following is a simple demo showing how to use Milvus Lite for text search. There are more comprehensive [examples](https://github.com/milvus-io/bootcamp/tree/master/bootcamp/tutorials) for using Milvus Lite to build applications
-such as [RAG](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/build_RAG_with_milvus.ipynb), [image search](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/quickstart/image_search_with_milvus.ipynb), and using Milvus Lite in popular RAG framework such as [LangChain](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_langchain.ipynb) and [LlamaIndex](https://github.com/milvus-io/bootcamp/blob/master/bootcamp/tutorials/integration/rag_with_milvus_and_llamaindex.ipynb)!
+```bash
+pip install -U "pymilvus[milvus-lite]"
+```
+
+If you already have the original C++/CGo-based `milvus-lite` package installed, upgrade in a clean environment or reinstall it explicitly:
+
+```bash
+pip uninstall milvus-lite -y
+pip install -U milvus-lite
+```
+
+`.db` files created by the original milvus-lite storage format are not compatible with this pure-Python engine. Re-import data into a new database; automatic migration is not available.
+
+## Quick Start
+
+### Local `.db` File
+
+Passing a local `.db` path to `MilvusClient` starts Milvus Lite automatically.
 
 ```python
 from pymilvus import MilvusClient
-import numpy as np
 
-client = MilvusClient("./milvus_demo.db")
+client = MilvusClient("./demo.db")
+
 client.create_collection(
-    collection_name="demo_collection",
-    dimension=384  # The vectors we will use in this demo has 384 dimensions
+    collection_name="docs",
+    dimension=4,
 )
 
-# Text strings to search from.
-docs = [
-    "Artificial intelligence was founded as an academic discipline in 1956.",
-    "Alan Turing was the first person to conduct substantial research in AI.",
-    "Born in Maida Vale, London, Turing was raised in southern England.",
+data = [
+    {"id": 1, "vector": [0.1, 0.2, 0.3, 0.4], "text": "python tutorial", "category": "tech"},
+    {"id": 2, "vector": [0.2, 0.1, 0.4, 0.3], "text": "machine learning", "category": "ai"},
+    {"id": 3, "vector": [0.9, 0.1, 0.1, 0.1], "text": "travel notes", "category": "life"},
 ]
-# For illustration, here we use fake vectors with random numbers (384 dimension).
+client.insert("docs", data)
 
-vectors = [[ np.random.uniform(-1, 1) for _ in range(384) ] for _ in range(len(docs)) ]
-data = [ {"id": i, "vector": vectors[i], "text": docs[i], "subject": "history"} for i in range(len(vectors)) ]
-res = client.insert(
-    collection_name="demo_collection",
-    data=data
-)
-
-# This will exclude any text in "history" subject despite close to the query vector.
-res = client.search(
-    collection_name="demo_collection",
-    data=[vectors[0]],
-    filter="subject == 'history'",
+results = client.search(
+    collection_name="docs",
+    data=[[0.1, 0.2, 0.3, 0.4]],
     limit=2,
-    output_fields=["text", "subject"],
+    filter="category in ['tech', 'ai']",
+    output_fields=["text", "category"],
 )
-print(res)
+print(results)
 
-# a query that retrieves all entities matching filter expressions.
-res = client.query(
-    collection_name="demo_collection",
-    filter="subject == 'history'",
-    output_fields=["text", "subject"],
+rows = client.query(
+    collection_name="docs",
+    filter="category == 'tech'",
+    output_fields=["text"],
 )
-print(res)
+print(rows)
 
-# delete
-res = client.delete(
-    collection_name="demo_collection",
-    filter="subject == 'history'",
-)
-print(res)
+client.delete("docs", ids=[3])
+client.drop_collection("docs")
 ```
 
-# Supported Features
+### Standalone gRPC Server
 
-## Functionality
-Milvus Lite shares the same API as Milvus Standalone, Milvus Distributed and Zilliz Cloud, offering core features including:
-- Insert/upsert operations
-- Vector data persistence and collection management
-- Dense, sparse, and hybrid vector search
-- Metadata filtering
-- Multi-vector support 
+Use server mode when you want a long-running local process or more than one client.
 
-## Index Type
-Milvus Lite has limited index type support compared to other Milvus deployments:
-
-- Prior to version 2.4.11:
-  - Only supports the [FLAT](https://milvus.io/docs/index.md?tab=floating#FLAT) index type
-  - Uses FLAT index regardless of the specified index type in collection creation
-
-- Version 2.4.11 and later:
-  - Supports both [FLAT](https://milvus.io/docs/index.md?tab=floating#FLAT) and [IVF_FLAT](https://milvus.io/docs/index.md?tab=floating#IVFFLAT) index types
-  - For IVF_FLAT indexes:
-    - Data size < 100,000: Automatically uses FLAT index internally for better performance
-    - Data size ≥ 100,000: Constructs and uses IVF_FLAT index as specified
-
-# Known Limitations
-
-Milvus Lite does not support partitions, users/roles/RBAC, alias. To use those features, please choose other Milvus deployment types such as [Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone), [Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed) or [Zilliz Cloud](https://zilliz.com/cloud) (fully-managed Milvus).
-
-# Migrating data from Milvus Lite
-
-All data stored in Milvus Lite can be easily exported and loaded into other types of Milvus deployment, such as Milvus Standalone on Docker, Milvus Distributed on K8s, or fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud).
-
-Milvus Lite provides a command line tool that can dump data into a json file, which can be imported into self-hosted [Milvus](https://github.com/milvus-io/milvus) or fully-managed Milvus on [Zilliz Cloud](https://zilliz.com/cloud). 
-
-```shell
-pip install -U "pymilvus[bulk_writer]"
-# The `milvus-lite` command line tool is already included in `milvus-lite` package which is part of "pymilvus", but it also needs some dependencies from `pymilvus[bulk_writer]` for dumping data.
-
-milvus-lite dump -h
-
-usage: milvus-lite dump [-h] [-d DB_FILE] [-c COLLECTION] [-p PATH]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -d DB_FILE, --db-file DB_FILE
-                        milvus lite db file
-  -c COLLECTION, --collection COLLECTION
-                        collection that need to be dumped
-  -p PATH, --path PATH  dump file storage dir
-```
-The following example dumps all data from `demo_collection` collection that's stored in `./milvus_demo.db` (a user specified local file that persists data for Milvus Lite)
-
-To export data:
-
-```shell
-milvus-lite dump -d ./milvus_demo.db -c demo_collection -p ./data_dir
-# ./milvus_demo.db: milvus lite db file
-# demo_collection: collection that need to be dumped
-#./data_dir : dump file storage dir
+```bash
+milvus-lite server --data-dir ./data --port 19530
 ```
 
-You can use the dump file as input to upload data to Zilliz Cloud via [Data Import](https://docs.zilliz.com/docs/data-import), or a self-hosted Milvus server via [Bulk Insert](https://milvus.io/docs/import-data.md).
-# Contributing
-If you want to contribute to Milvus Lite, please read the [Contributing Guide](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md) first.
+```python
+from pymilvus import MilvusClient
 
-# Report a bug
-For any bug or feature request, please report it by submitting an issue in [milvus-lite](https://github.com/milvus-io/milvus-lite/issues/new/choose) repo.
+client = MilvusClient(uri="http://127.0.0.1:19530")
+```
 
-# License
-Milvus Lite is under the Apache 2.0 license. See the [LICENSE](https://github.com/milvus-io/milvus-lite/blob/main/LICENSE) file for details.
+### Embedded Engine API
+
+Use the internal Python engine directly when you do not need the Milvus protocol adapter.
+
+```python
+from milvus_lite import CollectionSchema, DataType, FieldSchema, MilvusLite
+
+schema = CollectionSchema(fields=[
+    FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+    FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
+    FieldSchema(name="category", dtype=DataType.VARCHAR, max_length=64),
+])
+
+with MilvusLite("./data") as db:
+    col = db.create_collection("docs", schema)
+    col.insert([
+        {"id": 1, "vec": [0.1, 0.2, 0.3, 0.4], "category": "tech"},
+        {"id": 2, "vec": [0.2, 0.1, 0.4, 0.3], "category": "ai"},
+    ])
+    col.create_index("vec", {
+        "index_type": "HNSW",
+        "metric_type": "COSINE",
+        "params": {"M": 16, "efConstruction": 200},
+    })
+    col.load()
+
+    results = col.search(
+        [[0.1, 0.2, 0.3, 0.4]],
+        top_k=2,
+        metric_type="COSINE",
+        expr="category == 'tech'",
+        output_fields=["category"],
+    )
+    print(results)
+```
+
+## Full Text and Hybrid Search
+
+Milvus Lite supports BM25 through Milvus schema functions. Text fields are analyzed on insert and written to a sparse vector field.
+
+```python
+from pymilvus import DataType, Function, FunctionType, MilvusClient
+
+client = MilvusClient("./fts.db")
+
+schema = MilvusClient.create_schema(auto_id=True)
+schema.add_field("id", DataType.INT64, is_primary=True)
+schema.add_field(
+    "text",
+    DataType.VARCHAR,
+    max_length=65535,
+    enable_analyzer=True,
+    enable_match=True,
+)
+schema.add_field("sparse", DataType.SPARSE_FLOAT_VECTOR)
+schema.add_function(Function(
+    name="bm25",
+    function_type=FunctionType.BM25,
+    input_field_names=["text"],
+    output_field_names=["sparse"],
+))
+
+client.create_collection("articles", schema=schema)
+client.insert("articles", [
+    {"text": "machine learning algorithms"},
+    {"text": "deep learning neural networks"},
+    {"text": "database systems and search"},
+])
+
+index_params = client.prepare_index_params()
+index_params.add_index(
+    field_name="sparse",
+    index_type="SPARSE_INVERTED_INDEX",
+    metric_type="BM25",
+    params={},
+)
+client.create_index("articles", index_params)
+client.load_collection("articles")
+
+results = client.search(
+    "articles",
+    data=["machine learning"],
+    anns_field="sparse",
+    limit=3,
+    output_fields=["text"],
+)
+print(results)
+```
+
+Hybrid search combines multiple ANN routes, such as dense vector search plus BM25, with `WeightedRanker` or `RRFRanker`. Request-level `FunctionType.RERANK` is also supported for model rerank and numeric decay rerank.
+
+## Filtering
+
+Milvus Lite implements Milvus-style scalar expressions for search, query, get, and delete paths.
+
+```python
+client.query("docs", filter="age > 25 and status == 'active'")
+client.query("docs", filter="category in ['tech', 'science']")
+client.query("docs", filter="name like 'John%'")
+client.query("docs", filter='array_contains(tags, "python")')
+client.query("docs", filter="array_length(scores) >= 3")
+client.query("docs", filter='$meta["color"] == "red"')
+client.query("docs", filter="text_match(text, 'machine learning')")
+```
+
+## Dump Data
+
+Milvus Lite includes a compatibility dump command that exports a collection to local Milvus BulkWriter JSON files.
+
+Dump a local `.db` database:
+
+```bash
+milvus-lite dump -d ./demo.db -c docs -p ./dump
+```
+
+Or dump from a running Milvus-compatible endpoint:
+
+```bash
+milvus-lite dump --uri http://127.0.0.1:19530 -c docs -p ./dump
+```
+
+The command reads rows through `pymilvus` query iterators and writes BulkWriter JSON files that can be used with Milvus Bulk Insert or Zilliz Cloud import workflows. Its `pymilvus` and BulkWriter dependencies are expected to come from the `pymilvus` installation that installed Milvus Lite. This is an export tool, not an automatic storage-format migration: original milvus-lite v1 `.db` files still need to be dumped from an environment that can open the v1 database.
+
+## Supported Features
+
+| Area | Support |
+|---|---|
+| Vector types | `FLOAT_VECTOR`, `SPARSE_FLOAT_VECTOR` |
+| Scalar types | `BOOL`, integer types, `FLOAT`, `DOUBLE`, `VARCHAR`, `JSON`, `ARRAY` |
+| Metrics | `COSINE`, `L2`, `IP`, `BM25` |
+| Indexes | `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, `FLAT`, `BRUTE_FORCE`, `AUTOINDEX`, `SPARSE_INVERTED_INDEX` |
+| CRUD | insert, upsert, partial update, delete by ID/filter, get, query, search, truncate |
+| Collection management | create, drop, rename, describe, statistics, aliases |
+| Partitions | create, drop, list, partition-specific insert/search, partition key routing |
+| Search features | dense search, sparse search, hybrid search, range search, group-by, iterators, offset, `round_decimal` |
+| Schema features | auto ID, nullable fields, default values, dynamic fields, BM25 functions, text embedding functions |
+| Text search | standard analyzer, optional Jieba analyzer, `text_match`, BM25 sparse inverted index |
+| Adapter | Milvus-compatible gRPC server used by `pymilvus` |
+
+## Known Limitations
+
+- Single process per `data_dir`; Milvus Lite uses a file lock to protect local storage.
+- Single logical database namespace; database APIs expose the default namespace only.
+- No authentication, users, roles, or RBAC.
+- No binary, float16, or bfloat16 vector fields.
+- No Product Quantization indexes.
+- BM25 IDF statistics are segment-local rather than global.
+- The engine is designed for local development and small-scale workloads, not distributed production serving.
+
+## Architecture
+
+```text
+pymilvus client
+      |
+      v
+adapter/grpc
+      |
+      v
+engine/Collection
+      |
+      +-- storage/   WAL, MemTable, Parquet segments, deltas, manifest
+      +-- search/    bitmap pipeline, scalar filters, dense/sparse executors
+      +-- index/     FAISS indexes, brute-force index, sparse inverted index
+      +-- analyzer/  standard and Jieba analyzers, BM25 term hashing
+      +-- function/  BM25, text embedding, hybrid merge, rerank chains
+      +-- schema/    data types, validation, Arrow schema builders
+```
+
+The storage path is LSM-tree style: writes go to the WAL and MemTable, flush creates immutable Parquet files, and compaction merges segments and garbage-collects tombstones. Vector indexes are bound to immutable segments one-to-one and persisted as `.idx` files. The manifest is the source of truth and is updated atomically.
+
+## Development
+
+```bash
+git clone https://github.com/milvus-io/milvus-lite.git
+cd milvus-lite
+make dev
+source .venv/bin/activate
+```
+
+Common commands:
+
+| Command | Description |
+|---|---|
+| `make test` | Run the regular functional suite |
+| `make test-fast` | Run the fast local suite |
+| `make test-core` | Run schema, storage, search, index, analyzer, engine, function, rerank, embedding tests |
+| `make test-compat` | Run gRPC adapter and pymilvus compatibility tests |
+| `make test-stability` | Run slow crash and long-run stability tests |
+| `make test-soak` | Run explicit large-scale soak tests |
+| `make benchmark` | Run performance benchmarks |
+| `make coverage` | Run tests with coverage |
+| `make build` | Build wheel and source distribution under `dist/` |
+| `make serve` | Start a local gRPC server via `milvus-lite server` on port 19530 |
+| `make clean` | Remove virtualenv, caches, coverage files, and build artifacts |
+
+## Documentation
+
+Design notes are in [`docs/`](docs/). Start with [`docs/modules.md`](docs/modules.md) for the file-by-file architecture, then read the focused design documents for WAL, filters, indexes, gRPC compatibility, full text search, and search iterators.
+
+## Contributing
+
+Issues and pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before sending larger changes.
+
+## License
+
+Milvus Lite is licensed under Apache License 2.0. See [`LICENSE`](LICENSE).
