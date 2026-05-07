@@ -1,7 +1,8 @@
 """Tests for milvus_lite.db.MilvusLite — multi-Collection lifecycle + LOCK."""
 
-import multiprocessing
 import os
+import subprocess
+import sys
 import time
 
 import pytest
@@ -380,16 +381,47 @@ def test_double_open_in_same_process_raises(tmp_path):
         db1.close()
 
 
-def _try_open_in_subprocess(data_dir, result_queue):
-    """Helper for the subprocess multi-process test."""
-    try:
-        db = MilvusLite(data_dir)
-        db.close()
-        result_queue.put("opened")
-    except DataDirLockedError:
-        result_queue.put("locked")
-    except Exception as e:
-        result_queue.put(f"error: {type(e).__name__}: {e}")
+def _try_open_in_subprocess(data_dir):
+    """Open *data_dir* in a fresh Python process and return its status."""
+    status_prefix = "milvus_lite_lock_status:"
+    code = """
+import sys
+
+from milvus_lite.db import MilvusLite
+from milvus_lite.exceptions import DataDirLockedError
+
+STATUS_PREFIX = "milvus_lite_lock_status:"
+
+try:
+    db = MilvusLite(sys.argv[1])
+    db.close()
+except DataDirLockedError:
+    print(f"{STATUS_PREFIX}locked")
+except Exception as e:
+    print(f"{STATUS_PREFIX}error: {type(e).__name__}: {e}")
+else:
+    print(f"{STATUS_PREFIX}opened")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code, data_dir],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if result.returncode != 0:
+        return (
+            f"error: subprocess exited {result.returncode}; "
+            f"stdout={result.stdout.strip()!r}; "
+            f"stderr={result.stderr.strip()!r}"
+        )
+    for line in reversed(result.stdout.splitlines()):
+        if line.startswith(status_prefix):
+            return line.removeprefix(status_prefix)
+    return (
+        "error: subprocess did not report status; "
+        f"stdout={result.stdout.strip()!r}; "
+        f"stderr={result.stderr.strip()!r}"
+    )
 
 
 def test_lock_blocks_subprocess(tmp_path):
@@ -398,13 +430,7 @@ def test_lock_blocks_subprocess(tmp_path):
     data_dir = str(tmp_path / "data")
     db = MilvusLite(data_dir)
     try:
-        ctx = multiprocessing.get_context("spawn")
-        q = ctx.Queue()
-        p = ctx.Process(target=_try_open_in_subprocess, args=(data_dir, q))
-        p.start()
-        p.join(timeout=10)
-        assert not p.is_alive(), "subprocess hung"
-        result = q.get_nowait()
+        result = _try_open_in_subprocess(data_dir)
         assert result == "locked", f"expected 'locked', got {result!r}"
     finally:
         db.close()
@@ -416,11 +442,5 @@ def test_subprocess_can_open_after_close(tmp_path):
     db = MilvusLite(data_dir)
     db.close()
 
-    ctx = multiprocessing.get_context("spawn")
-    q = ctx.Queue()
-    p = ctx.Process(target=_try_open_in_subprocess, args=(data_dir, q))
-    p.start()
-    p.join(timeout=10)
-    assert not p.is_alive()
-    result = q.get_nowait()
+    result = _try_open_in_subprocess(data_dir)
     assert result == "opened", f"expected 'opened', got {result!r}"
