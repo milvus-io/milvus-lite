@@ -122,6 +122,12 @@ def parse_search_request(request, default_metric_type: str = "COSINE") -> dict:
         strict_group_size = bool(strict_group_size)
 
     function_score = decode_hybrid_function_score(request.function_score)
+    timezone = raw_params.get("timezone")
+    if not isinstance(timezone, str) or not timezone:
+        timezone = None
+    time_fields = raw_params.get("time_fields")
+    if not isinstance(time_fields, str) or not time_fields:
+        time_fields = None
 
     return {
         "query_vectors": query_vectors,
@@ -141,6 +147,8 @@ def parse_search_request(request, default_metric_type: str = "COSINE") -> dict:
         "round_decimal": int(raw_params.get("round_decimal", -1)),
         "ranker": function_score.get("boost"),
         "rerank": function_score.get("rerank"),
+        "timezone": timezone,
+        "time_fields": time_fields,
     }
 
 

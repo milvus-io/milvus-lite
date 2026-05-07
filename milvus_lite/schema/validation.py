@@ -13,9 +13,22 @@ from milvus_lite.schema.types import (
     Function,
     FunctionType,
 )
+from milvus_lite.schema.timestamptz import parse_timestamptz, validate_timezone_name
 
 # Reserved column names — users may not name fields these.
-RESERVED_FIELD_NAMES = frozenset({"_seq", "_partition", "$meta"})
+#
+# `iso`/`interval` mirror Milvus Plan.g4: they are lexer keywords for
+# TIMESTAMPTZ literals, not identifiers.
+RESERVED_FIELD_NAMES = frozenset({
+    "_seq",
+    "_partition",
+    "$meta",
+    "iso",
+    "ISO",
+    "interval",
+    "INTERVAL",
+})
+_CASE_INSENSITIVE_RESERVED_FIELD_NAMES = frozenset({"iso", "interval"})
 
 # pk dtype must be one of these.
 _PK_ALLOWED_DTYPES = frozenset({DataType.VARCHAR, DataType.INT64})
@@ -32,6 +45,7 @@ _DTYPE_PYTHON_CHECK = {
     DataType.DOUBLE: lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
     DataType.VARCHAR: lambda v: isinstance(v, str),
     DataType.JSON: lambda v: isinstance(v, (dict, list, str, int, float, bool)) or v is None,
+    DataType.TIMESTAMPTZ: lambda v: isinstance(v, int) and not isinstance(v, bool),
 }
 
 
@@ -39,7 +53,10 @@ _DTYPE_PYTHON_CHECK = {
 # Schema validation
 # ---------------------------------------------------------------------------
 
-def validate_schema(schema: CollectionSchema) -> None:
+def validate_schema(
+    schema: CollectionSchema,
+    default_properties: Optional[dict[str, Any]] = None,
+) -> None:
     """Validate a CollectionSchema definition.
 
     Rules:
@@ -49,12 +66,21 @@ def validate_schema(schema: CollectionSchema) -> None:
     - FLOAT_VECTOR field must have dim > 0
     - primary key field must not be nullable
     - field names must be unique
-    - field names must not collide with reserved names (_seq, _partition, $meta)
+    - field names must not collide with reserved names
     - BM25 function: input must be VARCHAR with enable_analyzer,
       output must be SPARSE_FLOAT_VECTOR
     """
     if not schema.fields:
         raise SchemaValidationError("schema has no fields")
+    if not isinstance(schema.properties, dict):
+        raise SchemaValidationError("schema properties must be a dict")
+
+    default_timezone = None
+    if default_properties and "timezone" in default_properties:
+        default_timezone = validate_timezone_name(default_properties["timezone"])
+    if "timezone" in schema.properties:
+        default_timezone = validate_timezone_name(schema.properties["timezone"])
+        schema.properties["timezone"] = default_timezone
 
     seen_names: set[str] = set()
     pk_fields: list[FieldSchema] = []
@@ -65,7 +91,10 @@ def validate_schema(schema: CollectionSchema) -> None:
     for f in schema.fields:
         if not f.name:
             raise SchemaValidationError("field name must not be empty")
-        if f.name in RESERVED_FIELD_NAMES:
+        if (
+            f.name in RESERVED_FIELD_NAMES
+            or f.name.casefold() in _CASE_INSENSITIVE_RESERVED_FIELD_NAMES
+        ):
             raise SchemaValidationError(
                 f"field name {f.name!r} is reserved (one of {sorted(RESERVED_FIELD_NAMES)})"
             )
@@ -90,6 +119,11 @@ def validate_schema(schema: CollectionSchema) -> None:
                 raise SchemaValidationError(
                     f"ARRAY field {f.name!r} requires element_type"
                 )
+        if f.dtype == DataType.TIMESTAMPTZ and f.default_value is not None:
+            f.default_value = parse_timestamptz(
+                f.default_value,
+                default_timezone=default_timezone,
+            )
 
     if len(pk_fields) == 0:
         raise SchemaValidationError("schema has no primary key field")
@@ -262,7 +296,11 @@ def _function_output_field_names(schema: CollectionSchema) -> frozenset[str]:
     return frozenset(names)
 
 
-def validate_record(record: dict, schema: CollectionSchema) -> None:
+def validate_record(
+    record: dict,
+    schema: CollectionSchema,
+    default_properties: Optional[dict[str, Any]] = None,
+) -> None:
     """Validate a single record dict against the schema.
 
     Rules:
@@ -287,6 +325,9 @@ def validate_record(record: dict, schema: CollectionSchema) -> None:
                 record[f.name] = copy.deepcopy(f.default_value)
 
     schema_field_names = {f.name for f in schema.fields}
+    default_timezone = schema.properties.get("timezone")
+    if default_timezone is None and default_properties:
+        default_timezone = default_properties.get("timezone")
     pk = _find_pk(schema)
     func_output_names = _function_output_field_names(schema)
 
@@ -375,6 +416,17 @@ def validate_record(record: dict, schema: CollectionSchema) -> None:
                     f"field {f.name!r} is None but not nullable"
                 )
             continue
+        if f.dtype == DataType.TIMESTAMPTZ:
+            try:
+                record[f.name] = parse_timestamptz(
+                    value,
+                    default_timezone=default_timezone,
+                )
+            except SchemaValidationError as e:
+                raise SchemaValidationError(
+                    f"field {f.name!r} value {value!r} does not match dtype {f.dtype}"
+                ) from e
+            value = record[f.name]
         # VARCHAR max_length check
         if f.dtype == DataType.VARCHAR and f.max_length is not None:
             if isinstance(value, str) and len(value) > f.max_length:

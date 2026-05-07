@@ -75,6 +75,10 @@ class TokenKind(Enum):
     # Sentinel
     EOF = "EOF"
 
+    # TIMESTAMPTZ literals
+    ISO = "ISO"
+    INTERVAL = "INTERVAL"
+
 
 @dataclass(frozen=True)
 class Token:
@@ -95,6 +99,8 @@ _KEYWORD_MAP = {
     "like": TokenKind.LIKE, "LIKE": TokenKind.LIKE,
     "is": TokenKind.IS, "IS": TokenKind.IS,
     "null": TokenKind.NULL, "NULL": TokenKind.NULL,
+    "iso": TokenKind.ISO, "ISO": TokenKind.ISO,
+    "interval": TokenKind.INTERVAL, "INTERVAL": TokenKind.INTERVAL,
 }
 
 # Boolean literals — only these 6 forms are accepted as bool.

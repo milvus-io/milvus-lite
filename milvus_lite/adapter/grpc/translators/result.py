@@ -36,6 +36,8 @@ def build_search_result_data(
     pk_name: str,
     output_fields: Optional[List[str]] = None,
     group_by_field: Optional[str] = None,
+    time_fields: Optional[List[str] | str] = None,
+    timezone: str | None = None,
 ) -> schema_pb2.SearchResultData:
     """Flatten the engine's per-query results into one SearchResultData.
 
@@ -86,7 +88,11 @@ def build_search_result_data(
     # translator still emits one empty FieldData per emitted field
     # (Phase 10.3 fix), so pymilvus's parser doesn't choke.
     fields_data = records_to_fields_data(
-        flat_records, schema, output_fields=output_fields,
+        flat_records,
+        schema,
+        output_fields=output_fields,
+        time_fields=time_fields,
+        timezone=timezone,
     )
 
     # Determine emitted output_fields list. pymilvus's parser uses

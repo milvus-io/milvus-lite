@@ -70,6 +70,7 @@ from milvus_lite.schema.validation import (
     validate_record,
     validate_schema,
 )
+from milvus_lite.schema.timestamptz import validate_timezone_name
 from milvus_lite.search.assembler import assemble_candidates
 from milvus_lite.search.executor import execute_search
 from milvus_lite.search.executor_indexed import execute_search_with_index
@@ -145,8 +146,12 @@ class Collection:
         name: str,
         data_dir: str,
         schema: CollectionSchema,
+        database_properties: Optional[Dict[str, Any]] = None,
     ) -> None:
-        validate_schema(schema)
+        self._database_properties = (
+            database_properties if database_properties is not None else {}
+        )
+        validate_schema(schema, default_properties=self._database_properties)
 
         self._name = name
         self._data_dir = data_dir
@@ -311,7 +316,11 @@ class Collection:
 
         # 3. validate every record up-front
         for r in records:
-            validate_record(r, self._schema)
+            validate_record(
+                r,
+                self._schema,
+                default_properties=self._database_properties,
+            )
 
         # 4. partition key routing
         if self._partition_key_field is not None:
@@ -504,6 +513,7 @@ class Collection:
         partition_names: Optional[List[str]] = None,
         expr: Optional[str] = None,
         output_fields: Optional[List[str]] = None,
+        timezone: Optional[str] = None,
     ) -> List[dict]:
         """Point read across MemTable + segments.
 
@@ -526,7 +536,7 @@ class Collection:
         self._require_loaded()
 
         partition_filter = set(partition_names) if partition_names else None
-        compiled_filter = self._compile_filter(expr) if expr else None
+        compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
         # Snapshot tombstones so the bg worker's gc_below doesn't
         # invalidate entries we rely on during this read.
         seg_snap, delta_snap = self._read_snapshot()
@@ -591,6 +601,7 @@ class Collection:
         range_filter: Optional[float] = None,
         offset: int = 0,
         ranker: Optional[dict] = None,
+        timezone: Optional[str] = None,
     ) -> List[List[dict]]:
         """Vector top-k search.
 
@@ -684,6 +695,7 @@ class Collection:
                 partition_names=partition_names,
                 expr=expr,
                 output_fields=output_fields,
+                timezone=timezone,
             )
         else:
             # Dense float vector search — auto-embed text queries if needed
@@ -693,7 +705,7 @@ class Collection:
                 raise ValueError(
                     f"query_vectors must be a 2-D list, got shape {q_arr.shape}"
                 )
-            compiled_filter = self._compile_filter(expr) if expr else None
+            compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
             seg_snap, delta_snap = self._read_snapshot()
             raw_results = execute_search_with_index(
                 query_vectors=q_arr,
@@ -725,7 +737,7 @@ class Collection:
                 ranker,
                 metric_type=metric_type,
                 pk_name=self._pk_name,
-                compile_filter=self._compile_filter,
+                compile_filter=lambda s: self._compile_filter(s, timezone=timezone),
                 row_matches_filter=_row_matches_filter,
             )
 
@@ -786,6 +798,7 @@ class Collection:
         partition_names: Optional[List[str]],
         expr: Optional[str],
         output_fields: Optional[List[str]],
+        timezone: Optional[str] = None,
     ) -> List[List[dict]]:
         """Sparse vector search using per-segment cached BM25 indexes.
 
@@ -880,7 +893,7 @@ class Collection:
 
             # Apply scalar filter
             if expr:
-                compiled = self._compile_filter(expr)
+                compiled = self._compile_filter(expr, timezone=timezone)
                 from milvus_lite.search.filter.eval import evaluate as filter_evaluate
                 fmask = filter_evaluate(compiled, table).to_numpy(zero_copy_only=False)
                 valid_mask = valid_mask & fmask
@@ -918,7 +931,7 @@ class Collection:
             mt_valid = np.ones(len(mt_pks), dtype=bool)
 
             if expr:
-                compiled = self._compile_filter(expr)
+                compiled = self._compile_filter(expr, timezone=timezone)
                 from milvus_lite.search.filter.eval.python_backend import _eval_row
                 for i in range(len(mt_pks)):
                     if mt_valid[i]:
@@ -1053,6 +1066,7 @@ class Collection:
         partition_names: Optional[List[str]] = None,
         limit: Optional[int] = None,
         offset: int = 0,
+        timezone: Optional[str] = None,
     ) -> List[dict]:
         """Pure scalar query — no vector, no distance.
 
@@ -1079,7 +1093,7 @@ class Collection:
 
         self._require_loaded()
 
-        compiled_filter = self._compile_filter(expr) if expr else None
+        compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
 
         seg_snap, delta_snap = self._read_snapshot()
 
@@ -1138,20 +1152,38 @@ class Collection:
                 f"call load() before search/get/query"
             )
 
-    def _compile_filter(self, expr_str: str) -> "CompiledExpr":
+    def _compile_filter(
+        self,
+        expr_str: str,
+        timezone: Optional[str] = None,
+    ) -> "CompiledExpr":
         """Parse + compile a filter expression, with LRU caching.
 
-        The cache is keyed only on the expression string because the
-        schema is implicit (this Collection's). Schema is immutable for
-        the lifetime of a Collection, so cached entries never go stale.
+        The cache is keyed on the expression string plus the effective
+        timezone, because naive TIMESTAMPTZ literals are normalized at
+        parse time.
         """
-        cached = self._filter_cache.get(expr_str)
+        default_timezone = self._effective_timezone(timezone)
+        cache_key = (expr_str, default_timezone)
+        cached = self._filter_cache.get(cache_key)
         if cached is not None:
             return cached
         from milvus_lite.search.filter import compile_filter
-        compiled = compile_filter(expr_str, self._schema)
-        self._filter_cache.put(expr_str, compiled)
+        compiled = compile_filter(
+            expr_str,
+            self._schema,
+            default_timezone=default_timezone,
+        )
+        self._filter_cache.put(cache_key, compiled)
         return compiled
+
+    def _effective_timezone(self, timezone: Optional[str] = None) -> Optional[str]:
+        if timezone is not None and timezone != "":
+            return validate_timezone_name(timezone)
+        return (
+            self._schema.properties.get("timezone")
+            or self._database_properties.get("timezone")
+        )
 
     def _project_record(
         self,
@@ -1500,6 +1532,30 @@ class Collection:
         """Collection schema (read-only)."""
         return self._schema
 
+    def alter_properties(
+        self,
+        properties: Optional[Dict[str, Any]] = None,
+        delete_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Update mutable collection properties.
+
+        The schema structure remains immutable; only schema-level
+        properties such as TIMESTAMPTZ timezone are updated.
+        """
+        import copy
+
+        next_schema = copy.deepcopy(self._schema)
+        next_props = dict(next_schema.properties)
+        for key in delete_keys or []:
+            next_props.pop(str(key), None)
+        for key, value in (properties or {}).items():
+            next_props[str(key)] = value
+        next_schema.properties = next_props
+        validate_schema(next_schema, default_properties=self._database_properties)
+
+        self._schema.properties = dict(next_schema.properties)
+        self._filter_cache.clear()
+
     @property
     def num_entities(self) -> int:
         """Approximate live row count across MemTable + segments.
@@ -1579,6 +1635,7 @@ class Collection:
                     for f in self._schema.fields
                 ],
                 "enable_dynamic_field": self._schema.enable_dynamic_field,
+                "properties": dict(self._schema.properties),
             },
             "partitions": self.list_partitions(),
             "num_entities": self.num_entities,

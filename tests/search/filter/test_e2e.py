@@ -9,6 +9,7 @@ that introduces python_backend dispatch will preserve semantics.
 """
 
 from dataclasses import replace
+from datetime import datetime, timezone
 
 import pyarrow as pa
 import pytest
@@ -30,6 +31,7 @@ def schema():
         FieldSchema(name="score", dtype=DataType.FLOAT),
         FieldSchema(name="active", dtype=DataType.BOOL),
         FieldSchema(name="category", dtype=DataType.VARCHAR),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ, nullable=True),
     ])
 
 
@@ -43,6 +45,16 @@ def sample_table():
         "score": [0.1, 0.5, 0.7, 0.3, 0.9, 0.5, 1.0, 0.0],
         "active": [True, False, True, True, False, True, True, False],
         "category": ["news", "tech", "tech", "blog", "news", "tech", "ai", "blog"],
+        "tsz": pa.array([
+            datetime(2024, 12, 31, 16, tzinfo=timezone.utc),
+            datetime(2025, 1, 1, 16, tzinfo=timezone.utc),
+            datetime(2025, 1, 2, 16, tzinfo=timezone.utc),
+            None,
+            datetime(2025, 1, 4, 16, tzinfo=timezone.utc),
+            datetime(2025, 1, 5, 16, tzinfo=timezone.utc),
+            datetime(2025, 1, 6, 16, tzinfo=timezone.utc),
+            datetime(2025, 1, 7, 16, tzinfo=timezone.utc),
+        ], type=pa.timestamp("us", tz="UTC")),
     })
 
 
@@ -157,6 +169,12 @@ DIFFERENTIAL_EXPRESSIONS = [
     "age + 1 > 20 and title like '%i%'",
     "title is not null and age * 2 > 30",
     "(age - 10) * 2 < 50 or score / 2 > 0.4",
+    # ── TIMESTAMPTZ ─────────────────────────────────────────────
+    "tsz > ISO '2025-01-03T00:00:00+08:00'",
+    "tsz + INTERVAL 'P1D' <= ISO '2025-01-06T00:00:00Z'",
+    "tsz - INTERVAL 'PT6H' < ISO '2025-01-05T00:00:00Z'",
+    "tsz in [ISO '2025-01-01T16:00:00Z', ISO '2025-01-05T16:00:00Z']",
+    "tsz is null",
 ]
 
 

@@ -573,6 +573,53 @@ def test_hybrid_with_filter(milvus_client):
     milvus_client.drop_collection(name)
 
 
+def test_hybrid_timestamptz_timezone_and_time_fields(milvus_client):
+    schema = MilvusClient.create_schema(auto_id=False)
+    schema.add_field("id", DataType.INT64, is_primary=True)
+    schema.add_field("dense", DataType.FLOAT_VECTOR, dim=2)
+    schema.add_field("ts", DataType.TIMESTAMPTZ, nullable=False)
+
+    name = "hybrid_timestamptz"
+    milvus_client.create_collection(
+        name,
+        schema=schema,
+        properties={"timezone": "UTC"},
+    )
+    milvus_client.insert(name, [
+        {"id": 1, "dense": [1.0, 0.0], "ts": "2025-01-01T00:00:00Z"},
+        {"id": 2, "dense": [0.9, 0.0], "ts": "2024-12-31T16:00:00Z"},
+    ])
+
+    idx = milvus_client.prepare_index_params()
+    idx.add_index(field_name="dense", index_type="BRUTE_FORCE",
+                  metric_type="COSINE", params={})
+    milvus_client.create_index(name, idx)
+    milvus_client.load_collection(name)
+
+    req = AnnSearchRequest(
+        data=[[1.0, 0.0]],
+        anns_field="dense",
+        param={},
+        limit=2,
+        expr="ts == ISO '2025-01-01T00:00:00'",
+    )
+
+    results = milvus_client.hybrid_search(
+        name,
+        reqs=[req],
+        ranker=RRFRanker(),
+        limit=2,
+        output_fields=["ts"],
+        timezone="Asia/Shanghai",
+        time_fields="year, month, day, hour",
+    )
+
+    assert [hit["id"] for hit in results[0]] == [2]
+    assert results[0][0]["entity"]["ts"] == [2025, 1, 1, 0]
+
+    milvus_client.drop_collection(name)
+
+
 def test_hybrid_single_route_same_as_search(milvus_client):
     """Hybrid with one route should produce same results as plain search."""
     name = _create_hybrid_collection(milvus_client, "hybrid_single")

@@ -40,12 +40,15 @@ from milvus_lite.exceptions import (
 from milvus_lite.schema.persistence import load_schema, save_schema
 from milvus_lite.schema.types import CollectionSchema
 from milvus_lite.schema.validation import validate_schema
+from milvus_lite.schema.timestamptz import validate_timezone_name
 
 
 COLLECTIONS_DIRNAME = "collections"
 LOCK_FILENAME = "LOCK"
 SCHEMA_FILENAME = "schema.json"
 ALIASES_FILENAME = "aliases.json"
+DATABASE_PROPERTIES_FILENAME = "database_properties.json"
+DEFAULT_DATABASE_NAME = "default"
 
 
 class MilvusLite:
@@ -84,6 +87,7 @@ class MilvusLite:
         # only created when explicitly requested (lazy load on get).
         self._collections: Dict[str, Collection] = {}
         self._aliases: Dict[str, str] = self._load_aliases()
+        self._database_properties: Dict[str, Any] = self._load_database_properties()
         self._closed = False
 
     # ── public API ──────────────────────────────────────────────
@@ -92,15 +96,21 @@ class MilvusLite:
         self,
         name: str,
         schema: CollectionSchema,
+        properties: Optional[Dict[str, Any]] = None,
     ) -> Collection:
         """Create a new Collection. Raises if a Collection with this
         name already exists."""
         self._check_open()
         self._validate_name(name)
 
+        if properties:
+            merged = dict(schema.properties)
+            merged.update(properties)
+            schema.properties = merged
+
         # Validate the schema BEFORE touching disk so we don't leave a
         # half-initialized collection directory if validation fails.
-        validate_schema(schema)
+        validate_schema(schema, default_properties=self._database_properties)
 
         if self.has_collection(name):
             raise CollectionAlreadyExistsError(
@@ -115,7 +125,12 @@ class MilvusLite:
         save_schema(schema, name, os.path.join(col_dir, SCHEMA_FILENAME))
 
         try:
-            col = Collection(name, col_dir, schema)
+            col = Collection(
+                name,
+                col_dir,
+                schema,
+                database_properties=self._database_properties,
+            )
         except Exception:
             # Clean up orphan directory if Collection init fails
             shutil.rmtree(col_dir, ignore_errors=True)
@@ -137,7 +152,12 @@ class MilvusLite:
 
         col_dir = self._collection_dir(name)
         _name, schema = load_schema(os.path.join(col_dir, SCHEMA_FILENAME))
-        col = Collection(name, col_dir, schema)
+        col = Collection(
+            name,
+            col_dir,
+            schema,
+            database_properties=self._database_properties,
+        )
         self._collections[name] = col
         return col
 
@@ -250,6 +270,72 @@ class MilvusLite:
         os.makedirs(col_dir, exist_ok=False)
         save_schema(schema, name, os.path.join(col_dir, SCHEMA_FILENAME))
 
+    def alter_collection_properties(
+        self,
+        name: str,
+        properties: Optional[Dict[str, Any]] = None,
+        delete_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Update mutable collection properties and persist schema.json."""
+        self._check_open()
+        name = self.resolve_collection_name(name)
+        if not self.has_collection(name):
+            raise CollectionNotFoundError(f"collection {name!r} does not exist")
+
+        col = self.get_collection(name)
+        col.alter_properties(properties=properties, delete_keys=delete_keys)
+        save_schema(
+            col.schema,
+            name,
+            os.path.join(self._collection_dir(name), SCHEMA_FILENAME),
+        )
+
+    def describe_database(self, name: str = DEFAULT_DATABASE_NAME) -> Dict[str, Any]:
+        """Return metadata for the single embedded database."""
+        self._check_open()
+        self._validate_database_name(name)
+        return {
+            "name": DEFAULT_DATABASE_NAME,
+            "properties": dict(self._database_properties),
+        }
+
+    def alter_database_properties(
+        self,
+        name: str = DEFAULT_DATABASE_NAME,
+        properties: Optional[Dict[str, Any]] = None,
+        delete_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Update database-level default properties.
+
+        MilvusLite exposes one embedded database named ``default``.  Its
+        properties are defaults for collections that do not set the same
+        property themselves; TIMESTAMPTZ timezone parsing currently uses
+        this hierarchy.
+        """
+        self._check_open()
+        self._validate_database_name(name)
+
+        next_props = dict(self._database_properties)
+        for key in delete_keys or []:
+            next_props.pop(str(key), None)
+        for key, value in (properties or {}).items():
+            next_props[str(key)] = value
+        next_props = self._normalize_database_properties(next_props)
+
+        self._database_properties.clear()
+        self._database_properties.update(next_props)
+        self._save_database_properties()
+        for col in self._collections.values():
+            col._filter_cache.clear()  # noqa: SLF001
+
+    def drop_database_properties(
+        self,
+        name: str = DEFAULT_DATABASE_NAME,
+        property_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Delete database-level properties."""
+        self.alter_database_properties(name=name, delete_keys=property_keys or [])
+
     def create_alias(self, collection_name: str, alias: str) -> None:
         """Create a collection alias."""
         self._check_open()
@@ -360,6 +446,9 @@ class MilvusLite:
     def _aliases_path(self) -> str:
         return os.path.join(self._data_dir, ALIASES_FILENAME)
 
+    def _database_properties_path(self) -> str:
+        return os.path.join(self._data_dir, DATABASE_PROPERTIES_FILENAME)
+
     def _load_aliases(self) -> Dict[str, str]:
         path = self._aliases_path()
         if not os.path.exists(path):
@@ -380,6 +469,45 @@ class MilvusLite:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(self._aliases, f, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp_path, path)
+
+    def _load_database_properties(self) -> Dict[str, Any]:
+        path = self._database_properties_path()
+        if not os.path.exists(path):
+            return {}
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        return self._normalize_database_properties(data)
+
+    def _save_database_properties(self) -> None:
+        path = self._database_properties_path()
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(
+                self._database_properties,
+                f,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        os.replace(tmp_path, path)
+
+    @staticmethod
+    def _normalize_database_properties(values: Dict[str, Any]) -> Dict[str, Any]:
+        out = {str(key): value for key, value in values.items()}
+        if "timezone" in out:
+            out["timezone"] = validate_timezone_name(out["timezone"])
+        return out
+
+    @staticmethod
+    def _validate_database_name(name: str) -> None:
+        if not name:
+            name = DEFAULT_DATABASE_NAME
+        if name != DEFAULT_DATABASE_NAME:
+            raise ValueError(
+                f"MilvusLite only supports database {DEFAULT_DATABASE_NAME!r}, got {name!r}"
+            )
 
     @staticmethod
     def _validate_name(name: str) -> None:
