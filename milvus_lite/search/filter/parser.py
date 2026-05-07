@@ -35,6 +35,7 @@ from milvus_lite.search.filter.ast import (
     FloatLit,
     InOp,
     IntLit,
+    IntervalLit,
     ArrayAccessOp,
     ArrayContainsOp,
     ArrayLengthOp,
@@ -47,10 +48,12 @@ from milvus_lite.search.filter.ast import (
     Not,
     Or,
     StringLit,
+    TimestampLit,
     TextMatchOp,
 )
 from milvus_lite.search.filter.exceptions import FilterParseError
 from milvus_lite.search.filter.tokens import Token, TokenKind, tokenize
+from milvus_lite.schema.timestamptz import parse_interval_micros, parse_timestamptz
 
 
 _CMP_KINDS = (
@@ -458,23 +461,14 @@ class Parser:
 
     def parse_primary(self) -> Expr:
         """prec 6: literal | ident | (expr)."""
+        lit = self._parse_literal()
+        if lit is not None:
+            return lit
+
         tok = self._peek()
 
-        if tok.kind == TokenKind.INT:
-            self._consume()
-            return IntLit(value=tok.value, pos=tok.pos)
-
-        if tok.kind == TokenKind.FLOAT:
-            self._consume()
-            return FloatLit(value=tok.value, pos=tok.pos)
-
-        if tok.kind == TokenKind.STRING:
-            self._consume()
-            return StringLit(value=tok.value, pos=tok.pos)
-
-        if tok.kind == TokenKind.BOOL:
-            self._consume()
-            return BoolLit(value=tok.value, pos=tok.pos)
+        if tok.kind == TokenKind.INTERVAL:
+            return self._parse_interval_literal(tok)
 
         if tok.kind == TokenKind.IDENT:
             self._consume()
@@ -530,6 +524,40 @@ class Parser:
             hint="expected literal, identifier, or '('",
         )
 
+    def _parse_timestamp_literal(self, tok: Token) -> Expr:
+        """Parse ``ISO '...'`` as a TIMESTAMPTZ literal."""
+        iso_tok = self._consume()  # ISO
+        value_tok = self._peek()
+        if value_tok.kind != TokenKind.STRING:
+            raise FilterParseError(
+                "ISO timestamp literal requires a string",
+                self.source, value_tok.pos,
+                hint="example: ISO '2025-01-01T00:00:00Z'",
+            )
+        self._consume()
+        try:
+            value = parse_timestamptz(value_tok.value)
+        except Exception as e:
+            raise FilterParseError(str(e), self.source, value_tok.pos) from e
+        return TimestampLit(value=value, pos=iso_tok.pos)
+
+    def _parse_interval_literal(self, tok: Token) -> Expr:
+        """Parse ``INTERVAL 'P1D'`` as a duration literal."""
+        interval_tok = self._consume()  # INTERVAL
+        value_tok = self._peek()
+        if value_tok.kind != TokenKind.STRING:
+            raise FilterParseError(
+                "INTERVAL literal requires a string",
+                self.source, value_tok.pos,
+                hint="example: INTERVAL 'P1D'",
+            )
+        self._consume()
+        try:
+            value = parse_interval_micros(value_tok.value)
+        except Exception as e:
+            raise FilterParseError(str(e), self.source, value_tok.pos) from e
+        return IntervalLit(value=value, pos=interval_tok.pos)
+
     def parse_list_literal(self) -> ListLit:
         """Parse `[ literal (',' literal)* (',')? ]`. Caller has not
         yet consumed the '['."""
@@ -576,6 +604,18 @@ class Parser:
                 return IntLit(value=-inner.value, pos=sub_tok.pos)
             return FloatLit(value=-inner.value, pos=sub_tok.pos)
 
+        lit = self._parse_literal()
+        if lit is not None:
+            return lit
+
+        raise FilterParseError(
+            f"list elements must be literals, got {tok.text!r}",
+            self.source, tok.pos, span=max(1, len(tok.text)),
+        )
+
+    def _parse_literal(self) -> Optional[Literal]:
+        """Parse scalar literals shared by primary expressions and lists."""
+        tok = self._peek()
         if tok.kind == TokenKind.INT:
             self._consume()
             return IntLit(value=tok.value, pos=tok.pos)
@@ -588,11 +628,9 @@ class Parser:
         if tok.kind == TokenKind.BOOL:
             self._consume()
             return BoolLit(value=tok.value, pos=tok.pos)
-
-        raise FilterParseError(
-            f"list elements must be literals, got {tok.text!r}",
-            self.source, tok.pos, span=max(1, len(tok.text)),
-        )
+        if tok.kind == TokenKind.ISO:
+            return self._parse_timestamp_literal(tok)
+        return None
 
     # ── token utilities ─────────────────────────────────────────
 

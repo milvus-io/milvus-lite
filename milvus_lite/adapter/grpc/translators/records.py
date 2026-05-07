@@ -8,11 +8,11 @@ without losing any field, type, or null information.
 
 Phase 10.3 supported types (matches translators/schema.py):
     Bool / Int8 / Int16 / Int32 / Int64 / Float / Double / VarChar
-    JSON / FloatVector
+    JSON / Timestamptz / FloatVector
 
 Unsupported (raise UnsupportedFieldTypeError):
     BinaryVector / Float16Vector / BFloat16Vector / SparseFloatVector
-    Int8Vector / Array / Geometry / Text / Timestamptz / ArrayOfVector
+    Int8Vector / Geometry / Text / ArrayOfVector
 
 Two functions:
 
@@ -39,6 +39,7 @@ from pymilvus.grpc_gen import schema_pb2
 
 from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.schema.types import CollectionSchema, DataType
+from milvus_lite.schema.timestamptz import micros_to_iso_z, parse_timestamptz
 
 
 # ── Milvus DataType enum (int) → name and category. We use the int
@@ -56,6 +57,7 @@ _SCALAR_TYPE_TO_SLOT: Dict[int, str] = {
     11: "double_data",   # Double
     21: "string_data",   # VarChar
     23: "json_data",     # JSON
+    26: "string_data",   # Timestamptz. pymilvus sends/parses it as string_data.
 }
 
 _VECTOR_TYPES = frozenset({100, 101, 102, 103, 104, 105})  # Binary/Float/F16/BF16/Sparse/Int8
@@ -67,6 +69,7 @@ def _milvus_type_name(dtype_int: int) -> str:
         1: "Bool", 2: "Int8", 3: "Int16", 4: "Int32", 5: "Int64",
         10: "Float", 11: "Double", 20: "String", 21: "VarChar",
         22: "Array", 23: "JSON", 24: "Geometry", 25: "Text",
+        26: "Timestamptz",
         100: "BinaryVector", 101: "FloatVector",
         102: "Float16Vector", 103: "BFloat16Vector",
         104: "SparseFloatVector", 105: "Int8Vector",
@@ -193,6 +196,9 @@ def _extract_column(fd, num_rows: int) -> List[Any]:
                 f"expected {num_rows}"
             )
 
+    if dtype_int == 26:
+        column = [None if v is None else parse_timestamptz(v) for v in column]
+
     return column
 
 
@@ -202,6 +208,13 @@ def _extract_scalar_column(fd, dtype_int: int) -> List[Any]:
     # Array type (22) — special handling via array_data slot
     if dtype_int == 22:
         return _extract_array_column(fd)
+
+    if dtype_int == 26:
+        if scalars.HasField("timestamptz_data"):
+            return list(scalars.timestamptz_data.data)
+        if scalars.HasField("string_data"):
+            return list(scalars.string_data.data)
+        return []
 
     if dtype_int not in _SCALAR_TYPE_TO_SLOT:
         raise SchemaValidationError(
@@ -506,6 +519,16 @@ def _build_field_data(name, fschema, column):
         sub.data.extend(encoded)
         return fd
 
+    if dtype == DataType.TIMESTAMPTZ:
+        out = []
+        for v in column:
+            if v is None:
+                out.append("")
+            else:
+                out.append(micros_to_iso_z(v))
+        sub.data.extend(out)
+        return fd
+
     # Numeric / bool / string scalar
     out = []
     for v in column:
@@ -529,6 +552,7 @@ _LITEVECDB_TO_MILVUS_INT: Dict[DataType, int] = {
     DataType.VARCHAR: 21,
     DataType.ARRAY:   22,
     DataType.JSON:    23,
+    DataType.TIMESTAMPTZ: 26,
     DataType.FLOAT_VECTOR: 101,
     DataType.SPARSE_FLOAT_VECTOR: 104,
 }
@@ -540,6 +564,8 @@ def _default_for(dtype: DataType) -> Any:
     if dtype == DataType.BOOL:
         return False
     if dtype in (DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64):
+        return 0
+    if dtype == DataType.TIMESTAMPTZ:
         return 0
     if dtype in (DataType.FLOAT, DataType.DOUBLE):
         return 0.0
@@ -554,6 +580,8 @@ def _coerce_for(dtype: DataType, v: Any) -> Any:
         return bool(v)
     if dtype in (DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64):
         return int(v)
+    if dtype == DataType.TIMESTAMPTZ:
+        return parse_timestamptz(v)
     if dtype in (DataType.FLOAT, DataType.DOUBLE):
         return float(v)
     if dtype == DataType.VARCHAR:

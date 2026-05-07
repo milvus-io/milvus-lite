@@ -916,7 +916,7 @@ Search → top-N candidates → group by group_by_field → top group_size per g
 | Geometry types | WKT format + spatial queries |
 | Struct/Array nesting | Structured array fields |
 | MinHash vectors | MinHash vector type |
-| TimestampTZ | Timezone-aware timestamps |
+| TimestampTZ timezone hierarchy | Database/collection/query-level timezone overrides for naive timestamp literals |
 | Clustering Key | Clustered compaction |
 | Warmup | Collection pre-warming |
 | MMap | Memory-mapped storage |
@@ -937,6 +937,70 @@ Search → top-N candidates → group by group_by_field → top group_size per g
 | Consistency Levels | Single-process synchronous architecture is naturally Strong Consistency; no need for multiple levels |
 
 **Coverage**: Measured against the Milvus pymilvus test suite (55 test files), MilvusLite P0 covers approximately ~85% of core features, P0+P1 covers approximately ~90%. Remaining gaps are concentrated in advanced index types, extended data types, and enterprise-grade operational capabilities.
+
+---
+
+## Milvus Feature Integration Backlog
+
+This section tracks Milvus features that are worth bringing into MilvusLite after the current compatibility baseline. The selection principle is:
+
+1. Prefer features that improve local development, notebooks, tests, and small-scale RAG applications.
+2. Prefer features that fit the existing LSM + immutable segment architecture.
+3. Prefer pymilvus compatibility gaps that users are likely to hit when moving code between MilvusLite and Milvus.
+4. Avoid distributed, enterprise, and operational-control features that add surface area without improving the embedded use case.
+
+### P0 - High-Value Compatibility and Performance
+
+| Feature | Milvus Surface | Why It Matters | MilvusLite Design Direction | Acceptance Criteria |
+|---|---|---|---|---|
+| Scalar Index | `INVERTED`, `BITMAP`, `NGRAM` scalar indexes | Current scalar filters are functional but can become scan-heavy as local datasets grow. Scalar indexes are the highest-impact performance upgrade because search/query/delete all depend on filters. | Add segment-level immutable `.sidx` files. Filter compilation should first produce an optional indexed bitmap, then merge it with the existing bitmap pipeline. Start with scalar equality/range/in-list indexes, then add NGRAM for `LIKE`/prefix-style VARCHAR predicates. | Indexed and non-indexed filter results are identical under differential tests; large filtered search/query benchmarks show lower scanned-row count. |
+| JSON and Dynamic Field Indexes | JSON path index, dynamic field key index | MilvusLite already supports JSON path and `$meta["key"]` filtering, but those paths likely remain scan-bound. This is a common local RAG metadata pattern. | Reuse the scalar index framework, with extracted path columns stored per segment. Index declared paths first; later consider adaptive path materialization. | Filters such as `meta["source"] == "x"` and `$meta["tenant"] in [...]` can use index bitmaps and preserve current expression semantics. |
+| Compact Vector Types | `FLOAT16_VECTOR`, `BFLOAT16_VECTOR`, `INT8_VECTOR`, `BINARY_VECTOR` | README currently lists binary/float16/bfloat16 vectors as unsupported. These types are important for compatibility and reduce local memory/disk pressure. | Extend schema, Arrow builders, validation, gRPC translators, and distance kernels. Store compact formats natively; convert to float32 for unsupported index/search paths. Start with brute-force parity, then FAISS paths where available. | pymilvus create/insert/search smoke tests pass for each type; distance parity is documented for any conversion path. |
+| IVF_PQ | `IVF_PQ` index | README currently lists Product Quantization as unsupported. FAISS is already a core dependency, so this is a natural index-family extension. | Add `FaissIvfPqIndex` under the existing `VectorIndex` protocol and segment-bound `.idx` lifecycle. Keep `AUTOINDEX` unchanged unless PQ is explicitly requested. | Build/load/search round-trip works; recall benchmark is compared against `BRUTE_FORCE` and existing IVF indexes. |
+
+### P1 - Retrieval Quality and RAG Ergonomics
+
+| Feature | Milvus Surface | Why It Matters | MilvusLite Design Direction | Acceptance Criteria |
+|---|---|---|---|---|
+| Global BM25 Statistics | BM25 sparse search | README notes BM25 IDF is currently segment-local. Cross-segment ranking quality can drift after flushes and compaction. | Maintain collection-level term document-frequency and total-document stats. Update stats during flush/compaction and keep a conservative recovery path. | BM25 results are stable across flush boundaries; differential tests verify segment-local fallback does not change correctness when global stats are unavailable. |
+| Phrase Match | `phrase_match` / text phrase predicates | Phrase search is useful for local document QA and is now part of Milvus text retrieval surface. | Extend the sparse/text inverted index to store term positions. Implement ordered phrase matching with optional slop, then integrate it into filter parsing/evaluation. | `phrase_match(text, "...")` works in query/search filters and matches Milvus-style phrase semantics for supported analyzer output. |
+| Analyzer Debugging | `run_analyzer` | Users building FTS pipelines need to inspect tokenizer/analyzer behavior locally. This is cheap and useful for notebooks. | Expose analyzer execution through the adapter and internal helper API. Reuse existing `Analyzer` implementations. | pymilvus-compatible analyzer debug calls return deterministic token streams for Standard and Jieba analyzers. |
+| Bulk Import | Milvus import / BulkWriter JSON/Parquet inputs | MilvusLite already has dump/export. Import closes the loop for local reproduction of Milvus/Zilliz datasets. | Support Milvus BulkWriter JSON first, then Parquet. Prefer routing through validation + flush to preserve WAL/manifest invariants; direct segment build can be a later optimization. | Export from MilvusLite and import into a fresh MilvusLite DB produces equivalent query/search-visible rows. |
+| Text Highlighting | FTS result highlighting | Useful for search demos and local RAG inspection, but not core storage/search correctness. | Implement as post-processing over output text fields using analyzer token offsets when available. | Search output can include highlight snippets without changing ranking. |
+
+### P2 - Domain-Specific Compatibility
+
+| Feature | Milvus Surface | Why It Matters | MilvusLite Design Direction | Acceptance Criteria |
+|---|---|---|---|---|
+| `TIMESTAMPTZ` follow-ups | Timezone-aware timestamp scalar type | Basic TIMESTAMPTZ storage, UTC normalization, gRPC FieldData, and ISO/INTERVAL filters are implemented. Remaining work is Milvus's timezone hierarchy and index acceleration. | Add database/collection/query-level `timezone` properties for naive timestamp parsing. Later integrate with scalar index or `STL_SORT` equivalent. | Naive timestamp literals respect operation-level timezone precedence; indexed timestamp range filters return the same rows as scan mode. |
+| Geometry | `GEOMETRY`, `ST_*` spatial predicates | Useful for geo-constrained vector search, but domain-specific and optional. | Start with optional `shapely`-backed brute-force predicates. Add segment-level R-tree only if benchmarks justify it. | Geometry fields can be inserted, persisted, and filtered with a small supported subset such as contains/within/intersects. |
+| Binary Vector Indexes | `BIN_FLAT`, `BIN_IVF_FLAT` | Complements `BINARY_VECTOR`; useful for compatibility but less common than float/sparse vectors in RAG. | Add brute-force Hamming/Jaccard first. Add FAISS binary indexes only after storage and metric semantics are stable. | Binary search results match brute-force reference for supported metrics. |
+| SPARSE_WAND | Sparse vector accelerated retrieval | Useful when BM25/sparse collections grow, but depends on sparse index maturity. | Add WAND-style upper-bound pruning inside `SparseInvertedIndex` without changing public API. | Sparse search returns the same top-k as exhaustive sparse scoring on test corpora. |
+| MMap / Warmup | Memory mapped storage, collection pre-warming | Useful for larger local databases, but secondary to indexes and compact vectors. | Introduce only behind explicit collection/index properties. Avoid making mmap a correctness dependency. | Load/search memory profile improves on large read-only datasets without changing results. |
+
+### Reconsider Later
+
+These features are not rejected forever, but should not preempt the P0/P1 work.
+
+| Feature | Reason to Defer |
+|---|---|
+| Full schema alter | Current design assumes immutable schemas. Safe support probably means only additive nullable/default scalar fields first. |
+| Multi-database isolation | Current single default namespace is enough for most local workflows. Full DB isolation adds adapter/storage surface area. |
+| REST API | gRPC/pymilvus compatibility is the primary contract. REST is useful only if there is a concrete local tooling requirement. |
+| Snapshots | Valuable for backup/restore, but direct filesystem copy is often sufficient for embedded usage until concurrent readers/writers become more complex. |
+| DiskANN | Heavy dependency and architecture cost. Revisit only if MilvusLite explicitly targets larger-than-memory local datasets. |
+| SCANN / OPQ / HNSW_PQ | Useful index variants, but IVF_PQ should land first as the quantization baseline. |
+
+### Explicitly Out of Scope for MilvusLite Core
+
+| Feature | Reason |
+|---|---|
+| RBAC, users, roles, privilege groups | Embedded single-user process; security should be handled by the host application. |
+| Resource groups, replicas, shard balancing | Distributed serving controls do not map to a single-process local engine. |
+| Full consistency-level matrix | Single-process synchronous writes naturally provide strong consistency for the embedded use case. Snapshot sequence support should stay internal for iterators/MVCC-style reads. |
+| GPU indexes | Dependency footprint and platform variance are too high for the default local package. |
+| TLS / mTLS | Local embedded deployments should terminate transport security outside MilvusLite if needed. |
+| Distributed metrics / component states | MilvusLite has no QueryNode/DataNode/Coord component topology to report. |
 
 ---
 

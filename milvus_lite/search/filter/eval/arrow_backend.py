@@ -27,6 +27,7 @@ from milvus_lite.search.filter.ast import (
     FloatLit,
     InOp,
     IntLit,
+    IntervalLit,
     IsNullOp,
     LikeOp,
     ListLit,
@@ -34,7 +35,9 @@ from milvus_lite.search.filter.ast import (
     Not,
     Or,
     StringLit,
+    TimestampLit,
 )
+from milvus_lite.schema.timestamptz import micros_to_utc_datetime
 
 if TYPE_CHECKING:
     from milvus_lite.search.filter.semantic import CompiledExpr
@@ -119,6 +122,13 @@ def _eval(node, table):
         return pa.scalar(node.value, type=pa.string())
     if isinstance(node, BoolLit):
         return pa.scalar(node.value, type=pa.bool_())
+    if isinstance(node, TimestampLit):
+        return pa.scalar(
+            micros_to_utc_datetime(node.value),
+            type=pa.timestamp("us", tz="UTC"),
+        )
+    if isinstance(node, IntervalLit):
+        return pa.scalar(node.value, type=pa.duration("us"))
 
     if isinstance(node, FieldRef):
         col = table.column(node.name)
@@ -140,7 +150,7 @@ def _eval(node, table):
         # comes from the literals; semantic.py has already verified
         # type compatibility with the field, so pyarrow's auto-cast
         # handles any int/float promotion.
-        py_values = [el.value for el in node.values.elements]
+        py_values = [_eval(el, table).as_py() for el in node.values.elements]
         if not py_values:
             # Empty list: `in []` → all False, `not in []` → all True.
             val = node.negate  # False for `in`, True for `not in`
