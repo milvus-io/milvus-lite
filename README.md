@@ -18,6 +18,10 @@ Milvus Lite is a lightweight version of [Milvus](https://github.com/milvus-io/mi
 
 This generation of Milvus Lite is rebuilt from scratch in pure Python. Instead of wrapping the full C++ Milvus core, it uses a local LSM-style storage engine with WAL, in-memory memtables, immutable Parquet segments, segment-level FAISS indexes, scalar filtering, BM25 full text search, and a Milvus-compatible gRPC adapter.
 
+<div align="center">
+    <img src="https://milvus.io/docs/v2.5.x/assets/select-deployment-option.png" width="80%"/>
+</div>
+
 Milvus Lite is intended for prototyping and local workloads. For large-scale production deployments, use [Milvus Standalone](https://milvus.io/docs/install-overview.md#Milvus-Standalone), [Milvus Distributed](https://milvus.io/docs/install-overview.md#Milvus-Distributed), or [Zilliz Cloud](https://zilliz.com/cloud).
 
 ## Highlights
