@@ -8,11 +8,11 @@ without losing any field, type, or null information.
 
 Phase 10.3 supported types (matches translators/schema.py):
     Bool / Int8 / Int16 / Int32 / Int64 / Float / Double / VarChar
-    JSON / Timestamptz / FloatVector
+    JSON / Geometry / Timestamptz / FloatVector
 
 Unsupported (raise UnsupportedFieldTypeError):
     BinaryVector / Float16Vector / BFloat16Vector / SparseFloatVector
-    Int8Vector / Geometry / Text / ArrayOfVector
+    Int8Vector / Text / ArrayOfVector
 
 Two functions:
 
@@ -61,6 +61,7 @@ _SCALAR_TYPE_TO_SLOT: Dict[int, str] = {
     11: "double_data",   # Double
     21: "string_data",   # VarChar
     23: "json_data",     # JSON
+    24: "string_data",   # Geometry WKT
     26: "string_data",   # Timestamptz. pymilvus sends/parses it as string_data.
 }
 
@@ -616,6 +617,7 @@ _LITEVECDB_TO_MILVUS_INT: Dict[DataType, int] = {
     DataType.VARCHAR: 21,
     DataType.ARRAY:   22,
     DataType.JSON:    23,
+    DataType.GEOMETRY: 24,
     DataType.TIMESTAMPTZ: 26,
     DataType.FLOAT_VECTOR: 101,
     DataType.SPARSE_FLOAT_VECTOR: 104,
@@ -633,7 +635,7 @@ def _default_for(dtype: DataType) -> Any:
         return 0
     if dtype in (DataType.FLOAT, DataType.DOUBLE):
         return 0.0
-    if dtype == DataType.VARCHAR:
+    if dtype in (DataType.VARCHAR, DataType.GEOMETRY):
         return ""
     return None
 
@@ -648,6 +650,6 @@ def _coerce_for(dtype: DataType, v: Any) -> Any:
         return parse_timestamptz(v)
     if dtype in (DataType.FLOAT, DataType.DOUBLE):
         return float(v)
-    if dtype == DataType.VARCHAR:
+    if dtype in (DataType.VARCHAR, DataType.GEOMETRY):
         return str(v)
     return v

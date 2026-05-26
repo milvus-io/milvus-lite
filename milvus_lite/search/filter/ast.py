@@ -227,6 +227,31 @@ class TextMatchOp:
     pos: int
 
 
+@dataclass(frozen=True)
+class GeometryOp:
+    """``geometry_contains/within/intersects(field, 'WKT')`` spatial predicate."""
+    op: str
+    field: FieldRef
+    geometry: StringLit
+    pos: int
+
+
+@dataclass(frozen=True)
+class GeometryIsValidOp:
+    """``ST_ISVALID(field)`` spatial predicate."""
+    field: FieldRef
+    pos: int
+
+
+@dataclass(frozen=True)
+class GeometryDWithinOp:
+    """``ST_DWITHIN(field, 'WKT', distance)`` spatial predicate."""
+    field: FieldRef
+    geometry: StringLit
+    distance: Union[IntLit, FloatLit]
+    pos: int
+
+
 # ── Array filter functions ────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -262,6 +287,6 @@ Expr = Union[
     CmpOp, InOp, And, Or, Not,
     ArithOp, LikeOp, IsNullOp,
     MetaAccess, JsonAccess,
-    TextMatchOp,
+    TextMatchOp, GeometryOp, GeometryIsValidOp, GeometryDWithinOp,
     ArrayContainsOp, ArrayLengthOp, ArrayAccessOp,
 ]

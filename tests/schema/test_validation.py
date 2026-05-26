@@ -343,6 +343,73 @@ def test_record_field_wrong_type():
         )
 
 
+def test_geometry_record_accepts_wkt():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY),
+    ])
+    validate_record({"id": 1, "vec": [0.1, 0.2], "shape": "POINT (1 2)"}, schema)
+
+
+def test_geometry_record_rejects_invalid_wkt():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY),
+    ])
+    with pytest.raises(SchemaValidationError, match="GEOMETRY"):
+        validate_record({"id": 1, "vec": [0.1, 0.2], "shape": "not-wkt"}, schema)
+
+
+@pytest.mark.parametrize("bad", ["", "   ", "POINT(nan 1)", "POINT(inf 1)"])
+def test_geometry_record_rejects_empty_or_non_finite_wkt(bad):
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY),
+    ])
+    with pytest.raises(SchemaValidationError, match="GEOMETRY"):
+        validate_record({"id": 1, "vec": [0.1, 0.2], "shape": bad}, schema)
+
+
+def test_geometry_default_value_fills_missing_record_field():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY, default_value="POINT(0 0)"),
+    ])
+    rec = {"id": 1, "vec": [0.1, 0.2]}
+
+    validate_schema(schema)
+    validate_record(rec, schema)
+
+    assert rec["shape"] == "POINT(0 0)"
+
+
+def test_geometry_record_rejects_self_intersecting_polygon():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY),
+    ])
+    with pytest.raises(SchemaValidationError, match="GEOMETRY"):
+        validate_record(
+            {"id": 1, "vec": [0.1, 0.2], "shape": "POLYGON((0 0, 2 2, 0 2, 2 0, 0 0))"},
+            schema,
+        )
+
+
+def test_geometry_invalid_default_value_rejected():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY, default_value="not-wkt"),
+    ])
+    with pytest.raises(SchemaValidationError, match="default_value"):
+        validate_schema(schema)
+
+
 def test_record_nullable_missing_ok():
     rec = {"id": "doc1", "vec": [0.1, 0.2, 0.3, 0.4], "score": 0.5}  # title missing, nullable
     validate_record(rec, _basic_schema())

@@ -35,6 +35,7 @@ def test_round_trip_all_supported_types():
         FieldSchema(name="i16", dtype=DataType.INT16),
         FieldSchema(name="i32", dtype=DataType.INT32),
         FieldSchema(name="data", dtype=DataType.JSON),
+        FieldSchema(name="shape", dtype=DataType.GEOMETRY),
         FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ, nullable=True),
     ])
     proto = milvus_lite_to_milvus_schema("test", schema)
