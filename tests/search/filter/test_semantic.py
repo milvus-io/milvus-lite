@@ -19,6 +19,7 @@ def schema():
         FieldSchema(name="score", dtype=DataType.FLOAT),
         FieldSchema(name="active", dtype=DataType.BOOL),
         FieldSchema(name="category", dtype=DataType.VARCHAR),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ, nullable=True),
     ])
 
 
@@ -66,6 +67,11 @@ def test_in_expression(schema):
 
 def test_in_string(schema):
     c = compile_str("category in ['tech', 'news']", schema)
+
+
+def test_in_timestamptz(schema):
+    c = compile_str("tsz in [ISO '2025-01-01T00:00:00Z']", schema)
+    assert "tsz" in c.fields
 
 
 def test_in_empty_list(schema):

@@ -15,6 +15,7 @@ Type mapping (MilvusLite ↔ Milvus DataType enum):
     VARCHAR      ↔ VarChar (21)
     BOOL         ↔ Bool (1)
     JSON         ↔ JSON (23)
+    TIMESTAMPTZ  ↔ Timestamptz (26)
     FLOAT_VECTOR ↔ FloatVector (101)
 
 Unsupported Milvus types raise UnsupportedFieldTypeError. Phase 10.2 MVP
@@ -46,6 +47,7 @@ from milvus_lite.schema.types import (
     Function,
     FunctionType,
 )
+from milvus_lite.schema.timestamptz import parse_timestamptz
 
 if TYPE_CHECKING:
     pass
@@ -66,6 +68,7 @@ _MILVUS_TO_LITEVECDB: dict[int, DataType] = {
     21: DataType.VARCHAR,        # VarChar
     22: DataType.ARRAY,          # Array
     23: DataType.JSON,           # JSON
+    26: DataType.TIMESTAMPTZ,    # Timestamptz
     101: DataType.FLOAT_VECTOR,          # FloatVector
     104: DataType.SPARSE_FLOAT_VECTOR,  # SparseFloatVector
 }
@@ -92,6 +95,7 @@ _MILVUS_TYPE_NAMES: dict[int, str] = {
     23: "JSON",
     24: "Geometry",
     25: "Text",
+    26: "Timestamptz",
     100: "BinaryVector",
     101: "FloatVector",
     102: "Float16Vector",
@@ -154,7 +158,7 @@ def _decode_field(proto_field: schema_pb2.FieldSchema) -> FieldSchema:
             f"field {proto_field.name!r} uses Milvus type {type_name} "
             f"which MilvusLite does not support. "
             f"Phase 10.2 supports: BOOL, INT8/16/32/64, FLOAT, DOUBLE, "
-            f"VARCHAR, JSON, FLOAT_VECTOR."
+            f"VARCHAR, JSON, ARRAY, TIMESTAMPTZ, FLOAT_VECTOR, SPARSE_FLOAT_VECTOR."
         )
 
     dtype = _MILVUS_TO_LITEVECDB[milvus_dtype_int]
@@ -222,7 +226,7 @@ def _decode_field(proto_field: schema_pb2.FieldSchema) -> FieldSchema:
                 pass
 
     # default_value
-    default_value = _decode_default_value(proto_field)
+    default_value = _decode_default_value(proto_field, dtype)
 
     return FieldSchema(
         name=proto_field.name,
@@ -243,13 +247,19 @@ def _decode_field(proto_field: schema_pb2.FieldSchema) -> FieldSchema:
     )
 
 
-def _decode_default_value(proto_field) -> object | None:
+def _decode_default_value(proto_field, dtype: DataType) -> object | None:
     """Extract default_value from a proto FieldSchema, or None."""
     dv = proto_field.default_value
     which = dv.WhichOneof("data")
     if which is None:
         return None
-    return getattr(dv, which)
+    value = getattr(dv, which)
+    if dtype == DataType.TIMESTAMPTZ:
+        if which in ("long_data", "timestamptz_data"):
+            return int(value)
+        if which == "string_data":
+            return str(value)
+    return value
 
 
 def _encode_default_value(pf, dtype: DataType, value: object) -> None:
@@ -267,6 +277,11 @@ def _encode_default_value(pf, dtype: DataType, value: object) -> None:
         vd.double_data = float(value)
     elif dtype == DataType.VARCHAR:
         vd.string_data = str(value)
+    elif dtype == DataType.TIMESTAMPTZ:
+        if hasattr(vd, "timestamptz_data"):
+            vd.timestamptz_data = parse_timestamptz(value)
+        else:
+            vd.long_data = parse_timestamptz(value)
 
 
 _MILVUS_FUNCTION_TYPE_MAP = {

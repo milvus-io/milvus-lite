@@ -1,6 +1,7 @@
 """Tests for schema/validation.py"""
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -18,6 +19,7 @@ from milvus_lite.schema.validation import (
     validate_record,
     validate_schema,
 )
+from milvus_lite.schema.timestamptz import parse_timestamptz
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +83,16 @@ def test_empty_field_name():
 
 @pytest.mark.parametrize("reserved", sorted(RESERVED_FIELD_NAMES))
 def test_reserved_field_name(reserved):
+    with pytest.raises(SchemaValidationError, match="reserved"):
+        validate_schema(CollectionSchema(fields=[
+            FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True),
+            FieldSchema(name=reserved, dtype=DataType.VARCHAR),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
+        ]))
+
+
+@pytest.mark.parametrize("reserved", ["Iso", "iSo", "Interval", "inTERVAL"])
+def test_reserved_field_name_is_case_insensitive(reserved):
     with pytest.raises(SchemaValidationError, match="reserved"):
         validate_schema(CollectionSchema(fields=[
             FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True),
@@ -172,6 +184,102 @@ def test_valid_record_ok():
     schema = _basic_schema()
     rec = {"id": "doc1", "vec": [0.1, 0.2, 0.3, 0.4], "title": "hi", "score": 0.5}
     validate_record(rec, schema)
+
+
+def test_timestamptz_record_normalized_to_utc_micros():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ),
+    ])
+    rec = {
+        "id": 1,
+        "vec": [0.1, 0.2],
+        "tsz": "2025-01-01T00:00:00+08:00",
+    }
+
+    validate_record(rec, schema)
+
+    assert rec["tsz"] == parse_timestamptz("2024-12-31T16:00:00Z")
+
+
+def test_timestamptz_accepts_aware_datetime():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ),
+    ])
+    rec = {
+        "id": 1,
+        "vec": [0.1, 0.2],
+        "tsz": datetime(2025, 1, 1, tzinfo=timezone.utc),
+    }
+
+    validate_record(rec, schema)
+
+    assert rec["tsz"] == parse_timestamptz("2025-01-01T00:00:00Z")
+
+
+def test_timestamptz_rejects_naive_string():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ),
+    ])
+
+    with pytest.raises(SchemaValidationError, match="TIMESTAMPTZ"):
+        validate_record({
+            "id": 1,
+            "vec": [0.1, 0.2],
+            "tsz": "2025-01-01T00:00:00",
+        }, schema)
+
+
+def test_timestamptz_uses_collection_timezone_for_naive_string():
+    schema = CollectionSchema(
+        fields=[
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+            FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ),
+        ],
+        properties={"timezone": "Asia/Shanghai"},
+    )
+    validate_schema(schema)
+    rec = {
+        "id": 1,
+        "vec": [0.1, 0.2],
+        "tsz": "2025-01-01T00:00:00",
+    }
+
+    validate_record(rec, schema)
+
+    assert rec["tsz"] == parse_timestamptz("2024-12-31T16:00:00Z")
+
+
+def test_timestamptz_default_uses_collection_timezone():
+    schema = CollectionSchema(
+        fields=[
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+            FieldSchema(
+                name="tsz",
+                dtype=DataType.TIMESTAMPTZ,
+                default_value="2025-01-01T00:00:00",
+            ),
+        ],
+        properties={"timezone": "Asia/Shanghai"},
+    )
+
+    validate_schema(schema)
+
+    assert schema.fields[2].default_value == parse_timestamptz("2024-12-31T16:00:00Z")
+
+
+def test_schema_rejects_unknown_timezone():
+    schema = _basic_schema(properties={"timezone": "No/Such_Zone"})
+
+    with pytest.raises(SchemaValidationError, match="unknown timezone"):
+        validate_schema(schema)
 
 
 def test_record_not_dict():

@@ -22,6 +22,7 @@ Implementation discipline (from grpc-adapter-design.md §15):
 from __future__ import annotations
 
 import logging
+import json
 from typing import TYPE_CHECKING
 
 import grpc
@@ -67,6 +68,44 @@ def _extract_anns_field(sub_req) -> str | None:
             except (ValueError, _json.JSONDecodeError):
                 v = kv.value
             return v if isinstance(v, str) and v else None
+    return None
+
+
+def _kv_pairs_to_dict(pairs) -> dict[str, str]:
+    return {
+        str(p.key): str(p.value)
+        for p in pairs
+        if getattr(p, "key", None)
+    }
+
+
+def _dict_to_kv_pairs(values: dict) -> list[common_pb2.KeyValuePair]:
+    return [
+        common_pb2.KeyValuePair(key=str(key), value=str(value))
+        for key, value in values.items()
+    ]
+
+
+def _decode_kv_value(value: str):
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return value
+
+
+def _extract_timezone(pairs) -> str | None:
+    for kv in pairs:
+        if kv.key == "timezone":
+            value = _decode_kv_value(kv.value)
+            return value if isinstance(value, str) and value else None
+    return None
+
+
+def _extract_time_fields(pairs) -> str | None:
+    for kv in pairs:
+        if kv.key == "time_fields":
+            value = _decode_kv_value(kv.value)
+            return value if isinstance(value, str) and value else None
     return None
 
 
@@ -150,7 +189,12 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             proto_schema = schema_pb2.CollectionSchema()
             proto_schema.ParseFromString(request.schema)
             milvus_lite_schema = milvus_to_milvus_lite_schema(proto_schema)
-            self._db.create_collection(request.collection_name, milvus_lite_schema)
+            properties = _kv_pairs_to_dict(getattr(request, "properties", []))
+            self._db.create_collection(
+                request.collection_name,
+                milvus_lite_schema,
+                properties=properties,
+            )
             return common_pb2.Status(**success_status_kwargs())
         except MilvusLiteError as e:
             return common_pb2.Status(**to_status_kwargs(e))
@@ -195,6 +239,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 collection_name=col.name,
                 shards_num=1,
                 num_partitions=len(col.list_partitions()),
+                properties=_dict_to_kv_pairs(col.schema.properties),
             )
         except MilvusLiteError as e:
             return milvus_pb2.DescribeCollectionResponse(
@@ -232,7 +277,9 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         try:
             col = self._db.get_collection(request.collection_name)
             records = fields_data_to_records(
-                request.fields_data, request.num_rows
+                request.fields_data,
+                request.num_rows,
+                default_timezone=col._effective_timezone(),  # noqa: SLF001
             )
             partition_name = request.partition_name or "_default"
             inserted_pks = col.insert(records, partition_name=partition_name)
@@ -258,7 +305,9 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         try:
             col = self._db.get_collection(request.collection_name)
             records = fields_data_to_records(
-                request.fields_data, request.num_rows
+                request.fields_data,
+                request.num_rows,
+                default_timezone=col._effective_timezone(),  # noqa: SLF001
             )
             partition_name = request.partition_name or "_default"
             upserted_pks = col.upsert(records, partition_name=partition_name)
@@ -343,6 +392,8 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             # Extract limit and offset from query_params KV list.
             limit = None
             offset = 0
+            timezone = _extract_timezone(request.query_params)
+            time_fields = _extract_time_fields(request.query_params)
             for kv in request.query_params:
                 if kv.key == "limit":
                     try:
@@ -363,7 +414,11 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             if output_fields and "count(*)" in output_fields:
                 expr = request.expr if request.expr else None
                 if expr:
-                    rows = col.query(expr, partition_names=partition_names)
+                    rows = col.query(
+                        expr,
+                        partition_names=partition_names,
+                        timezone=timezone,
+                    )
                     count = len(rows)
                 else:
                     count = col.num_entities
@@ -391,12 +446,17 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     partition_names=partition_names,
                     limit=limit,
                     offset=offset,
+                    timezone=timezone,
                 )
 
             return milvus_pb2.QueryResults(
                 status=common_pb2.Status(**success_status_kwargs()),
                 fields_data=records_to_fields_data(
-                    rows, col.schema, output_fields=output_fields,
+                    rows,
+                    col.schema,
+                    output_fields=output_fields,
+                    time_fields=time_fields,
+                    timezone=col._effective_timezone(timezone),  # noqa: SLF001
                 ),
                 collection_name=col.name,
                 output_fields=output_fields or [],
@@ -486,6 +546,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 range_filter=parsed.get("range_filter"),
                 offset=search_offset,
                 ranker=parsed.get("ranker"),
+                timezone=parsed.get("timezone"),
             )
 
             if l2_func is not None:
@@ -552,6 +613,8 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 pk_name=col._pk_name,  # noqa: SLF001
                 output_fields=requested_output_fields,
                 group_by_field=group_by_field,
+                time_fields=parsed.get("time_fields"),
+                timezone=col._effective_timezone(parsed.get("timezone")),  # noqa: SLF001
             )
 
             return milvus_pb2.SearchResults(
@@ -929,6 +992,34 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             db_names=["default"],
         )
 
+    def DescribeDatabase(self, request, context):
+        try:
+            desc = self._db.describe_database(request.db_name or "default")
+            return milvus_pb2.DescribeDatabaseResponse(
+                status=common_pb2.Status(**success_status_kwargs()),
+                db_name=desc["name"],
+                properties=_dict_to_kv_pairs(desc["properties"]),
+            )
+        except Exception as e:
+            logger.exception("DescribeDatabase failed: %s", e)
+            return milvus_pb2.DescribeDatabaseResponse(
+                status=common_pb2.Status(code=_UNEXPECTED_ERROR, reason=str(e)),
+            )
+
+    def AlterDatabase(self, request, context):
+        try:
+            properties = _kv_pairs_to_dict(getattr(request, "properties", []))
+            delete_keys = list(getattr(request, "delete_keys", [])) or None
+            self._db.alter_database_properties(
+                request.db_name or "default",
+                properties=properties or None,
+                delete_keys=delete_keys,
+            )
+            return common_pb2.Status(**success_status_kwargs())
+        except Exception as e:
+            logger.exception("AlterDatabase failed: %s", e)
+            return common_pb2.Status(code=_UNEXPECTED_ERROR, reason=str(e))
+
     # ── Explicitly UNIMPLEMENTED stubs ─────────────────────────
     #
     # The base class returns UNIMPLEMENTED for every method we don't
@@ -967,6 +1058,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             top_level_l0_ranker = function_score.get("boost")
             top_level_l2_func = function_score.get("rerank")
             requested_output_fields = list(request.output_fields) or None
+            hybrid_timezone = _extract_timezone(request.rank_params)
+            hybrid_time_fields = _extract_time_fields(request.rank_params)
+            output_timezone = hybrid_timezone
+            output_time_fields = hybrid_time_fields
 
             gb_field = rp.get("group_by_field")
             internal_output_fields = []
@@ -994,6 +1089,11 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     first_spec = next(iter(all_specs.values()), None)
                     sub_default_metric = first_spec.metric_type if first_spec else "COSINE"
                 parsed = parse_search_request(sub_req, default_metric_type=sub_default_metric)
+                route_timezone = parsed.get("timezone") or hybrid_timezone
+                if output_timezone is None and parsed.get("timezone") is not None:
+                    output_timezone = parsed.get("timezone")
+                if output_time_fields is None and parsed.get("time_fields") is not None:
+                    output_time_fields = parsed.get("time_fields")
                 sub_ranker = merge_boost_rankers(
                     parsed.get("ranker"),
                     top_level_l0_ranker,
@@ -1015,6 +1115,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     output_fields=route_output_fields,
                     anns_field=parsed.get("anns_field"),
                     ranker=sub_ranker,
+                    timezone=route_timezone,
                 )
                 all_results.append(results)
                 route_metrics.append(parsed["metric_type"])
@@ -1087,6 +1188,8 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 pk_name=col._pk_name,  # noqa: SLF001
                 output_fields=output_fields,
                 group_by_field=gb_field,
+                time_fields=output_time_fields,
+                timezone=col._effective_timezone(output_timezone),  # noqa: SLF001
             )
 
             return milvus_pb2.SearchResults(
@@ -1186,10 +1289,20 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             )
 
     def AlterCollection(self, request, context):
-        return self._unimplemented(
-            context, "AlterCollection",
-            "schema is immutable in MilvusLite — create a new collection instead",
-        )
+        try:
+            properties = _kv_pairs_to_dict(getattr(request, "properties", []))
+            delete_keys = list(getattr(request, "delete_keys", [])) or None
+            self._db.alter_collection_properties(
+                request.collection_name,
+                properties=properties or None,
+                delete_keys=delete_keys,
+            )
+            return common_pb2.Status(**success_status_kwargs())
+        except MilvusLiteError as e:
+            return common_pb2.Status(**to_status_kwargs(e))
+        except Exception as e:
+            logger.exception("AlterCollection failed: %s", e)
+            return common_pb2.Status(code=_UNEXPECTED_ERROR, reason=str(e))
 
     def LoadPartitions(self, request, context):
         return self._unimplemented(

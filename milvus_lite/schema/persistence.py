@@ -6,6 +6,7 @@ Format (one schema = one JSON file):
       "collection_name": "...",
       "version": 1,
       "enable_dynamic_field": false,
+      "properties": {},
       "fields": [
         {
           "name": "id",
@@ -57,6 +58,7 @@ def save_schema(
         "schema_format_version": SCHEMA_FORMAT_VERSION,
         "version": schema.version,
         "enable_dynamic_field": schema.enable_dynamic_field,
+        "properties": dict(schema.properties),
         "fields": [_field_to_dict(f) for f in schema.fields],
     }
     if schema.functions:
@@ -98,6 +100,7 @@ def load_schema(path: str) -> Tuple[str, CollectionSchema]:
         collection_name = payload["collection_name"]
         version = payload["version"]
         enable_dynamic = payload.get("enable_dynamic_field", False)
+        properties = payload.get("properties", {})
         fields_raw = payload["fields"]
     except KeyError as e:
         raise SchemaValidationError(
@@ -107,6 +110,10 @@ def load_schema(path: str) -> Tuple[str, CollectionSchema]:
     if not isinstance(fields_raw, list):
         raise SchemaValidationError(
             f"schema file {path!r} 'fields' must be a list"
+        )
+    if not isinstance(properties, dict):
+        raise SchemaValidationError(
+            f"schema file {path!r} 'properties' must be an object"
         )
 
     fields = [_field_from_dict(d, path) for d in fields_raw]
@@ -119,6 +126,7 @@ def load_schema(path: str) -> Tuple[str, CollectionSchema]:
         version=int(version),
         enable_dynamic_field=bool(enable_dynamic),
         functions=functions,
+        properties=dict(properties) if isinstance(properties, dict) else {},
     )
     return str(collection_name), schema
 

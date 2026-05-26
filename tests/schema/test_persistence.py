@@ -32,6 +32,7 @@ def _full_schema() -> CollectionSchema:
         ],
         version=3,
         enable_dynamic_field=True,
+        properties={"timezone": "Asia/Shanghai"},
     )
 
 
@@ -48,6 +49,7 @@ def test_save_load_roundtrip(tmp_path):
     assert name == "my_collection"
     assert loaded.version == schema.version
     assert loaded.enable_dynamic_field == schema.enable_dynamic_field
+    assert loaded.properties == schema.properties
     assert len(loaded.fields) == len(schema.fields)
     for src, dst in zip(schema.fields, loaded.fields):
         assert src.name == dst.name

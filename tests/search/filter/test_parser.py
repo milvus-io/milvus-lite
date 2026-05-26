@@ -11,6 +11,7 @@ from milvus_lite.search.filter.ast import (
     FloatLit,
     InOp,
     IntLit,
+    IntervalLit,
     IsNullOp,
     LikeOp,
     ListLit,
@@ -18,6 +19,7 @@ from milvus_lite.search.filter.ast import (
     Not,
     Or,
     StringLit,
+    TimestampLit,
 )
 from milvus_lite.search.filter.exceptions import FilterParseError
 from milvus_lite.search.filter.parser import parse_expr
@@ -62,6 +64,28 @@ def test_bool_literal_true():
     e = parse_expr("true")
     assert isinstance(e, BoolLit)
     assert e.value is True
+
+
+def test_timestamp_literal():
+    e = parse_expr("ISO '2025-01-01T00:00:00Z'")
+    assert isinstance(e, TimestampLit)
+    assert e.value > 0
+
+
+def test_timestamp_literal_uses_default_timezone():
+    e = parse_expr(
+        "ISO '2025-01-01T00:00:00'",
+        default_timezone="Asia/Shanghai",
+    )
+    expected = parse_expr("ISO '2024-12-31T16:00:00Z'")
+    assert isinstance(e, TimestampLit)
+    assert e.value == expected.value
+
+
+def test_interval_literal():
+    e = parse_expr("INTERVAL 'P2DT6H'")
+    assert isinstance(e, IntervalLit)
+    assert e.value == (2 * 24 + 6) * 3600 * 1_000_000
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +266,13 @@ def test_in_trailing_comma():
 def test_in_negative_literal():
     e = parse_expr("temp in [-5, 0, 10]")
     assert [el.value for el in e.values.elements] == [-5, 0, 10]
+
+
+def test_in_timestamp_literal():
+    e = parse_expr("tsz in [ISO '2025-01-01T00:00:00Z']")
+    assert isinstance(e, InOp)
+    assert isinstance(e.values.elements[0], TimestampLit)
+    assert e.values.elements[0].value > 0
 
 
 def test_in_lhs_must_be_field():

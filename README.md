@@ -249,7 +249,7 @@ The command reads rows through `pymilvus` query iterators and writes BulkWriter 
 | Area | Support |
 |---|---|
 | Vector types | `FLOAT_VECTOR`, `SPARSE_FLOAT_VECTOR` |
-| Scalar types | `BOOL`, integer types, `FLOAT`, `DOUBLE`, `VARCHAR`, `JSON`, `ARRAY` |
+| Scalar types | `BOOL`, integer types, `FLOAT`, `DOUBLE`, `VARCHAR`, `JSON`, `ARRAY`, `TIMESTAMPTZ` |
 | Metrics | `COSINE`, `L2`, `IP`, `BM25` |
 | Indexes | `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, `FLAT`, `BRUTE_FORCE`, `AUTOINDEX`, `SPARSE_INVERTED_INDEX` |
 | CRUD | insert, upsert, partial update, delete by ID/filter, get, query, search, truncate |

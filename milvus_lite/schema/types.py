@@ -20,6 +20,7 @@ class DataType(Enum):
     VARCHAR = "varchar"
     JSON = "json"
     ARRAY = "array"
+    TIMESTAMPTZ = "timestamptz"
     FLOAT_VECTOR = "float_vector"
     SPARSE_FLOAT_VECTOR = "sparse_float_vector"
 
@@ -71,6 +72,7 @@ class CollectionSchema:
     version: int = 1
     enable_dynamic_field: bool = False
     functions: List[Function] = field(default_factory=list)
+    properties: Dict[str, Any] = field(default_factory=dict)
 
 
 # DataType -> PyArrow type mapping.
@@ -87,6 +89,7 @@ TYPE_MAP: Dict[DataType, Any] = {
     DataType.VARCHAR: pa.string(),
     DataType.JSON: pa.string(),
     DataType.ARRAY: None,  # resolved at runtime from element_type
+    DataType.TIMESTAMPTZ: pa.timestamp("us", tz="UTC"),
     DataType.FLOAT_VECTOR: None,
     DataType.SPARSE_FLOAT_VECTOR: pa.binary(),
 }

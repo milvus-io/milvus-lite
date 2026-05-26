@@ -28,6 +28,7 @@ from milvus_lite.search.filter.ast import (
     FloatLit,
     InOp,
     IntLit,
+    IntervalLit,
     IsNullOp,
     LikeOp,
     ListLit,
@@ -35,11 +36,16 @@ from milvus_lite.search.filter.ast import (
     Not,
     Or,
     StringLit,
+    TimestampLit,
     JsonAccess,
     TextMatchOp,
     ArrayContainsOp,
     ArrayLengthOp,
     ArrayAccessOp,
+)
+from milvus_lite.schema.timestamptz import (
+    interval_micros_to_timedelta,
+    micros_to_utc_datetime,
 )
 
 if TYPE_CHECKING:
@@ -129,6 +135,10 @@ def _eval_row(node, row: dict) -> Any:
         return node.value
     if isinstance(node, BoolLit):
         return node.value
+    if isinstance(node, TimestampLit):
+        return micros_to_utc_datetime(node.value)
+    if isinstance(node, IntervalLit):
+        return interval_micros_to_timedelta(node.value)
 
     if isinstance(node, FieldRef):
         return row.get(node.name)
@@ -149,7 +159,7 @@ def _eval_row(node, row: dict) -> Any:
         val = _eval_row(node.field, row)
         if val is None:
             return None  # NULL propagation (Kleene logic)
-        members = {el.value for el in node.values.elements}
+        members = {_eval_row(el, row) for el in node.values.elements}
         result = val in members
         return (not result) if node.negate else result
 

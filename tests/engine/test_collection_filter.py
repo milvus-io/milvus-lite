@@ -787,9 +787,9 @@ def test_filter_cache_lru_eviction(col):
     col._compile_filter("age > 2")
     col._compile_filter("age > 3")  # evicts age > 1
     assert len(col._filter_cache) == 2
-    assert "age > 1" not in col._filter_cache
-    assert "age > 2" in col._filter_cache
-    assert "age > 3" in col._filter_cache
+    assert ("age > 1", None) not in col._filter_cache
+    assert ("age > 2", None) in col._filter_cache
+    assert ("age > 3", None) in col._filter_cache
 
 
 def test_filter_cache_does_not_cache_errors(col):

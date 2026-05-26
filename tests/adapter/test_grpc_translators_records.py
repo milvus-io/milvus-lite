@@ -24,6 +24,7 @@ from milvus_lite.adapter.grpc.translators.records import (
 )
 from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
+from milvus_lite.schema.timestamptz import micros_to_iso_z, parse_timestamptz
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +100,20 @@ def test_decode_json_field():
     assert records[0]["data"] == {"k": 1}
     assert records[1]["data"] == {"k": "two"}
     assert records[2]["data"] == [1, 2, 3]
+
+
+def test_decode_timestamptz_field():
+    ts = parse_timestamptz("2025-01-01T00:00:00Z")
+    fd = _scalar_fd("tsz", 26, "string_data", ["2025-01-01T00:00:00Z"])
+    records = fields_data_to_records([fd], num_rows=1)
+    assert records == [{"tsz": ts}]
+
+
+def test_decode_timestamptz_field_from_native_proto_slot():
+    ts = parse_timestamptz("2025-01-01T00:00:00Z")
+    fd = _scalar_fd("tsz", 26, "timestamptz_data", [ts])
+    records = fields_data_to_records([fd], num_rows=1)
+    assert records == [{"tsz": ts}]
 
 
 def test_decode_empty_request():
@@ -214,6 +229,56 @@ def test_encode_basic_round_trip():
     assert records_out[0]["active"] is True
     assert abs(records_out[0]["score"] - 0.5) < 1e-6
     assert records_out[1]["title"] == "b"
+
+
+def test_encode_timestamptz_round_trip():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ, nullable=True),
+    ])
+    ts = parse_timestamptz("2025-01-01T00:00:00+08:00")
+    fields_data = records_to_fields_data([
+        {"id": 1, "vec": [0.1, 0.2], "tsz": ts},
+        {"id": 2, "vec": [0.2, 0.3], "tsz": None},
+    ], schema)
+    tsz_fd = next(fd for fd in fields_data if fd.field_name == "tsz")
+    assert tsz_fd.type == 26
+    assert list(tsz_fd.valid_data) == [True, False]
+    assert list(tsz_fd.scalars.string_data.data) == [micros_to_iso_z(ts), ""]
+
+    records = fields_data_to_records(fields_data, num_rows=2)
+    assert records[0]["tsz"] == ts
+    assert records[1]["tsz"] is None
+
+
+def test_encode_timestamptz_time_fields():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="tsz", dtype=DataType.TIMESTAMPTZ, nullable=True),
+    ])
+    ts = parse_timestamptz("2024-12-31T16:00:01.123456Z")
+
+    fields_data = records_to_fields_data(
+        [
+            {"id": 1, "vec": [0.1, 0.2], "tsz": ts},
+            {"id": 2, "vec": [0.2, 0.3], "tsz": None},
+        ],
+        schema,
+        output_fields=["tsz"],
+        time_fields="year, month, day, hour, minute, second, microsecond",
+        timezone="Asia/Shanghai",
+    )
+
+    tsz_fd = next(fd for fd in fields_data if fd.field_name == "tsz")
+    assert tsz_fd.type == 22
+    assert tsz_fd.scalars.array_data.element_type == 5
+    assert list(tsz_fd.valid_data) == [True, False]
+    assert list(tsz_fd.scalars.array_data.data[0].long_data.data) == [
+        2025, 1, 1, 0, 0, 1, 123456,
+    ]
+    assert list(tsz_fd.scalars.array_data.data[1].long_data.data) == []
 
 
 def test_encode_output_fields_subset():
