@@ -59,10 +59,10 @@ _SCALAR_TYPE_TO_SLOT: Dict[int, str] = {
     5:  "long_data",     # Int64
     10: "float_data",    # Float
     11: "double_data",   # Double
-    21: "string_data",   # VarChar
-    23: "json_data",     # JSON
-    24: "string_data",   # Geometry WKT
-    26: "string_data",   # Timestamptz. pymilvus sends/parses it as string_data.
+    21: "string_data",        # VarChar
+    23: "json_data",          # JSON
+    24: "geometry_wkt_data",  # Geometry WKT
+    26: "string_data",        # Timestamptz. pymilvus sends/parses it as string_data.
 }
 
 _VECTOR_TYPES = frozenset({100, 101, 102, 103, 104, 105})  # Binary/Float/F16/BF16/Sparse/Int8
@@ -228,6 +228,13 @@ def _extract_scalar_column(fd, dtype_int: int) -> List[Any]:
     # Array type (22) — special handling via array_data slot
     if dtype_int == 22:
         return _extract_array_column(fd)
+
+    if dtype_int == 24:
+        if scalars.HasField("geometry_wkt_data"):
+            return list(scalars.geometry_wkt_data.data)
+        if scalars.HasField("string_data"):
+            return list(scalars.string_data.data)
+        return []
 
     if dtype_int == 26:
         if scalars.HasField("timestamptz_data"):

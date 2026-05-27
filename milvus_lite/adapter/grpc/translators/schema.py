@@ -277,7 +277,7 @@ def _encode_default_value(pf, dtype: DataType, value: object) -> None:
         vd.float_data = float(value)
     elif dtype == DataType.DOUBLE:
         vd.double_data = float(value)
-    elif dtype == DataType.VARCHAR:
+    elif dtype in (DataType.VARCHAR, DataType.GEOMETRY):
         vd.string_data = str(value)
     elif dtype == DataType.TIMESTAMPTZ:
         if hasattr(vd, "timestamptz_data"):

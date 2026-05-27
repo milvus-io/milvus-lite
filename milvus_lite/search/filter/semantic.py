@@ -46,6 +46,8 @@ from milvus_lite.search.filter.ast import (
     ArrayLengthOp,
     ArrayAccessOp,
 )
+from milvus_lite.exceptions import SchemaValidationError
+from milvus_lite.schema import validate_geometry_wkt
 from milvus_lite.search.filter.exceptions import (
     FilterFieldError,
     FilterTypeError,
@@ -498,6 +500,7 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
                 f"{_describe_operand(node.field, field_type)}",
                 ctx.source, node.pos,
             )
+        _validate_geometry_literal(node.geometry, ctx)
         ctx.requires_python = True
         return SEM_BOOL
 
@@ -520,6 +523,7 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
                 f"{_describe_operand(node.field, field_type)}",
                 ctx.source, node.pos,
             )
+        _validate_geometry_literal(node.geometry, ctx)
         ctx.requires_python = True
         return SEM_BOOL
 
@@ -546,6 +550,17 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
         return SEM_DYNAMIC
 
     raise TypeError(f"unknown AST node type: {type(node).__name__}")
+
+
+def _validate_geometry_literal(node: StringLit, ctx: "_CompileCtx") -> None:
+    try:
+        validate_geometry_wkt(node.value)
+    except SchemaValidationError as e:
+        raise FilterTypeError(
+            "geometry predicate requires a valid WKT literal",
+            ctx.source,
+            node.pos,
+        ) from e
 
 
 def _describe_operand(node: Expr, sem_type: str) -> str:

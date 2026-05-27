@@ -10,6 +10,7 @@ from milvus_lite.schema.geometry import (
 )
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
 from milvus_lite.search.filter import compile_expr, evaluate, parse_expr
+from milvus_lite.search.filter.exceptions import FilterTypeError
 from milvus_lite.search.filter.ast import GeometryDWithinOp, GeometryIsValidOp, GeometryOp
 
 
@@ -132,6 +133,25 @@ def test_parse_st_dwithin():
     assert expr.field.name == "shape"
     assert expr.geometry.value == "POINT(1 2)"
     assert expr.distance.value == 3.5
+
+
+def test_geometry_filter_uses_python_backend():
+    compiled = compile_expr(
+        parse_expr("geometry_contains(shape, 'POINT(5 5)')"),
+        _schema(),
+        "geometry_contains(shape, 'POINT(5 5)')",
+    )
+
+    assert compiled.backend == "python"
+
+
+def test_geometry_filter_rejects_invalid_wkt_literal():
+    with pytest.raises(FilterTypeError, match="valid WKT"):
+        compile_expr(
+            parse_expr("geometry_contains(shape, 'not-wkt')"),
+            _schema(),
+            "geometry_contains(shape, 'not-wkt')",
+        )
 
 
 def test_geometry_filter_evaluates():

@@ -175,6 +175,14 @@ def test_decode_unsupported_vector_type_raises():
 
 
 def test_decode_geometry_scalar():
+    fd = _scalar_fd("geo", 24, "geometry_wkt_data", ["POINT(1 2)"])
+
+    records = fields_data_to_records([fd], num_rows=1)
+
+    assert records == [{"geo": "POINT(1 2)"}]
+
+
+def test_decode_geometry_scalar_legacy_string_slot():
     fd = _scalar_fd("geo", 24, "string_data", ["POINT(1 2)"])
 
     records = fields_data_to_records([fd], num_rows=1)
@@ -245,7 +253,7 @@ def test_encode_nullable_geometry_field():
     geo_fd = next(fd for fd in fields_data if fd.field_name == "geo")
     assert geo_fd.type == 24
     assert list(geo_fd.valid_data) == [True, False]
-    assert list(geo_fd.scalars.string_data.data) == ["POINT(1 2)", ""]
+    assert list(geo_fd.scalars.geometry_wkt_data.data) == ["POINT(1 2)", ""]
 
     records = fields_data_to_records(fields_data, num_rows=2)
     assert records[0]["geo"] == "POINT(1 2)"
