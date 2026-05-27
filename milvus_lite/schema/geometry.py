@@ -226,14 +226,19 @@ def _polygon_polygon_distance(a: Polygon, b: Polygon) -> float:
 def _polygon_contains_polygon(a: Polygon, b: Polygon) -> bool:
     if not all(_point_in_polygon(p, a, include_boundary=True) for p in b.points[:-1]):
         return False
-    for a1, a2 in zip(a.points, a.points[1:]):
-        for b1, b2 in zip(b.points, b.points[1:]):
-            if _segments_intersect(a1, a2, b1, b2):
-                shared_a1 = _points_equal(a1, b1) or _points_equal(a1, b2)
-                shared_a2 = _points_equal(a2, b1) or _points_equal(a2, b2)
-                if not (shared_a1 and shared_a2):
+    for b1, b2 in zip(b.points, b.points[1:]):
+        midpoint = Point((b1.x + b2.x) / 2, (b1.y + b2.y) / 2)
+        if not _point_in_polygon(midpoint, a, include_boundary=True):
+            return False
+        for a1, a2 in zip(a.points, a.points[1:]):
+            if _segments_intersect(a1, a2, b1, b2) and not _segments_collinear(a1, a2, b1, b2):
+                if not _point_on_segment(b1, a1, a2) and not _point_on_segment(b2, a1, a2):
                     return False
     return True
+
+
+def _segments_collinear(a1: Point, a2: Point, b1: Point, b2: Point) -> bool:
+    return _orientation(a1, a2, b1) == 0 and _orientation(a1, a2, b2) == 0
 
 
 def _polygons_intersect(a: Polygon, b: Polygon) -> bool:
@@ -260,10 +265,6 @@ def _segments_intersect(a1: Point, a2: Point, b1: Point, b2: Point) -> bool:
     if d4 == 0 and _point_on_segment(a2, b1, b2):
         return True
     return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0)
-
-
-def _points_equal(a: Point, b: Point) -> bool:
-    return abs(a.x - b.x) <= 1e-9 and abs(a.y - b.y) <= 1e-9
 
 
 def _orientation(a: Point, b: Point, c: Point) -> int:

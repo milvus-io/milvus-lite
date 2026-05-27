@@ -39,6 +39,16 @@ def test_geometry_helpers_point_polygon():
         ("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))", "POINT(5 5)", True),
         ("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))", "POINT(0 5)", True),
         ("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))", "POINT(15 5)", False),
+        (
+            "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))",
+            True,
+        ),
+        (
+            "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))",
+            "POLYGON((0 0, 5 0, 5 5, 0 5, 0 0))",
+            True,
+        ),
     ],
 )
 def test_geometry_contains_truth_table(left, right, expected):
