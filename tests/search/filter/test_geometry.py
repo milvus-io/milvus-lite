@@ -7,6 +7,7 @@ from milvus_lite.schema.geometry import (
     geometry_intersects,
     geometry_is_valid,
     geometry_within,
+    validate_geometry_wkt,
 )
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
 from milvus_lite.search.filter import compile_expr, evaluate, parse_expr
@@ -42,6 +43,15 @@ def test_geometry_helpers_point_polygon():
 )
 def test_geometry_contains_truth_table(left, right, expected):
     assert geometry_contains(left, right) is expected
+
+
+def test_geometry_contains_concave_polygon_rejects_crossing_inner_polygon():
+    outer = "POLYGON((0 0, 4 0, 4 4, 3 4, 3 1, 1 1, 1 4, 0 4, 0 0))"
+    crossing = "POLYGON((0.5 0.5, 3.5 0.5, 3.5 3.5, 0.5 3.5, 0.5 0.5))"
+    contained = "POLYGON((0.2 0.2, 0.8 0.2, 0.8 0.8, 0.2 0.8, 0.2 0.2))"
+
+    assert geometry_contains(outer, crossing) is False
+    assert geometry_contains(outer, contained) is True
 
 
 @pytest.mark.parametrize(
@@ -97,6 +107,21 @@ def test_geometry_is_valid_rejects_non_finite_and_self_intersecting_wkt():
     assert geometry_is_valid("POINT(nan 2)") is False
     assert geometry_is_valid("POINT(inf 2)") is False
     assert geometry_is_valid("POLYGON((0 0, 2 2, 0 2, 2 0, 0 0))") is False
+
+
+@pytest.mark.parametrize(
+    "wkt",
+    [
+        "LINESTRING(0 0, 1 1)",
+        "MULTIPOLYGON(((0 0, 1 0, 1 1, 0 0)))",
+        "POLYGON((0 0, 4 0, 4 4, 0 4, 0 0), (1 1, 2 1, 2 2, 1 1))",
+        "POINT Z (1 2 3)",
+    ],
+)
+def test_geometry_rejects_unsupported_wkt_subset(wkt):
+    assert geometry_is_valid(wkt) is False
+    with pytest.raises(Exception):
+        validate_geometry_wkt(wkt)
 
 
 def test_parse_geometry_predicate():

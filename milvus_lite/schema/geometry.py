@@ -61,7 +61,7 @@ def geometry_contains(left: str, right: str) -> bool:
     if isinstance(a, Point) and isinstance(b, Point):
         return a == b
     if isinstance(a, Polygon) and isinstance(b, Polygon):
-        return all(_point_in_polygon(p, a, include_boundary=True) for p in b.points[:-1])
+        return _polygon_contains_polygon(a, b)
     return False
 
 
@@ -223,6 +223,19 @@ def _polygon_polygon_distance(a: Polygon, b: Polygon) -> float:
     )
 
 
+def _polygon_contains_polygon(a: Polygon, b: Polygon) -> bool:
+    if not all(_point_in_polygon(p, a, include_boundary=True) for p in b.points[:-1]):
+        return False
+    for a1, a2 in zip(a.points, a.points[1:]):
+        for b1, b2 in zip(b.points, b.points[1:]):
+            if _segments_intersect(a1, a2, b1, b2):
+                shared_a1 = _points_equal(a1, b1) or _points_equal(a1, b2)
+                shared_a2 = _points_equal(a2, b1) or _points_equal(a2, b2)
+                if not (shared_a1 and shared_a2):
+                    return False
+    return True
+
+
 def _polygons_intersect(a: Polygon, b: Polygon) -> bool:
     a_edges = list(zip(a.points, a.points[1:]))
     b_edges = list(zip(b.points, b.points[1:]))
@@ -247,6 +260,10 @@ def _segments_intersect(a1: Point, a2: Point, b1: Point, b2: Point) -> bool:
     if d4 == 0 and _point_on_segment(a2, b1, b2):
         return True
     return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0)
+
+
+def _points_equal(a: Point, b: Point) -> bool:
+    return abs(a.x - b.x) <= 1e-9 and abs(a.y - b.y) <= 1e-9
 
 
 def _orientation(a: Point, b: Point, c: Point) -> int:

@@ -1,5 +1,6 @@
 import pytest
 
+from milvus_lite.db import MilvusLite
 from milvus_lite.engine.collection import Collection
 from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
@@ -234,6 +235,30 @@ def test_geometry_invalid_wkt_rejected(tmp_path):
 
     with pytest.raises(SchemaValidationError, match="GEOMETRY"):
         col.insert([{"id": 1, "vec": [0.1, 0.2], "shape": "not-wkt"}])
+
+
+def test_geometry_query_after_db_reopen(tmp_path):
+    data_dir = str(tmp_path / "db")
+    db = MilvusLite(data_dir)
+    col = db.create_collection("geo", _schema())
+    col.insert([
+        {"id": 1, "vec": [0.1, 0.2], "shape": "POINT(1 1)"},
+        {"id": 2, "vec": [0.2, 0.3], "shape": "POINT(20 20)"},
+    ])
+    col.flush()
+    db.close()
+
+    reopened = MilvusLite(data_dir)
+    try:
+        col = reopened.get_collection("geo")
+        rows = col.query(
+            "ST_WITHIN(shape, 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')",
+            output_fields=["shape"],
+        )
+    finally:
+        reopened.close()
+
+    assert rows == [{"id": 1, "shape": "POINT(1 1)"}]
 
 
 def test_geometry_filter_on_non_geometry_field_rejected(tmp_path):
