@@ -20,6 +20,7 @@ def test_datatype_values():
     assert DataType.FLOAT_VECTOR.value == "float_vector"
     assert DataType.VARCHAR.value == "varchar"
     assert DataType.JSON.value == "json"
+    assert DataType.GEOMETRY.value == "geometry"
     assert DataType.TIMESTAMPTZ.value == "timestamptz"
 
 
@@ -27,7 +28,7 @@ def test_datatype_members():
     expected = {
         "BOOL", "INT8", "INT16", "INT32", "INT64",
         "FLOAT", "DOUBLE", "VARCHAR", "JSON", "ARRAY",
-        "TIMESTAMPTZ", "FLOAT_VECTOR", "SPARSE_FLOAT_VECTOR",
+        "GEOMETRY", "TIMESTAMPTZ", "FLOAT_VECTOR", "SPARSE_FLOAT_VECTOR",
     }
     assert set(DataType.__members__.keys()) == expected
 
@@ -100,6 +101,7 @@ def test_type_map_scalar_types():
     assert TYPE_MAP[DataType.DOUBLE] == pa.float64()
     assert TYPE_MAP[DataType.VARCHAR] == pa.string()
     assert TYPE_MAP[DataType.JSON] == pa.string()
+    assert TYPE_MAP[DataType.GEOMETRY] == pa.string()
     assert TYPE_MAP[DataType.TIMESTAMPTZ] == pa.timestamp("us", tz="UTC")
 
 

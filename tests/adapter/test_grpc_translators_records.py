@@ -174,13 +174,20 @@ def test_decode_unsupported_vector_type_raises():
         fields_data_to_records([fd], num_rows=1)
 
 
-def test_decode_unsupported_scalar_type_raises():
-    fd = schema_pb2.FieldData()
-    fd.field_name = "geo"
-    fd.type = 24  # Geometry
-    fd.scalars.bytes_data.data.extend([b""])
-    with pytest.raises(SchemaValidationError, match="Geometry"):
-        fields_data_to_records([fd], num_rows=1)
+def test_decode_geometry_scalar():
+    fd = _scalar_fd("geo", 24, "geometry_wkt_data", ["POINT(1 2)"])
+
+    records = fields_data_to_records([fd], num_rows=1)
+
+    assert records == [{"geo": "POINT(1 2)"}]
+
+
+def test_decode_geometry_scalar_legacy_string_slot():
+    fd = _scalar_fd("geo", 24, "string_data", ["POINT(1 2)"])
+
+    records = fields_data_to_records([fd], num_rows=1)
+
+    assert records == [{"geo": "POINT(1 2)"}]
 
 
 def test_decode_length_mismatch_raises():
@@ -229,6 +236,28 @@ def test_encode_basic_round_trip():
     assert records_out[0]["active"] is True
     assert abs(records_out[0]["score"] - 0.5) < 1e-6
     assert records_out[1]["title"] == "b"
+
+
+def test_encode_nullable_geometry_field():
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="geo", dtype=DataType.GEOMETRY, nullable=True),
+    ])
+
+    fields_data = records_to_fields_data([
+        {"id": 1, "vec": [0.1, 0.2], "geo": "POINT(1 2)"},
+        {"id": 2, "vec": [0.2, 0.3], "geo": None},
+    ], schema)
+
+    geo_fd = next(fd for fd in fields_data if fd.field_name == "geo")
+    assert geo_fd.type == 24
+    assert list(geo_fd.valid_data) == [True, False]
+    assert list(geo_fd.scalars.geometry_wkt_data.data) == ["POINT(1 2)", ""]
+
+    records = fields_data_to_records(fields_data, num_rows=2)
+    assert records[0]["geo"] == "POINT(1 2)"
+    assert records[1]["geo"] is None
 
 
 def test_encode_timestamptz_round_trip():

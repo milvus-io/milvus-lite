@@ -13,6 +13,7 @@ from milvus_lite.schema.types import (
     Function,
     FunctionType,
 )
+from milvus_lite.schema.geometry import validate_geometry_wkt
 from milvus_lite.schema.timestamptz import parse_timestamptz, validate_timezone_name
 
 # Reserved column names — users may not name fields these.
@@ -45,6 +46,7 @@ _DTYPE_PYTHON_CHECK = {
     DataType.DOUBLE: lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
     DataType.VARCHAR: lambda v: isinstance(v, str),
     DataType.JSON: lambda v: isinstance(v, (dict, list, str, int, float, bool)) or v is None,
+    DataType.GEOMETRY: lambda v: isinstance(v, str),
     DataType.TIMESTAMPTZ: lambda v: isinstance(v, int) and not isinstance(v, bool),
 }
 
@@ -124,6 +126,13 @@ def validate_schema(
                 f.default_value,
                 default_timezone=default_timezone,
             )
+        if f.dtype == DataType.GEOMETRY and f.default_value is not None:
+            try:
+                validate_geometry_wkt(f.default_value)
+            except SchemaValidationError as e:
+                raise SchemaValidationError(
+                    f"GEOMETRY field {f.name!r} default_value is invalid"
+                ) from e
 
     if len(pk_fields) == 0:
         raise SchemaValidationError("schema has no primary key field")
@@ -427,6 +436,13 @@ def validate_record(
                     f"field {f.name!r} value {value!r} does not match dtype {f.dtype}"
                 ) from e
             value = record[f.name]
+        if f.dtype == DataType.GEOMETRY:
+            try:
+                validate_geometry_wkt(value)
+            except SchemaValidationError as e:
+                raise SchemaValidationError(
+                    f"field {f.name!r} value {value!r} does not match dtype {f.dtype}"
+                ) from e
         # VARCHAR max_length check
         if f.dtype == DataType.VARCHAR and f.max_length is not None:
             if isinstance(value, str) and len(value) > f.max_length:

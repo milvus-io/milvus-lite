@@ -25,6 +25,9 @@ from milvus_lite.search.filter.ast import (
     Expr,
     FieldRef,
     FloatLit,
+    GeometryOp,
+    GeometryDWithinOp,
+    GeometryIsValidOp,
     InOp,
     IntLit,
     IntervalLit,
@@ -43,6 +46,8 @@ from milvus_lite.search.filter.ast import (
     ArrayLengthOp,
     ArrayAccessOp,
 )
+from milvus_lite.exceptions import SchemaValidationError
+from milvus_lite.schema import validate_geometry_wkt
 from milvus_lite.search.filter.exceptions import (
     FilterFieldError,
     FilterTypeError,
@@ -60,12 +65,13 @@ SEM_STRING = "string"
 SEM_BOOL = "bool"
 SEM_TIMESTAMPTZ = "timestamptz"
 SEM_INTERVAL = "interval"
+SEM_GEOMETRY = "geometry"
 # Phase F2b: $meta["key"] returns a value whose type is unknown until
 # runtime. SEM_DYNAMIC is compatible with any other type for the purpose
 # of comparisons / IN / arithmetic — runtime semantics decide.
 SEM_DYNAMIC = "dynamic"
 
-_SEM_TYPES = {SEM_INT, SEM_FLOAT, SEM_STRING, SEM_BOOL, SEM_TIMESTAMPTZ, SEM_INTERVAL, SEM_DYNAMIC}
+_SEM_TYPES = {SEM_INT, SEM_FLOAT, SEM_STRING, SEM_BOOL, SEM_TIMESTAMPTZ, SEM_INTERVAL, SEM_GEOMETRY, SEM_DYNAMIC}
 
 # Reserved field names that must not be referenced from filter expressions.
 _RESERVED_FIELDS = frozenset({"_seq", "_partition", "$meta"})
@@ -80,6 +86,8 @@ def _datatype_to_sem(dtype: DataType) -> Optional[str]:
         return SEM_FLOAT
     if dtype == DataType.VARCHAR:
         return SEM_STRING
+    if dtype == DataType.GEOMETRY:
+        return SEM_GEOMETRY
     if dtype == DataType.BOOL:
         return SEM_BOOL
     if dtype == DataType.TIMESTAMPTZ:
@@ -252,6 +260,7 @@ def compile_expr(
         source=source,
         enable_dynamic_field=schema.enable_dynamic_field,
         has_meta_access=False,
+        requires_python=False,
     )
 
     # Walk the AST: type-check + collect referenced fields.
@@ -268,9 +277,8 @@ def compile_expr(
     #   - "arrow"  for pure schema field expressions (fast path)
     #   - "hybrid" for $meta expressions (per-batch JSON preprocessing
     #     then arrow path; ~10x faster than pure row-wise python)
-    #   - "python" reserved for future UDF / truly dynamic things that
-    #     hybrid can't handle. Not selected automatically in F3+.
-    backend = "hybrid" if ctx.has_meta_access else "arrow"
+    #   - "python" for row-wise functions that have no Arrow kernel.
+    backend = "python" if ctx.requires_python else "hybrid" if ctx.has_meta_access else "arrow"
 
     return CompiledExpr(
         ast=expr,
@@ -290,6 +298,7 @@ class _CompileCtx:
     source: str
     enable_dynamic_field: bool
     has_meta_access: bool
+    requires_python: bool
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +491,42 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
         ctx.has_meta_access = True
         return SEM_BOOL
 
+    # ── Geometry functions ───────────────────────────────────
+    if isinstance(node, GeometryOp):
+        field_type = _check_node(node.field, ctx)
+        if field_type != SEM_GEOMETRY:
+            raise FilterTypeError(
+                f"{node.op} requires a GEOMETRY field, got "
+                f"{_describe_operand(node.field, field_type)}",
+                ctx.source, node.pos,
+            )
+        _validate_geometry_literal(node.geometry, ctx)
+        ctx.requires_python = True
+        return SEM_BOOL
+
+    if isinstance(node, GeometryIsValidOp):
+        field_type = _check_node(node.field, ctx)
+        if field_type != SEM_GEOMETRY:
+            raise FilterTypeError(
+                f"ST_ISVALID requires a GEOMETRY field, got "
+                f"{_describe_operand(node.field, field_type)}",
+                ctx.source, node.pos,
+            )
+        ctx.requires_python = True
+        return SEM_BOOL
+
+    if isinstance(node, GeometryDWithinOp):
+        field_type = _check_node(node.field, ctx)
+        if field_type != SEM_GEOMETRY:
+            raise FilterTypeError(
+                f"ST_DWITHIN requires a GEOMETRY field, got "
+                f"{_describe_operand(node.field, field_type)}",
+                ctx.source, node.pos,
+            )
+        _validate_geometry_literal(node.geometry, ctx)
+        ctx.requires_python = True
+        return SEM_BOOL
+
     # ── Array functions ──────────────────────────────────────
     if isinstance(node, ArrayContainsOp):
         _check_node(node.field, ctx)
@@ -505,6 +550,17 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
         return SEM_DYNAMIC
 
     raise TypeError(f"unknown AST node type: {type(node).__name__}")
+
+
+def _validate_geometry_literal(node: StringLit, ctx: "_CompileCtx") -> None:
+    try:
+        validate_geometry_wkt(node.value)
+    except SchemaValidationError as e:
+        raise FilterTypeError(
+            "geometry predicate requires a valid WKT literal",
+            ctx.source,
+            node.pos,
+        ) from e
 
 
 def _describe_operand(node: Expr, sem_type: str) -> str:

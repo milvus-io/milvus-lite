@@ -15,6 +15,7 @@ Type mapping (MilvusLite ↔ Milvus DataType enum):
     VARCHAR      ↔ VarChar (21)
     BOOL         ↔ Bool (1)
     JSON         ↔ JSON (23)
+    GEOMETRY     ↔ Geometry (24)
     TIMESTAMPTZ  ↔ Timestamptz (26)
     FLOAT_VECTOR ↔ FloatVector (101)
 
@@ -68,6 +69,7 @@ _MILVUS_TO_LITEVECDB: dict[int, DataType] = {
     21: DataType.VARCHAR,        # VarChar
     22: DataType.ARRAY,          # Array
     23: DataType.JSON,           # JSON
+    24: DataType.GEOMETRY,       # Geometry
     26: DataType.TIMESTAMPTZ,    # Timestamptz
     101: DataType.FLOAT_VECTOR,          # FloatVector
     104: DataType.SPARSE_FLOAT_VECTOR,  # SparseFloatVector
@@ -158,7 +160,7 @@ def _decode_field(proto_field: schema_pb2.FieldSchema) -> FieldSchema:
             f"field {proto_field.name!r} uses Milvus type {type_name} "
             f"which MilvusLite does not support. "
             f"Phase 10.2 supports: BOOL, INT8/16/32/64, FLOAT, DOUBLE, "
-            f"VARCHAR, JSON, ARRAY, TIMESTAMPTZ, FLOAT_VECTOR, SPARSE_FLOAT_VECTOR."
+            f"VARCHAR, JSON, ARRAY, GEOMETRY, TIMESTAMPTZ, FLOAT_VECTOR, SPARSE_FLOAT_VECTOR."
         )
 
     dtype = _MILVUS_TO_LITEVECDB[milvus_dtype_int]
@@ -275,7 +277,7 @@ def _encode_default_value(pf, dtype: DataType, value: object) -> None:
         vd.float_data = float(value)
     elif dtype == DataType.DOUBLE:
         vd.double_data = float(value)
-    elif dtype == DataType.VARCHAR:
+    elif dtype in (DataType.VARCHAR, DataType.GEOMETRY):
         vd.string_data = str(value)
     elif dtype == DataType.TIMESTAMPTZ:
         if hasattr(vd, "timestamptz_data"):

@@ -31,8 +31,8 @@ from milvus_lite.search.filter.ast import (
     BoolLit,
     CmpOp,
     Expr,
-    FieldRef,
     FloatLit,
+    FieldRef,
     InOp,
     IntLit,
     IntervalLit,
@@ -315,6 +315,105 @@ class Parser:
         self._consume()
         return TextMatchOp(field=field, query=query, pos=func_tok.pos)
 
+    def _parse_geometry_field_arg(self, func_tok: Token) -> FieldRef:
+        field_tok = self._peek()
+        if field_tok.kind != TokenKind.IDENT:
+            raise FilterParseError(
+                f"{func_tok.text}: expected geometry field name",
+                self.source, field_tok.pos,
+            )
+        self._consume()
+        return FieldRef(name=field_tok.text, pos=field_tok.pos)
+
+    def _parse_geometry_predicate(self, func_tok: Token, op: str) -> Expr:
+        """``geometry_contains(field, 'WKT')`` and related predicates."""
+        from milvus_lite.search.filter.ast import GeometryOp
+
+        self._consume()  # '('
+        field = self._parse_geometry_field_arg(func_tok)
+        if self._peek().kind != TokenKind.COMMA:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ',' after field name",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        geom_tok = self._peek()
+        if geom_tok.kind != TokenKind.STRING:
+            raise FilterParseError(
+                f"{func_tok.text}: expected WKT string literal",
+                self.source, geom_tok.pos,
+            )
+        self._consume()
+        geometry = StringLit(value=geom_tok.value, pos=geom_tok.pos)
+        if self._peek().kind != TokenKind.RPAREN:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ')'",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        return GeometryOp(op=op, field=field, geometry=geometry, pos=func_tok.pos)
+
+    def _parse_geometry_isvalid(self, func_tok: Token) -> Expr:
+        from milvus_lite.search.filter.ast import GeometryIsValidOp
+
+        self._consume()  # '('
+        field = self._parse_geometry_field_arg(func_tok)
+        if self._peek().kind != TokenKind.RPAREN:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ')'",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        return GeometryIsValidOp(field=field, pos=func_tok.pos)
+
+    def _parse_geometry_dwithin(self, func_tok: Token) -> Expr:
+        from milvus_lite.search.filter.ast import GeometryDWithinOp
+
+        self._consume()  # '('
+        field = self._parse_geometry_field_arg(func_tok)
+        if self._peek().kind != TokenKind.COMMA:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ',' after field name",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        geom_tok = self._peek()
+        if geom_tok.kind != TokenKind.STRING:
+            raise FilterParseError(
+                f"{func_tok.text}: expected WKT string literal",
+                self.source, geom_tok.pos,
+            )
+        self._consume()
+        if self._peek().kind != TokenKind.COMMA:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ',' after WKT string",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        distance = self.parse_unary()
+        if not isinstance(distance, (IntLit, FloatLit)):
+            raise FilterParseError(
+                f"{func_tok.text}: expected numeric distance literal",
+                self.source, getattr(distance, "pos", func_tok.pos),
+            )
+        if distance.value < 0:
+            raise FilterParseError(
+                f"{func_tok.text}: distance must be non-negative",
+                self.source, distance.pos,
+            )
+        if self._peek().kind != TokenKind.RPAREN:
+            raise FilterParseError(
+                f"{func_tok.text}: expected ')'",
+                self.source, self._peek().pos,
+            )
+        self._consume()
+        return GeometryDWithinOp(
+            field=field,
+            geometry=StringLit(value=geom_tok.value, pos=geom_tok.pos),
+            distance=distance,
+            pos=func_tok.pos,
+        )
+
     def _parse_bracket_access(self, ident_tok: Token) -> Expr:
         """``field["key"]``, ``field["a"]["b"]`` (JSON path) or ``field[N]`` (array index).
 
@@ -483,6 +582,20 @@ class Parser:
                 fn_name = tok.text.lower()
                 if fn_name == "text_match":
                     return self._parse_text_match(tok)
+                geometry_aliases = {
+                    "geometry_contains": "geometry_contains",
+                    "geometry_within": "geometry_within",
+                    "geometry_intersects": "geometry_intersects",
+                    "st_contains": "geometry_contains",
+                    "st_within": "geometry_within",
+                    "st_intersects": "geometry_intersects",
+                }
+                if fn_name in geometry_aliases:
+                    return self._parse_geometry_predicate(tok, geometry_aliases[fn_name])
+                if fn_name in ("st_isvalid", "geometry_isvalid"):
+                    return self._parse_geometry_isvalid(tok)
+                if fn_name in ("st_dwithin", "geometry_dwithin"):
+                    return self._parse_geometry_dwithin(tok)
                 if fn_name in ("array_contains", "json_contains"):
                     return self._parse_array_contains(tok, "any_one")
                 if fn_name in ("array_contains_all", "json_contains_all"):
@@ -494,8 +607,10 @@ class Parser:
                 raise FilterParseError(
                     f"unknown function {tok.text!r}",
                     self.source, tok.pos, span=len(tok.text),
-                    hint="supported: text_match, array_contains, json_contains, "
-                         "array_contains_all, array_contains_any, array_length",
+                    hint="supported: text_match, geometry_contains, geometry_within, "
+                         "geometry_intersects, ST_CONTAINS, ST_WITHIN, ST_INTERSECTS, "
+                         "ST_ISVALID, ST_DWITHIN, array_contains, json_contains, array_contains_all, "
+                         "array_contains_any, array_length",
                 )
             # field[...] access: JSON path or array index
             if self._peek().kind == TokenKind.LBRACKET:

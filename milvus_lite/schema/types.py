@@ -20,6 +20,7 @@ class DataType(Enum):
     VARCHAR = "varchar"
     JSON = "json"
     ARRAY = "array"
+    GEOMETRY = "geometry"
     TIMESTAMPTZ = "timestamptz"
     FLOAT_VECTOR = "float_vector"
     SPARSE_FLOAT_VECTOR = "sparse_float_vector"
@@ -89,6 +90,7 @@ TYPE_MAP: Dict[DataType, Any] = {
     DataType.VARCHAR: pa.string(),
     DataType.JSON: pa.string(),
     DataType.ARRAY: None,  # resolved at runtime from element_type
+    DataType.GEOMETRY: pa.string(),
     DataType.TIMESTAMPTZ: pa.timestamp("us", tz="UTC"),
     DataType.FLOAT_VECTOR: None,
     DataType.SPARSE_FLOAT_VECTOR: pa.binary(),
