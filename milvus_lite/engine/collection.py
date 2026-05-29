@@ -77,6 +77,7 @@ from milvus_lite.search.executor_indexed import execute_search_with_index
 from milvus_lite.storage.manifest import Manifest
 from milvus_lite.storage.memtable import MemTable
 from milvus_lite.storage.segment import Segment
+from milvus_lite.storage.snapshots import snapshot_references
 from milvus_lite.storage.wal import WAL
 
 if False:  # TYPE_CHECKING
@@ -277,6 +278,8 @@ class Collection:
                 bucket = f"{PARTITION_KEY_BUCKET_PREFIX}{i}"
                 if not self._manifest.has_partition(bucket):
                     self._manifest.add_partition(bucket)
+
+        self._schedule_bg_maintenance()
 
     # ── public API ──────────────────────────────────────────────
 
@@ -1290,8 +1293,27 @@ class Collection:
             self._data_dir, "partitions", partition_name
         )
         if os.path.exists(partition_dir):
-            import shutil
-            shutil.rmtree(partition_dir, ignore_errors=False)
+            snapshot_data_refs, snapshot_delta_refs, snapshot_index_refs = snapshot_references(
+                self._data_dir
+            )
+            pinned = set()
+            pinned.update(snapshot_data_refs.get(partition_name, set()))
+            pinned.update(snapshot_delta_refs.get(partition_name, set()))
+            pinned.update(snapshot_index_refs.get(partition_name, set()))
+
+            for root, dirs, files in os.walk(partition_dir, topdown=False):
+                for filename in files:
+                    abs_path = os.path.join(root, filename)
+                    rel = os.path.relpath(abs_path, partition_dir)
+                    if rel in pinned:
+                        continue
+                    os.remove(abs_path)
+                for dirname in dirs:
+                    abs_dir = os.path.join(root, dirname)
+                    if not os.listdir(abs_dir):
+                        os.rmdir(abs_dir)
+            if not os.listdir(partition_dir):
+                os.rmdir(partition_dir)
 
     def list_partitions(self) -> List[str]:
         """Return all partition names, sorted."""
@@ -1404,6 +1426,22 @@ class Collection:
                     "call release() first"
                 )
 
+        self._wait_for_bg()
+
+        with self._maintenance_lock:
+            if not self._index_specs:
+                raise IndexNotFoundError("no index to drop")
+            if field_name is not None and field_name not in self._index_specs:
+                raise IndexNotFoundError(
+                    f"no index on field {field_name!r}; "
+                    f"indexed fields: {list(self._index_specs.keys())}"
+                )
+            if self._load_state == "loaded":
+                raise SchemaValidationError(
+                    "vector index cannot be dropped on loaded collection; "
+                    "call release() first"
+                )
+
             # Determine which spec(s) to drop
             if field_name is not None:
                 drop_specs = [self._index_specs[field_name]]
@@ -1416,15 +1454,20 @@ class Collection:
                     seg.release_index(field_name=spec.field_name)
 
             # Delete on-disk .idx files matching the dropped (field, type)
-            # pair. File format: <stem>.<field>.<type>.idx
+            # pair, unless a snapshot still references them.
+            _snapshot_data_refs, _snapshot_delta_refs, snapshot_index_refs = snapshot_references(
+                self._data_dir
+            )
             for spec in drop_specs:
                 suffix = f".{spec.field_name}.{spec.index_type.lower()}.idx"
                 for partition in self._manifest.list_partitions():
                     index_dir = self._index_dir(partition)
                     if not os.path.exists(index_dir):
                         continue
+                    pinned = snapshot_index_refs.get(partition, set())
                     for entry in os.listdir(index_dir):
-                        if entry.endswith(suffix):
+                        rel = os.path.join("indexes", entry)
+                        if entry.endswith(suffix) and rel not in pinned:
                             try:
                                 os.remove(os.path.join(index_dir, entry))
                             except OSError:
@@ -1822,7 +1865,11 @@ class Collection:
             spec.field_name: spec.index_type.lower()
             for spec in self._index_specs.values()
         }
+        _snapshot_data_refs, _snapshot_delta_refs, snapshot_index_refs = snapshot_references(
+            self._data_dir
+        )
         for partition, data_files in self._manifest.get_all_data_files().items():
+            pinned_indexes = snapshot_index_refs.get(partition, set())
             index_dir = self._index_dir(partition)
             if not os.path.exists(index_dir):
                 continue
@@ -1837,6 +1884,9 @@ class Collection:
                 stem, _, field = stem_field.rpartition(".")
                 # Drop if (a) source data gone, or (b) field/type no
                 # longer in the active index_specs (dropped index).
+                rel = os.path.join("indexes", entry)
+                if rel in pinned_indexes:
+                    continue
                 if (
                     not stem
                     or stem not in valid_stems

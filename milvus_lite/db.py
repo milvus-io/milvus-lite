@@ -41,6 +41,14 @@ from milvus_lite.schema.persistence import load_schema, save_schema
 from milvus_lite.schema.types import CollectionSchema
 from milvus_lite.schema.validation import validate_schema
 from milvus_lite.schema.timestamptz import validate_timezone_name
+from milvus_lite.storage.manifest import MANIFEST_FILENAME, Manifest
+from milvus_lite.storage.snapshots import (
+    collect_index_files,
+    create_snapshot as create_snapshot_metadata,
+    drop_snapshot as drop_snapshot_metadata,
+    list_snapshots as list_snapshot_metadata,
+    load_snapshot,
+)
 
 
 COLLECTIONS_DIRNAME = "collections"
@@ -233,6 +241,116 @@ class MilvusLite:
             if os.path.isdir(sub) and os.path.exists(os.path.join(sub, SCHEMA_FILENAME)):
                 names.append(entry)
         return sorted(names)
+
+    def create_snapshot(
+        self,
+        collection_name: str,
+        snapshot_name: str,
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """Create an immutable manifest snapshot for a collection."""
+        self._check_open()
+        collection_name = self.resolve_collection_name(collection_name)
+        col = self.get_collection(collection_name)
+        col.flush()
+        col._wait_for_bg()
+
+        col_dir = self._collection_dir(collection_name)
+        with col._maintenance_lock:
+            manifest_path = os.path.join(col_dir, MANIFEST_FILENAME)
+            if not os.path.exists(manifest_path):
+                col._manifest.save()
+            data_files = col._manifest.get_all_data_files()
+            delta_files = col._manifest.get_all_delta_files()
+            index_files = collect_index_files(col_dir, data_files)
+            return create_snapshot_metadata(
+                collection_dir=col_dir,
+                collection_name=collection_name,
+                snapshot_name=snapshot_name,
+                description=description,
+                schema_filename=SCHEMA_FILENAME,
+                manifest_filename=MANIFEST_FILENAME,
+                data_files=data_files,
+                delta_files=delta_files,
+                index_files=index_files,
+                current_seq=col._manifest.current_seq,
+                manifest_version=col._manifest.version,
+            )
+
+    def list_snapshots(self, collection_name: str) -> List[Dict[str, Any]]:
+        """List snapshots for a collection."""
+        self._check_open()
+        collection_name = self.resolve_collection_name(collection_name)
+        if not self.has_collection(collection_name):
+            raise CollectionNotFoundError(f"collection {collection_name!r} does not exist")
+        return list_snapshot_metadata(self._collection_dir(collection_name))
+
+    def drop_snapshot(self, collection_name: str, snapshot_name: str) -> None:
+        """Drop snapshot metadata and release its pinned files."""
+        self._check_open()
+        collection_name = self.resolve_collection_name(collection_name)
+        if not self.has_collection(collection_name):
+            raise CollectionNotFoundError(f"collection {collection_name!r} does not exist")
+        drop_snapshot_metadata(self._collection_dir(collection_name), snapshot_name)
+
+    def restore_snapshot(
+        self,
+        collection_name: str,
+        snapshot_name: str,
+        new_collection_name: str,
+    ) -> Collection:
+        """Restore a snapshot into a new collection in the same database."""
+        self._check_open()
+        collection_name = self.resolve_collection_name(collection_name)
+        self._validate_name(new_collection_name)
+        if not self.has_collection(collection_name):
+            raise CollectionNotFoundError(f"collection {collection_name!r} does not exist")
+        if self.has_collection(new_collection_name):
+            raise CollectionAlreadyExistsError(
+                f"collection {new_collection_name!r} already exists"
+            )
+
+        src_dir = self._collection_dir(collection_name)
+        dst_dir = self._collection_dir(new_collection_name)
+        snap = load_snapshot(src_dir, snapshot_name)
+        os.makedirs(dst_dir, exist_ok=False)
+        try:
+            schema_src = os.path.join(src_dir, snap["schema_file"])
+            manifest_src = os.path.join(src_dir, snap["manifest_file"])
+            shutil.copy2(schema_src, os.path.join(dst_dir, SCHEMA_FILENAME))
+            shutil.copy2(manifest_src, os.path.join(dst_dir, MANIFEST_FILENAME))
+            restored_manifest = Manifest.load(dst_dir)
+            restored_manifest.active_wal_number = None
+            restored_manifest.save()
+
+            for key in ("data_files", "delta_files", "index_files"):
+                file_map = snap.get(key, {})
+                if not isinstance(file_map, dict):
+                    continue
+                for partition, rels in file_map.items():
+                    if not isinstance(partition, str) or not isinstance(rels, list):
+                        continue
+                    for rel in rels:
+                        if not isinstance(rel, str):
+                            continue
+                        src = os.path.join(src_dir, "partitions", partition, rel)
+                        dst = os.path.join(dst_dir, "partitions", partition, rel)
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        shutil.copy2(src, dst)
+
+            _old_name, schema = load_schema(os.path.join(dst_dir, SCHEMA_FILENAME))
+            save_schema(schema, new_collection_name, os.path.join(dst_dir, SCHEMA_FILENAME))
+            col = Collection(
+                new_collection_name,
+                dst_dir,
+                schema,
+                database_properties=self._database_properties,
+            )
+        except Exception:
+            shutil.rmtree(dst_dir, ignore_errors=True)
+            raise
+        self._collections[new_collection_name] = col
+        return col
 
     def get_collection_stats(self, name: str) -> Dict[str, Any]:
         """Phase 9.1: Return basic stats for a collection.
