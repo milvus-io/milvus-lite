@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Iterator, List, Tuple
 from milvus_lite.engine.operation import DeleteOp, InsertOp, Operation
 from milvus_lite.storage.delta_index import DeltaIndex
 from milvus_lite.storage.memtable import MemTable
+from milvus_lite.storage.snapshots import snapshot_references
 from milvus_lite.storage.wal import WAL
 
 if TYPE_CHECKING:
@@ -190,6 +191,13 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
     referenced_delta: dict[str, set[str]] = {
         p: set(files) for p, files in manifest.get_all_delta_files().items()
     }
+    snapshot_data_refs, snapshot_delta_refs, snapshot_index_refs = snapshot_references(
+        data_dir
+    )
+    for partition, files in snapshot_data_refs.items():
+        referenced_data.setdefault(partition, set()).update(files)
+    for partition, files in snapshot_delta_refs.items():
+        referenced_delta.setdefault(partition, set()).update(files)
     # For index orphan detection we need the bare stems (without the
     # "data/" prefix and ".parquet" suffix) so we can compare against
     # .idx file stems.
@@ -200,6 +208,9 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
             stem = os.path.splitext(os.path.basename(rel))[0]
             stems.add(stem)
         referenced_data_stems[p] = stems
+    referenced_index: dict[str, set[str]] = {
+        p: set(files) for p, files in snapshot_index_refs.items()
+    }
 
     for partition in os.listdir(partitions_root):
         partition_dir = os.path.join(partitions_root, partition)
@@ -255,7 +266,8 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
                 if not stem:
                     # Malformed name; remove defensively.
                     stem = stem_field or base
-                if stem not in valid_stems:
+                rel = os.path.join("indexes", fn)
+                if stem not in valid_stems and rel not in referenced_index.get(partition, set()):
                     abs_path = os.path.join(index_subdir, fn)
                     try:
                         os.remove(abs_path)

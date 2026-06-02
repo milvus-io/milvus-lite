@@ -59,6 +59,7 @@ from milvus_lite.storage.data_file import (
     read_data_file,
     write_data_file,
 )
+from milvus_lite.storage.snapshots import snapshot_references
 
 if TYPE_CHECKING:
     from milvus_lite.schema.types import CollectionSchema
@@ -274,9 +275,15 @@ class CompactionManager:
             manifest.add_data_file(partition, rel)
         manifest.save()
 
-        # 6. Delete old files from disk. Past this point a crash leaves
-        #    orphan files, which recovery's _cleanup_orphan_files handles.
+        # 6. Delete old files from disk unless pinned by a snapshot. Past
+        #    this point a crash leaves orphan files, which recovery handles.
+        snapshot_data_refs, _snapshot_delta_refs, _snapshot_index_refs = snapshot_references(
+            self._data_dir
+        )
+        pinned = snapshot_data_refs.get(partition, set())
         for fn in files_to_compact:
+            if fn in pinned:
+                continue
             abs_path = os.path.join(partition_dir, fn)
             if os.path.exists(abs_path):
                 try:
@@ -425,6 +432,9 @@ class CompactionManager:
 
         Returns True if any delta files were removed.
         """
+        _snapshot_data_refs, snapshot_delta_refs, _snapshot_index_refs = snapshot_references(
+            self._data_dir
+        )
         gc_plan: List[Tuple[str, List[str]]] = []
         for partition in manifest.list_partitions():
             delta_files = manifest.get_delta_files(partition)
@@ -435,6 +445,8 @@ class CompactionManager:
                 try:
                     _seq_min, seq_max = parse_seq_range(rel)
                 except ValueError:
+                    continue
+                if rel in snapshot_delta_refs.get(partition, set()):
                     continue
                 if seq_max < global_min:
                     obsolete.append(rel)
