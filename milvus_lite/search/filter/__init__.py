@@ -22,6 +22,13 @@ from milvus_lite.search.filter.semantic import CompiledExpr, FieldInfo, compile_
 from milvus_lite.search.filter.eval import evaluate
 
 
+def evaluate_mask(compiled: CompiledExpr, table):
+    mask = evaluate(compiled, table).to_numpy(zero_copy_only=False)
+    if mask.dtype == bool:
+        return mask
+    return mask.astype(bool, copy=False)
+
+
 def compile_filter(
     source: str,
     schema,
@@ -45,6 +52,7 @@ __all__ = [
     "compile_expr",
     "compile_filter",
     "evaluate",
+    "evaluate_mask",
     "CompiledExpr",
     "FieldInfo",
     "FilterError",

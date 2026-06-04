@@ -287,6 +287,36 @@ def test_startup_maintenance_compacts_existing_files(tmp_path, monkeypatch, sche
         db.close()
 
 
+def test_snapshot_pins_scalar_index_files_after_drop_index(tmp_path):
+    scalar_schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
+        FieldSchema(name="age", dtype=DataType.INT64, nullable=True),
+    ])
+    db = MilvusLite(str(tmp_path / "db"))
+    try:
+        col = db.create_collection("docs", scalar_schema)
+        col.insert([
+            {"id": 1, "vec": [1.0, 0.0, 0.0, 0.0], "age": 18},
+            {"id": 2, "vec": [0.0, 1.0, 0.0, 0.0], "age": 25},
+        ])
+        col.flush()
+        col.create_index("age", {"index_type": "INVERTED"})
+        snap = db.create_snapshot("docs", "snap_a")
+        pinned = snap["index_files"]["_default"][0]
+        pinned_path = tmp_path / "db" / "collections" / "docs" / "partitions" / "_default" / pinned
+
+        col.release()
+        col.drop_index("age")
+
+        assert os.path.exists(pinned_path)
+        restored = db.restore_snapshot("docs", "snap_a", "docs_restored")
+        restored.load()
+        assert restored.query("age >= 20", output_fields=["id"]) == [{"id": 2}]
+    finally:
+        db.close()
+
+
 def test_snapshot_pins_index_files_after_drop_index(tmp_path, schema):
     db = MilvusLite(str(tmp_path / "db"))
     try:

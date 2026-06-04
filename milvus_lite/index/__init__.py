@@ -1,6 +1,6 @@
 """Vector index subsystem (Phase 9).
 
-Each VectorIndex is bound 1:1 to a Segment (one .idx sidecar per data
+Each VectorIndex is bound 1:1 to a Segment (one index sidecar per data
 Parquet file). Indexes are immutable — compaction creates a new merged
 segment + a new index, dropping the old ones.
 

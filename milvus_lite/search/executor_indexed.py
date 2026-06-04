@@ -39,6 +39,7 @@ import numpy as np
 from milvus_lite.index.brute_force import BruteForceIndex
 
 if TYPE_CHECKING:
+    from milvus_lite.index.scalar import IndexedFilterPlan
     from milvus_lite.search.filter.semantic import CompiledExpr
     from milvus_lite.storage.delta_index import DeltaIndex
     from milvus_lite.storage.memtable import MemTable
@@ -57,6 +58,7 @@ def execute_search_with_index(
     partition_names: Optional[List[str]] = None,
     compiled_filter: Optional["CompiledExpr"] = None,
     output_fields: Optional[List[str]] = None,
+    indexed_filter_plan: Optional["IndexedFilterPlan"] = None,
 ) -> List[List[dict]]:
     """Per-source recall + global merge search path.
 
@@ -132,13 +134,14 @@ def execute_search_with_index(
     seg_filter_masks: Dict[int, np.ndarray] = {}
     mt_filter_mask: Optional[np.ndarray] = None
     if compiled_filter is not None:
-        from milvus_lite.search.filter.eval import evaluate as filter_evaluate
+        from milvus_lite.search.filter import evaluate_mask
+        from milvus_lite.search.indexed_filter import evaluate_segment_filter
         for seg in in_scope_segments:
-            mask = filter_evaluate(compiled_filter, seg.table)
-            seg_filter_masks[id(seg)] = mask.to_numpy(zero_copy_only=False)
+            seg_filter_masks[id(seg)] = evaluate_segment_filter(
+                seg, compiled_filter, indexed_filter_plan,
+            )
         if mt_pks and mt_table is not None:
-            mask = filter_evaluate(compiled_filter, mt_table)
-            mt_filter_mask = mask.to_numpy(zero_copy_only=False)
+            mt_filter_mask = evaluate_mask(compiled_filter, mt_table)
 
     # ── 3. per-source recall ────────────────────────────────────
     # Per query, accumulate (distance, source_idx, local_id) candidate

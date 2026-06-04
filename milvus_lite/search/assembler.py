@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Tuple
 import numpy as np
 
 if TYPE_CHECKING:
+    from milvus_lite.index.scalar import IndexedFilterPlan
     from milvus_lite.search.filter.semantic import CompiledExpr
     from milvus_lite.storage.memtable import MemTable
     from milvus_lite.storage.segment import Segment
@@ -31,6 +32,7 @@ def assemble_candidates(
     vector_field: Optional[str],
     partition_names: Optional[List[str]] = None,
     filter_compiled: Optional["CompiledExpr"] = None,
+    indexed_filter_plan: Optional["IndexedFilterPlan"] = None,
 ) -> Tuple[List[Any], np.ndarray, np.ndarray, List[RecordSource], Optional[np.ndarray]]:
     """Build the unified candidate arrays.
 
@@ -44,7 +46,8 @@ def assemble_candidates(
                         or memtable.materialize_row(*ref) to get the dict.
         filter_mask:    np.ndarray[bool] (length N) or None
     """
-    from milvus_lite.search.filter.eval import evaluate as filter_evaluate
+    from milvus_lite.search.filter import evaluate_mask
+    from milvus_lite.search.indexed_filter import evaluate_segment_filter
 
     partition_filter = set(partition_names) if partition_names else None
 
@@ -66,8 +69,9 @@ def assemble_candidates(
         # Store (segment, row_idx) refs — NO row_to_dict call here
         rec_source_chunks.append([(seg, i) for i in range(seg.num_rows)])
         if filter_compiled is not None:
-            mask = filter_evaluate(filter_compiled, seg.table)
-            filter_chunks.append(mask.to_numpy(zero_copy_only=False))
+            filter_chunks.append(
+                evaluate_segment_filter(seg, filter_compiled, indexed_filter_plan)
+            )
 
     # ── memtable (deferred materialization) ─────────────────────
     mt_pks, mt_seqs, mt_vecs, mt_row_refs, mt_table = memtable.to_search_snapshot(
@@ -82,8 +86,7 @@ def assemble_candidates(
         # Store (memtable, (batch_idx, row_idx)) refs
         rec_source_chunks.append([(memtable, ref) for ref in mt_row_refs])
         if filter_compiled is not None and mt_table is not None:
-            mask = filter_evaluate(filter_compiled, mt_table)
-            filter_chunks.append(mask.to_numpy(zero_copy_only=False))
+            filter_chunks.append(evaluate_mask(filter_compiled, mt_table))
 
     # ── concatenate ─────────────────────────────────────────────
     if not pk_chunks:

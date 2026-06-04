@@ -493,11 +493,17 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             from milvus_lite.function.types import ID_FIELD, SCORE_FIELD
 
             col = self._db.get_collection(request.collection_name)
-            # Pull the canonical metric from the first IndexSpec if any.
-            first_spec = col._index_specs.get(col._vector_name) if col._index_specs else None  # noqa: SLF001
-            if first_spec is None and col._index_specs:
-                first_spec = next(iter(col._index_specs.values()))
-            default_metric = first_spec.metric_type if first_spec else "COSINE"
+            # Pull the canonical metric from a vector index if any.
+            first_spec = (
+                col._index_specs.get(col._vector_name)  # noqa: SLF001
+                if col._index_specs and col._vector_name is not None  # noqa: SLF001
+                else None
+            )
+            default_metric = (
+                first_spec.metric_type
+                if first_spec is not None and first_spec.metric_type != "NONE"
+                else "COSINE"
+            )
             parsed = parse_search_request(request, default_metric_type=default_metric)
 
             group_by_field = parsed.get("group_by_field")
@@ -645,9 +651,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         """
         try:
             col = self._db.get_collection(request.collection_name)
-            params = kv_pairs_to_index_params_dict(
-                request.extra_params, field_name=request.field_name
-            )
+            params = kv_pairs_to_index_params_dict(request.extra_params)
             col.create_index(request.field_name, params)
             return common_pb2.Status(**success_status_kwargs())
         except MilvusLiteError as e:

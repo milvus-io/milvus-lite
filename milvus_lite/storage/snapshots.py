@@ -14,6 +14,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
+from milvus_lite.index.files import parse_index_sidecar_name
+
 
 SNAPSHOTS_DIRNAME = "snapshots"
 SNAPSHOT_METADATA_DIRNAME = "metadata"
@@ -227,21 +229,14 @@ def collect_index_files(
             continue
         rels: List[str] = []
         for entry in os.listdir(index_dir):
-            if not entry.endswith(".idx"):
+            sidecar = parse_index_sidecar_name(entry)
+            if sidecar is None:
                 continue
-            stem = _index_source_stem(entry)
-            if stem in stems:
+            if sidecar.source_stem in stems:
                 rels.append(os.path.join("indexes", entry))
         if rels:
             out[partition] = sorted(rels)
     return out
-
-
-def _index_source_stem(filename: str) -> str:
-    base = filename[:-len(".idx")] if filename.endswith(".idx") else filename
-    stem_field, _, _index_type = base.rpartition(".")
-    stem, _, _field_name = stem_field.rpartition(".")
-    return stem or stem_field or base
 
 
 def _validate_rel_path(path: str, allowed_prefixes: Tuple[str, ...]) -> None:

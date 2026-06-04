@@ -18,6 +18,13 @@ def _make_schema():
     return schema
 
 
+def _make_scalar_schema():
+    schema = _make_schema()
+    schema.add_field("age", DataType.INT64, nullable=True)
+    schema.add_field("category", DataType.VARCHAR, max_length=64, nullable=True)
+    return schema
+
+
 def _hnsw_params(client):
     idx = client.prepare_index_params()
     idx.add_index(
@@ -184,3 +191,49 @@ def test_describe_index_empty_when_no_index(milvus_client):
     milvus_client.create_collection("demo", schema=_make_schema())
     desc = milvus_client.describe_index("demo", "vec")
     assert desc is None
+
+
+def test_create_scalar_inverted_index_query_and_search(milvus_client):
+    milvus_client.create_collection("demo", schema=_make_scalar_schema())
+    rows = [
+        {
+            "id": i,
+            "vec": [float(i == j) for j in range(4)],
+            "title": f"t{i}",
+            "age": None if i == 4 else 18 + i,
+            "category": ["tech", "news", "blog", "tech", None][i],
+        }
+        for i in range(5)
+    ]
+    milvus_client.insert("demo", rows)
+    milvus_client.flush("demo")
+
+    idx = milvus_client.prepare_index_params()
+    idx.add_index(field_name="age", index_type="INVERTED")
+    idx.add_index(field_name="category", index_type="INVERTED")
+    milvus_client.create_index("demo", idx)
+
+    age_desc = milvus_client.describe_index("demo", "age")
+    category_desc = milvus_client.describe_index("demo", "category")
+    assert age_desc["index_type"] == "INVERTED"
+    assert age_desc["metric_type"] == "NONE"
+    assert category_desc["index_type"] == "INVERTED"
+    assert category_desc["metric_type"] == "NONE"
+
+    milvus_client.load_collection("demo")
+    rows = milvus_client.query(
+        "demo",
+        filter="age >= 20",
+        output_fields=["age", "category"],
+    )
+    assert {row["id"] for row in rows} == {2, 3}
+
+    results = milvus_client.search(
+        "demo",
+        data=[[1.0, 0.0, 0.0, 0.0]],
+        limit=5,
+        filter="category == 'tech'",
+        output_fields=["category"],
+    )
+    assert [hit["id"] for hit in results[0]] == [0, 3]
+    assert all(hit["entity"]["category"] == "tech" for hit in results[0])

@@ -24,6 +24,7 @@ import os
 from typing import TYPE_CHECKING, Iterator, List, Tuple
 
 from milvus_lite.engine.operation import DeleteOp, InsertOp, Operation
+from milvus_lite.index.files import parse_index_sidecar_name
 from milvus_lite.storage.delta_index import DeltaIndex
 from milvus_lite.storage.memtable import MemTable
 from milvus_lite.storage.snapshots import snapshot_references
@@ -175,7 +176,7 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
 
     Walks every partition's data/ and delta/ subdirectories.
 
-    Phase 9.4: also walks ``indexes/`` and removes any .idx whose
+    Also walks ``indexes/`` and removes any index sidecar whose
     source data file (matched by filename stem) is no longer in the
     manifest. This handles the case where a crash happens after
     compaction wrote new segments but before the old indexes were
@@ -200,7 +201,7 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
         referenced_delta.setdefault(partition, set()).update(files)
     # For index orphan detection we need the bare stems (without the
     # "data/" prefix and ".parquet" suffix) so we can compare against
-    # .idx file stems.
+    # index sidecar source stems.
     referenced_data_stems: dict[str, set[str]] = {}
     for p, files in referenced_data.items():
         stems: set[str] = set()
@@ -250,24 +251,11 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
         if os.path.isdir(index_subdir):
             valid_stems = referenced_data_stems.get(partition, set())
             for fn in os.listdir(index_subdir):
-                # Index filename convention:
-                #   <data_stem>.<field_name>.<index_type_lower>.idx
-                # Strip .idx, then rpartition twice to peel off index_type
-                # and field_name, leaving the data_stem.
-                # E.g. "data_000001_000050.dense.hnsw.idx"
-                #  → base = "data_000001_000050.dense.hnsw"
-                #  → after first rpartition: ("data_000001_000050.dense", "hnsw")
-                #  → after second rpartition: ("data_000001_000050", "dense")
-                if not fn.endswith(".idx"):
+                sidecar = parse_index_sidecar_name(fn)
+                if sidecar is None:
                     continue
-                base = fn[:-len(".idx")]
-                stem_field, _, _index_type = base.rpartition(".")
-                stem, _, _field_name = stem_field.rpartition(".")
-                if not stem:
-                    # Malformed name; remove defensively.
-                    stem = stem_field or base
                 rel = os.path.join("indexes", fn)
-                if stem not in valid_stems and rel not in referenced_index.get(partition, set()):
+                if sidecar.source_stem not in valid_stems and rel not in referenced_index.get(partition, set()):
                     abs_path = os.path.join(index_subdir, fn)
                     try:
                         os.remove(abs_path)

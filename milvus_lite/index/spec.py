@@ -57,9 +57,9 @@ class IndexSpec:
             raise ValueError(f"field_name must be a non-empty string, got {self.field_name!r}")
         if not isinstance(self.index_type, str) or not self.index_type:
             raise ValueError(f"index_type must be a non-empty string, got {self.index_type!r}")
-        if self.metric_type not in ("COSINE", "L2", "IP", "BM25"):
+        if self.metric_type not in ("COSINE", "L2", "IP", "BM25", "NONE"):
             raise ValueError(
-                f"metric_type must be one of COSINE/L2/IP/BM25, got {self.metric_type!r}"
+                f"metric_type must be one of COSINE/L2/IP/BM25/NONE, got {self.metric_type!r}"
             )
         if not isinstance(self.build_params, (dict, MappingProxyType)):
             raise TypeError(f"build_params must be a dict, got {type(self.build_params).__name__}")
