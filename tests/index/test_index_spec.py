@@ -85,6 +85,16 @@ def test_from_dict_missing_build_params_defaults_empty():
 # ── Validation ──────────────────────────────────────────────────────
 
 
+def test_none_metric_type_allowed_for_scalar_indexes():
+    spec = IndexSpec(
+        field_name="age",
+        index_type="INVERTED",
+        metric_type="NONE",
+        build_params={},
+    )
+    assert spec.metric_type == "NONE"
+
+
 @pytest.mark.parametrize("bad_metric", ["cosine", "l2", "ip", "FOO", ""])
 def test_invalid_metric_type_raises(bad_metric):
     with pytest.raises(ValueError, match="metric_type"):

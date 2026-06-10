@@ -144,8 +144,7 @@ class BruteForceIndex(VectorIndex):
 
         Uses an explicit file handle (np.save would otherwise auto-
         append .npy if the path lacks that extension, which would break
-        Phase 9.4's strict ``<segment_stem>.<index_type>.idx`` naming
-        convention).
+        index sidecar naming).
 
         The NPY header carries dtype + shape so the load path doesn't
         need explicit dim/metric — only metric is supplied externally
@@ -159,8 +158,8 @@ class BruteForceIndex(VectorIndex):
         """Reload a previously saved BruteForceIndex.
 
         *dim* is validated against the on-disk shape; mismatch is a
-        loud error (not a silent reshape) since it indicates the .idx
-        file is paired with the wrong segment.
+        loud error (not a silent reshape) since it indicates the index
+        sidecar is paired with the wrong segment.
         """
         with open(path, "rb") as f:
             vectors = np.load(f, allow_pickle=False)

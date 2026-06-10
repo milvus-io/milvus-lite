@@ -28,39 +28,27 @@ from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.index.spec import IndexSpec
 
 
-def kv_pairs_to_index_params_dict(
-    extra_params: Iterable,
-    field_name: str = "",
-) -> dict:
+def kv_pairs_to_index_params_dict(extra_params: Iterable) -> dict:
     """Decode the CreateIndexRequest.extra_params KeyValuePair list
     into a dict suitable for ``Collection.create_index(field, params)``.
 
     Args:
         extra_params: iterable of common_pb2.KeyValuePair messages
-        field_name: fallback field_name from the outer request, used
-            if the KV list doesn't carry one
 
     Returns:
         ``{"index_type": ..., "metric_type": ..., "params": {...},
-            "search_params": {...}}``  — the shape Collection.create_index
-        consumes.
+            "search_params": {...}}``  — the index_params shape
+        Collection.create_index consumes.
 
     Raises:
-        SchemaValidationError: required keys (index_type, metric_type)
-            missing or malformed
+        SchemaValidationError: required keys are missing or malformed
     """
     kv: dict[str, str] = {p.key: p.value for p in extra_params}
 
     index_type = kv.get("index_type")
-    metric_type = kv.get("metric_type")
-
     if not index_type:
         raise SchemaValidationError(
             "create_index missing required 'index_type' parameter"
-        )
-    if not metric_type:
-        raise SchemaValidationError(
-            "create_index missing required 'metric_type' parameter"
         )
 
     # `params` is a JSON-encoded string in the wire format. pymilvus
@@ -87,12 +75,14 @@ def kv_pairs_to_index_params_dict(
     else:
         search_params = {}
 
-    return {
+    out = {
         "index_type": index_type,
-        "metric_type": metric_type,
         "params": build_params,
         "search_params": search_params,
     }
+    if "metric_type" in kv:
+        out["metric_type"] = kv["metric_type"]
+    return out
 
 
 def index_spec_to_kv_pairs(spec: IndexSpec) -> List:

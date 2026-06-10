@@ -56,6 +56,14 @@ from milvus_lite.exceptions import (
     SchemaValidationError,
 )
 from milvus_lite.index.brute_force import BruteForceIndex
+from milvus_lite.index.factory import KNOWN_VECTOR_INDEX_TYPES
+from milvus_lite.index.files import index_sidecar_suffix, parse_index_sidecar_name
+from milvus_lite.index.scalar import (
+    IMPLEMENTED_SCALAR_INDEX_TYPES,
+    KNOWN_SCALAR_INDEX_TYPES,
+    SUPPORTED_DTYPES_BY_SCALAR_INDEX_TYPE,
+    plan_indexed_filter,
+)
 from milvus_lite.index.spec import IndexSpec
 from milvus_lite.schema.types import DataType, FunctionType
 from milvus_lite.schema.arrow_builder import (
@@ -87,6 +95,47 @@ if False:  # TYPE_CHECKING
 # Segment cache key: (partition, relative_path) — relative_path is what
 # the manifest stores so two segments cannot collide on the same name.
 _SegmentKey = Tuple[str, str]
+
+
+def _validate_scalar_index_request(dtype: DataType, index_type: str) -> None:
+    if index_type not in KNOWN_SCALAR_INDEX_TYPES:
+        raise SchemaValidationError(
+            f"unknown scalar index_type {index_type!r}; supported scalar index_type: INVERTED"
+        )
+    if index_type not in IMPLEMENTED_SCALAR_INDEX_TYPES:
+        raise SchemaValidationError(
+            f"scalar index_type {index_type!r} is not implemented; supported: INVERTED"
+        )
+    if dtype not in SUPPORTED_DTYPES_BY_SCALAR_INDEX_TYPE[index_type]:
+        raise SchemaValidationError(
+            f"field type {dtype.name} does not support scalar index"
+        )
+
+
+def _is_scalar_index_spec(spec: Optional[IndexSpec]) -> bool:
+    return spec is not None and spec.index_type in IMPLEMENTED_SCALAR_INDEX_TYPES
+
+
+def _index_file_suffix(spec: IndexSpec) -> str:
+    return index_sidecar_suffix(
+        spec.field_name, spec.index_type, scalar=_is_scalar_index_spec(spec),
+    )
+
+
+def _schema_field(
+    schema: CollectionSchema,
+    field_name: str,
+    *,
+    error_message: Optional[str] = None,
+):
+    field = next((f for f in schema.fields if f.name == field_name), None)
+    if field is None:
+        raise SchemaValidationError(error_message or f"unknown field {field_name!r}")
+    return field
+
+
+def _field_dtype(schema: CollectionSchema, field_name: str) -> DataType:
+    return _schema_field(schema, field_name).dtype
 
 
 def _row_matches_filter(record: dict, compiled_filter) -> bool:
@@ -644,11 +693,11 @@ class Collection:
 
         # Validate group_by_field
         if group_by_field is not None:
-            gf = next((f for f in self._schema.fields if f.name == group_by_field), None)
-            if gf is None:
-                raise SchemaValidationError(
-                    f"group_by_field {group_by_field!r} not found in schema"
-                )
+            gf = _schema_field(
+                self._schema,
+                group_by_field,
+                error_message=f"group_by_field {group_by_field!r} not found in schema",
+            )
             _GROUP_BY_ALLOWED = (
                 DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64,
                 DataType.BOOL, DataType.VARCHAR,
@@ -709,6 +758,7 @@ class Collection:
                     f"query_vectors must be a 2-D list, got shape {q_arr.shape}"
                 )
             compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
+            indexed_filter_plan = self._indexed_filter_plan(compiled_filter)
             seg_snap, delta_snap = self._read_snapshot()
             raw_results = execute_search_with_index(
                 query_vectors=q_arr,
@@ -722,6 +772,7 @@ class Collection:
                 partition_names=partition_names,
                 compiled_filter=compiled_filter,
                 output_fields=output_fields,
+                indexed_filter_plan=indexed_filter_plan,
             )
 
         # Apply range filter (before group_by)
@@ -780,11 +831,11 @@ class Collection:
                 )
             return self._vector_name
 
-        field = next((f for f in self._schema.fields if f.name == anns_field), None)
-        if field is None:
-            raise SchemaValidationError(
-                f"anns_field {anns_field!r} not found in schema"
-            )
+        field = _schema_field(
+            self._schema,
+            anns_field,
+            error_message=f"anns_field {anns_field!r} not found in schema",
+        )
         if field.dtype not in (DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR):
             raise SchemaValidationError(
                 f"anns_field {anns_field!r} is not a vector field "
@@ -836,6 +887,8 @@ class Collection:
         # Convert query vectors upfront
         query_sparse = self._prepare_sparse_queries(query_vectors)
         nq = len(query_sparse)
+        compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
+        indexed_filter_plan = self._indexed_filter_plan(compiled_filter)
 
         # Per-source candidates: (distance, global_pk, source_ref)
         Candidate = Tuple[float, Any, Any]  # (dist, pk, (tbl, row_idx))
@@ -895,11 +948,11 @@ class Collection:
                     valid_mask[i] = False
 
             # Apply scalar filter
-            if expr:
-                compiled = self._compile_filter(expr, timezone=timezone)
-                from milvus_lite.search.filter.eval import evaluate as filter_evaluate
-                fmask = filter_evaluate(compiled, table).to_numpy(zero_copy_only=False)
-                valid_mask = valid_mask & fmask
+            if compiled_filter is not None:
+                from milvus_lite.search.indexed_filter import evaluate_segment_filter
+                valid_mask = valid_mask & evaluate_segment_filter(
+                    seg, compiled_filter, indexed_filter_plan,
+                )
 
             if not valid_mask.any():
                 continue
@@ -933,13 +986,12 @@ class Collection:
         if mt_pks:
             mt_valid = np.ones(len(mt_pks), dtype=bool)
 
-            if expr:
-                compiled = self._compile_filter(expr, timezone=timezone)
+            if compiled_filter is not None:
                 from milvus_lite.search.filter.eval.python_backend import _eval_row
                 for i in range(len(mt_pks)):
                     if mt_valid[i]:
                         record, _seq = mt_refs[i]
-                        if not _eval_row(compiled.ast, record):
+                        if not _eval_row(compiled_filter.ast, record):
                             mt_valid[i] = False
 
             mt_idx = SparseInvertedIndex(k1=bm25_k1, b=bm25_b)
@@ -1097,6 +1149,7 @@ class Collection:
         self._require_loaded()
 
         compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
+        indexed_filter_plan = self._indexed_filter_plan(compiled_filter)
 
         seg_snap, delta_snap = self._read_snapshot()
 
@@ -1106,6 +1159,7 @@ class Collection:
             vector_field=self._vector_name,
             partition_names=partition_names,
             filter_compiled=compiled_filter,
+            indexed_filter_plan=indexed_filter_plan,
         )
 
         if not all_pks:
@@ -1138,7 +1192,7 @@ class Collection:
         Layout: ``data_dir/partitions/<partition>/indexes/``
 
         The directory is created on demand by build_or_load_index when
-        the first .idx is written.
+        the first index sidecar is written.
         """
         return os.path.join(self._data_dir, "partitions", partition, "indexes")
 
@@ -1179,6 +1233,28 @@ class Collection:
         )
         self._filter_cache.put(cache_key, compiled)
         return compiled
+
+    def _indexed_filter_plan(self, compiled_filter):
+        if compiled_filter is None:
+            return None
+        indexed_fields = {
+            field_name for field_name in compiled_filter.fields
+            if _is_scalar_index_spec(self._index_specs.get(field_name))
+        }
+        if not indexed_fields:
+            return None
+        return plan_indexed_filter(compiled_filter, indexed_fields)
+
+    def _build_or_load_segment_index(self, seg: Segment, spec: IndexSpec) -> None:
+        index_dir = self._index_dir(seg.partition)
+        if _is_scalar_index_spec(spec):
+            seg.build_or_load_scalar_index(
+                spec,
+                index_dir,
+                _field_dtype(self._schema, spec.field_name),
+            )
+        else:
+            seg.build_or_load_index(spec, index_dir)
 
     def _effective_timezone(self, timezone: Optional[str] = None) -> Optional[str]:
         if timezone is not None and timezone != "":
@@ -1361,23 +1437,34 @@ class Collection:
                     f"call drop_index first"
                 )
 
-            # Validate the field is in the schema and is a vector type.
-            target = next((f for f in self._schema.fields if f.name == field_name), None)
-            if target is None:
-                raise SchemaValidationError(
-                    f"unknown field {field_name!r} for create_index"
-                )
-            if target.dtype not in (DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR):
-                raise SchemaValidationError(
-                    f"field {field_name!r} has type {target.dtype.name}; "
-                    f"create_index only supports vector fields"
-                )
+            target = _schema_field(
+                self._schema,
+                field_name,
+                error_message=f"unknown field {field_name!r} for create_index",
+            )
+
+            index_type = str(index_params["index_type"]).upper()
+            build_params = dict(index_params.get("params") or {})
+            metric_type = index_params.get("metric_type")
+            if target.dtype in (DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR):
+                if metric_type is None:
+                    raise SchemaValidationError(
+                        "create_index missing required 'metric_type' parameter"
+                    )
+            else:
+                if index_type in KNOWN_VECTOR_INDEX_TYPES:
+                    raise SchemaValidationError(
+                        f"field {field_name!r} has type {target.dtype.name}; "
+                        f"create_index with index_type {index_type!r} requires a vector field"
+                    )
+                _validate_scalar_index_request(target.dtype, index_type)
+                metric_type = metric_type or "NONE"
 
             spec = IndexSpec(
                 field_name=field_name,
-                index_type=index_params["index_type"],
-                metric_type=index_params["metric_type"],
-                build_params=dict(index_params.get("params") or {}),
+                index_type=index_type,
+                metric_type=metric_type,
+                build_params=build_params,
                 search_params=dict(index_params.get("search_params") or {}),
             )
 
@@ -1391,11 +1478,11 @@ class Collection:
             if self._load_state == "loaded":
                 for seg in self._segment_cache.values():
                     if seg.num_rows > 0:
-                        seg.build_or_load_index(spec, self._index_dir(seg.partition))
+                        self._build_or_load_segment_index(seg, spec)
 
     def drop_index(self, field_name: Optional[str] = None) -> None:
         """Remove the IndexSpec, release in-memory indexes, and delete
-        on-disk .idx files.
+        on-disk index sidecars.
 
         Args:
             field_name: optional; if given, must match the existing
@@ -1406,7 +1493,7 @@ class Collection:
             IndexNotFoundError: no index has been created
 
         Phase 9.4: also walks every partition's ``indexes/`` directory
-        and deletes the .idx files matching the dropped index_type.
+        and deletes the index sidecars matching the dropped index_type.
         Other index_type files (if any — currently impossible since we
         only support one index per Collection) are left alone.
         """
@@ -1422,7 +1509,7 @@ class Collection:
             # is loaded. Caller must release() first.
             if self._load_state == "loaded":
                 raise SchemaValidationError(
-                    "vector index cannot be dropped on loaded collection; "
+                    "index cannot be dropped on loaded collection; "
                     "call release() first"
                 )
 
@@ -1438,7 +1525,7 @@ class Collection:
                 )
             if self._load_state == "loaded":
                 raise SchemaValidationError(
-                    "vector index cannot be dropped on loaded collection; "
+                    "index cannot be dropped on loaded collection; "
                     "call release() first"
                 )
 
@@ -1453,13 +1540,13 @@ class Collection:
                 for seg in self._segment_cache.values():
                     seg.release_index(field_name=spec.field_name)
 
-            # Delete on-disk .idx files matching the dropped (field, type)
+            # Delete on-disk sidecars matching the dropped (field, type)
             # pair, unless a snapshot still references them.
             _snapshot_data_refs, _snapshot_delta_refs, snapshot_index_refs = snapshot_references(
                 self._data_dir
             )
             for spec in drop_specs:
-                suffix = f".{spec.field_name}.{spec.index_type.lower()}.idx"
+                suffix = _index_file_suffix(spec)
                 for partition in self._manifest.list_partitions():
                     index_dir = self._index_dir(partition)
                     if not os.path.exists(index_dir):
@@ -1513,7 +1600,7 @@ class Collection:
         segment if an IndexSpec exists; idempotent if already loaded.
 
         Phase 9.4: indexes are persisted to disk. The first load() after
-        a fresh create_index builds them and writes .idx sidecars; every
+        a fresh create_index builds them and writes index sidecars; every
         subsequent load() (including after process restart) reads them
         back via Segment.build_or_load_index, so cold-start is fast.
 
@@ -1532,9 +1619,7 @@ class Collection:
                     for seg in self._segment_cache.values():
                         if seg.num_rows == 0:
                             continue
-                        seg.build_or_load_index(
-                            spec, self._index_dir(seg.partition)
-                        )
+                        self._build_or_load_segment_index(seg, spec)
                 self._load_state = "loaded"
             except Exception:
                 self._load_state = "released"
@@ -1799,7 +1884,7 @@ class Collection:
                 self._cleanup_orphan_index_files()
 
             # Phase B: index build — outside the lock. build_or_load_index
-            # operates on an immutable Segment and writes a dedicated .idx
+            # operates on an immutable Segment and writes a dedicated sidecar
             # file, so concurrent user-thread flushes are safe.
             import time as _time
             t0 = _time.monotonic()
@@ -1837,20 +1922,25 @@ class Collection:
         built = 0
         for spec in specs:
             for seg in segs:
-                if spec.field_name not in seg.indexes and seg.num_rows > 0:
-                    seg.build_or_load_index(
-                        spec, self._index_dir(seg.partition)
-                    )
+                if seg.num_rows == 0:
+                    continue
+                has_index = (
+                    spec.field_name in seg.scalar_indexes
+                    if _is_scalar_index_spec(spec)
+                    else spec.field_name in seg.indexes
+                )
+                if not has_index:
+                    self._build_or_load_segment_index(seg, spec)
                     built += 1
         return built
 
     def _cleanup_orphan_index_files(self) -> None:
-        """Phase 9.4: delete .idx files whose source segment is gone.
+        """Delete index sidecars whose source segment is gone.
 
         Called from _trigger_flush after _refresh_segment_cache (which
         evicts compaction-removed segments). The cleanup compares the
         on-disk indexes/ directories against the manifest's data file
-        list and removes any .idx whose stem doesn't match a current
+        list and removes any sidecar whose stem doesn't match a current
         data file.
 
         This is the architectural safety net for invariant §11
@@ -1859,7 +1949,7 @@ class Collection:
         if not self._index_specs:
             return
 
-        # File format: <data_stem>.<field>.<index_type>.idx
+        # File format: <data_stem>.<field>.<index_type>.idx/.sidx
         # Build {field → index_type_lower} so we can validate both parts.
         expected: Dict[str, str] = {
             spec.field_name: spec.index_type.lower()
@@ -1877,20 +1967,15 @@ class Collection:
                 os.path.splitext(os.path.basename(df))[0] for df in data_files
             }
             for entry in os.listdir(index_dir):
-                if not entry.endswith(".idx"):
+                sidecar = parse_index_sidecar_name(entry)
+                if sidecar is None:
                     continue
-                base = entry[: -len(".idx")]
-                stem_field, _, idx_type = base.rpartition(".")
-                stem, _, field = stem_field.rpartition(".")
-                # Drop if (a) source data gone, or (b) field/type no
-                # longer in the active index_specs (dropped index).
                 rel = os.path.join("indexes", entry)
                 if rel in pinned_indexes:
                     continue
                 if (
-                    not stem
-                    or stem not in valid_stems
-                    or expected.get(field) != idx_type
+                    sidecar.source_stem not in valid_stems
+                    or expected.get(sidecar.field_name) != sidecar.index_type
                 ):
                     try:
                         os.remove(os.path.join(index_dir, entry))

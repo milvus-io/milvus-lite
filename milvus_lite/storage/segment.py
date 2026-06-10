@@ -24,16 +24,19 @@ attaches one.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pyarrow as pa
 
+from milvus_lite.index.files import index_sidecar_path
 from milvus_lite.storage.data_file import read_data_file
 
 if TYPE_CHECKING:
     from milvus_lite.index.protocol import VectorIndex
+    from milvus_lite.index.scalar import ScalarInvertedIndex
     from milvus_lite.index.spec import IndexSpec
+    from milvus_lite.schema.types import DataType
 
 
 class Segment:
@@ -62,6 +65,7 @@ class Segment:
         "pk_to_row",
         "index",
         "indexes",
+        "scalar_indexes",
         "_pk_field",
         "_vector_field",
     )
@@ -95,6 +99,7 @@ class Segment:
         # self.indexes maps field_name → VectorIndex.
         self.index: Optional["VectorIndex"] = None
         self.indexes: Dict[str, "VectorIndex"] = {}
+        self.scalar_indexes: Dict[str, "ScalarInvertedIndex"] = {}
 
     # ── factory ─────────────────────────────────────────────────
 
@@ -184,6 +189,9 @@ class Segment:
         if field_name == self._vector_field:
             self.index = index
 
+    def attach_scalar_index(self, index: "ScalarInvertedIndex", field_name: str) -> None:
+        self.scalar_indexes[field_name] = index
+
     def release_index(self, field_name: Optional[str] = None) -> None:
         """Drop index reference(s). Memory freed when GC collects.
 
@@ -193,35 +201,23 @@ class Segment:
         if field_name is None:
             self.index = None
             self.indexes.clear()
+            self.scalar_indexes.clear()
         else:
             self.indexes.pop(field_name, None)
+            self.scalar_indexes.pop(field_name, None)
             if field_name == self._vector_field:
                 self.index = None
 
     def index_file_path(
-        self, index_dir: str, index_type: str, field_name: str,
+        self,
+        index_dir: str,
+        index_type: str,
+        field_name: str,
+        *,
+        scalar: bool = False,
     ) -> str:
-        """Return the canonical .idx path for (segment, field, index_type).
-
-        Naming convention (architectural invariant §11):
-            ``<index_dir>/<segment_stem>.<field_name>.<index_type>.idx``
-
-        Example: data file ``data_000001_000500.parquet`` with an HNSW
-        index on the ``dense_vec`` field →
-        ``indexes/data_000001_000500.dense_vec.hnsw.idx``.
-
-        field_name is part of the filename so a single segment can hold
-        multiple indexes (e.g. hybrid-search collections with multiple
-        FLOAT_VECTOR fields, each with its own HNSW).
-
-        Orphan cleanup reverses the parse: strip the .idx suffix, then
-        rpartition twice to recover (stem, field, index_type).
-        """
-        import os
-        stem = os.path.splitext(os.path.basename(self.file_path))[0]
-        return os.path.join(
-            index_dir,
-            f"{stem}.{field_name}.{index_type.lower()}.idx",
+        return index_sidecar_path(
+            index_dir, self.file_path, field_name, index_type, scalar=scalar,
         )
 
     def build_or_load_index(
@@ -270,6 +266,32 @@ class Segment:
             idx.save(path)
 
         self.attach_index(idx, field_name=field_name)
+
+    def build_or_load_scalar_index(
+        self,
+        spec: "IndexSpec",  # type: ignore[name-defined]
+        index_dir: str,
+        dtype: "DataType",  # type: ignore[name-defined]
+    ) -> None:
+        field_name = spec.field_name
+        if field_name in self.scalar_indexes:
+            return
+        if self.num_rows == 0:
+            return
+
+        import os
+        from milvus_lite.index.scalar import ScalarInvertedIndex
+
+        path = self.index_file_path(index_dir, spec.index_type, field_name, scalar=True)
+        if os.path.exists(path):
+            idx = ScalarInvertedIndex.load(path)
+            if idx.field_name != field_name or idx.dtype != dtype:
+                raise ValueError(f"scalar index file metadata does not match {field_name!r}")
+        else:
+            idx = ScalarInvertedIndex.build(self.table, field_name, dtype)
+            os.makedirs(index_dir, exist_ok=True)
+            idx.save(path)
+        self.attach_scalar_index(idx, field_name)
 
     # ── introspection ───────────────────────────────────────────
 

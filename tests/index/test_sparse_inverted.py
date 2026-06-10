@@ -174,27 +174,30 @@ class TestSparseInvertedIndex:
 # ---------------------------------------------------------------------------
 
 class TestBM25EndToEnd:
-    def _make_collection(self, tmpdir):
+    def _make_collection(self, tmpdir, *, with_age=False):
         from milvus_lite.schema.types import (
             CollectionSchema, DataType, FieldSchema,
             Function, FunctionType,
         )
         from milvus_lite.engine.collection import Collection
 
+        fields = [
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(
+                name="text", dtype=DataType.VARCHAR,
+                enable_analyzer=True,
+                analyzer_params={"tokenizer": "standard"},
+            ),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
+            FieldSchema(
+                name="sparse_emb", dtype=DataType.SPARSE_FLOAT_VECTOR,
+                is_function_output=True,
+            ),
+        ]
+        if with_age:
+            fields.append(FieldSchema(name="age", dtype=DataType.INT64, nullable=True))
         schema = CollectionSchema(
-            fields=[
-                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
-                FieldSchema(
-                    name="text", dtype=DataType.VARCHAR,
-                    enable_analyzer=True,
-                    analyzer_params={"tokenizer": "standard"},
-                ),
-                FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
-                FieldSchema(
-                    name="sparse_emb", dtype=DataType.SPARSE_FLOAT_VECTOR,
-                    is_function_output=True,
-                ),
-            ],
+            fields=fields,
             functions=[
                 Function(
                     name="bm25_fn",
@@ -206,8 +209,8 @@ class TestBM25EndToEnd:
         )
         return Collection(name="test_bm25", data_dir=tmpdir, schema=schema)
 
-    def _record(self, id, text):
-        return {"id": id, "text": text, "vec": [1.0, 0.0, 0.0, 0.0]}
+    def _record(self, id, text, **fields):
+        return {"id": id, "text": text, "vec": [1.0, 0.0, 0.0, 0.0], **fields}
 
     def test_basic_bm25_search(self):
         """Insert documents, search by text, verify relevance ordering."""
@@ -312,6 +315,34 @@ class TestBM25EndToEnd:
             assert 1 not in hit_ids
             assert 2 in hit_ids
             assert 3 in hit_ids
+
+    def test_search_with_scalar_index_filter(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as d:
+            col = self._make_collection(d, with_age=True)
+            col.insert([
+                self._record(1, "hello world", age=18),
+                self._record(2, "hello there", age=25),
+                self._record(3, "hello again", age=30),
+                self._record(4, "other words", age=None),
+            ])
+            col.flush()
+            col.create_index("age", {"index_type": "INVERTED"})
+            col.load()
+
+            def fail_scan_filter(*args, **kwargs):
+                raise AssertionError("segment filter should use scalar index")
+
+            monkeypatch.setattr("milvus_lite.search.filter.evaluate_mask", fail_scan_filter)
+            query_vectors: list = ["hello"]
+            results = col.search(
+                query_vectors=query_vectors,
+                top_k=10,
+                metric_type="BM25",
+                anns_field="sparse_emb",
+                expr="age >= 25",
+                output_fields=["age"],
+            )
+            assert [hit["id"] for hit in results[0]] == [2, 3]
 
     def test_search_output_fields(self):
         """output_fields controls which fields appear in entity."""

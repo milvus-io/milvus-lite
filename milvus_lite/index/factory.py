@@ -50,6 +50,12 @@ _FAISS_INDEX_TYPES = frozenset({
     "HNSW", "HNSW_SQ",
     "IVF_FLAT", "IVF_SQ8", "IVF_PQ",
 })
+KNOWN_VECTOR_INDEX_TYPES = frozenset({
+    "AUTOINDEX",
+    "BRUTE_FORCE",
+    "FLAT",
+    "SPARSE_INVERTED_INDEX",
+}) | _FAISS_INDEX_TYPES
 
 
 def is_faiss_available() -> bool:

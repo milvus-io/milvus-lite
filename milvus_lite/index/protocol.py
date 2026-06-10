@@ -1,7 +1,7 @@
 """VectorIndex protocol — abstract per-segment vector index.
 
 A VectorIndex is the unit of vector retrieval in Phase 9. It is bound
-1:1 to a Segment (each immutable data Parquet file gets one .idx
+1:1 to a Segment (each immutable data Parquet file gets one index
 sidecar). Indexes are immutable: there is no add() or remove() — any
 mutation goes through "drop old segment + build new segment + build
 new index", driven by compaction.
@@ -103,9 +103,8 @@ class VectorIndex(ABC):
     def save(self, path: str) -> None:
         """Persist the index to *path*. Format is implementation-defined.
 
-        The caller is responsible for choosing the path (typically
-        ``indexes/<segment_stem>.<index_type>.idx``). The index file
-        becomes a sidecar of its source data Parquet — see Phase 9.4.
+        The caller is responsible for choosing the path. The index file
+        becomes a sidecar of its source data Parquet.
         """
 
     @classmethod
@@ -125,6 +124,6 @@ class VectorIndex(ABC):
     def index_type(self) -> str:
         """A short string tag like 'BRUTE_FORCE' / 'HNSW' / 'IVF_FLAT'.
 
-        Used in .idx filenames and in describe_index responses.
+        Used in index sidecar filenames and in describe_index responses.
         Conventionally uppercase to match Milvus's index_type strings.
         """
