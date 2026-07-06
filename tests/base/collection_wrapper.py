@@ -1,7 +1,5 @@
 import sys
-import time
-import timeout_decorator
-from numpy import NaN
+import numpy as np
 
 from pymilvus import Collection
 
@@ -99,9 +97,9 @@ class ApiCollectionWrapper:
         return res, check_result
 
     @trace()
-    def load(self, partition_names=None, replica_number=NaN, timeout=None, check_task=None, check_items=None, **kwargs):
+    def load(self, partition_names=None, replica_number=np.nan, timeout=None, check_task=None, check_items=None, **kwargs):
         timeout = TIMEOUT if timeout is None else timeout
-        replica_number = param_info.param_replica_num if replica_number is NaN else replica_number
+        replica_number = param_info.param_replica_num if replica_number is np.nan else replica_number
 
         func_name = sys._getframe().f_code.co_name
         res, check = api_request([self.collection.load, partition_names, replica_number, timeout], **kwargs)

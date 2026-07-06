@@ -129,7 +129,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Milvus Lite test artifacts
 *.db
+*.db_*
+.*.lock
+
 compile_commands.json
 
 # CLion

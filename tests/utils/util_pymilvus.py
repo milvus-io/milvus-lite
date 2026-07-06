@@ -10,7 +10,6 @@ import requests
 from sklearn import preprocessing
 from pymilvus import DataType
 from utils.util_log import test_log as log
-from utils.util_k8s import init_k8s_client_config
 
 port = 19530
 epsilon = 0.000001
@@ -793,6 +792,7 @@ def restart_server(helm_release_name):
     client.rest.logger.setLevel(log.WARNING)
 
     # service_name = "%s.%s.svc.cluster.local" % (helm_release_name, namespace)
+    from utils.util_k8s import init_k8s_client_config
     init_k8s_client_config()
     v1 = client.CoreV1Api()
     pod_name = None

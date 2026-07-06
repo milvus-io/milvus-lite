@@ -40,16 +40,20 @@ git clone --recurse-submodules https://github.com/milvus-io/milvus-lite.git
 cd python && python3 -m build --wheel
 ```
 
-4. Run Python integration tests:
+4. Install the wheel and run the e2e test suite:
+
+```bash
+pip3 install dist/milvus_lite-*.whl --force-reinstall --no-deps
+cd /workspaces/milvus-lite/tests
+python3 -m pytest milvus_lite/ -v --tags L0 --enable_milvus_local_api lite-e2e.db
+```
+
+Self-contained unit-style tests (no framework dependencies):
 
 ```bash
 python3 -m pytest tests/test_nullable.py tests/test_query.py tests/test_search.py -v \
-    --noconftest -o "addopts=" -c /dev/null
+    -o "addopts=" -c /dev/null
 ```
-
-The extra flags bypass `tests/conftest.py` (which imports heavy upstream
-dependencies like `jax` that aren't installed) and `tests/pytest.ini`
-(which requires `pytest-html`).
 
 5. Run C++ unit tests (after building the wheel):
 

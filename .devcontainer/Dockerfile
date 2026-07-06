@@ -22,6 +22,8 @@ RUN conan remote add default-conan-local \
     https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local
 
 # Test dependencies
-RUN pip3 install pymilvus==2.5.4 pytest scikit-learn pandas numpy scipy
+RUN pip3 install pymilvus==2.5.4 pytest scikit-learn pandas numpy scipy \
+    timeout_decorator==0.5.0 delayed-assert==0.3.5 ujson==5.5.0 \
+    pytest-html==3.1.1 'git+https://github.com/Projectplace/pytest-tags'
 
 WORKDIR /workspace

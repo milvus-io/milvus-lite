@@ -1,5 +1,5 @@
 import sys
-from numpy import NaN
+import numpy as np
 
 from pymilvus import Partition
 
@@ -53,9 +53,9 @@ class ApiPartitionWrapper:
                                        check_task, check_items, succ, **kwargs).run()
         return res, check_result
 
-    def load(self, replica_number=NaN, timeout=None, check_task=None, check_items=None, **kwargs):
+    def load(self, replica_number=np.nan, timeout=None, check_task=None, check_items=None, **kwargs):
         timeout = TIMEOUT if timeout is None else timeout
-        replica_number = param_info.param_replica_num if replica_number is NaN else replica_number
+        replica_number = param_info.param_replica_num if replica_number is np.nan else replica_number
 
         func_name = sys._getframe().f_code.co_name
         res, succ = api_request([self.partition.load, replica_number, timeout], **kwargs)

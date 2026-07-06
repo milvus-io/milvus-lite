@@ -1,7 +1,7 @@
 import multiprocessing
 import numbers
 import random
-import numpy
+import numpy as np
 import threading
 import pytest
 import pandas as pd
@@ -16,7 +16,6 @@ from utils.util_log import test_log as log
 from common import common_func as cf
 from common import common_type as ct
 from common.common_type import CaseLabel, CheckTasks
-from utils.util_pymilvus import *
 from common.constants import *
 from pymilvus.orm.types import CONSISTENCY_STRONG, CONSISTENCY_BOUNDED, CONSISTENCY_SESSION, CONSISTENCY_EVENTUALLY
 from base.high_level_api_wrapper import HighLevelApiWrapper

@@ -308,7 +308,7 @@ class TestNullableInsertAndQuery(unittest.TestCase):
         schema.add_field(
             "tag", DataType.VARCHAR, max_length=256, nullable=True, default_value="unset"
         )
-        schema.add_field("score", DataType.FLOAT, nullable=True, default_value=0.5)
+        schema.add_field("score", DataType.DOUBLE, nullable=True, default_value=0.5)
         index_params = self.client.prepare_index_params()
         index_params.add_index(field_name="vec", metric_type="L2")
         self.client.create_collection(name, schema=schema, index_params=index_params)

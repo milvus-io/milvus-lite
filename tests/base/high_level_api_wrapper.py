@@ -1,7 +1,4 @@
 import sys
-import time
-import timeout_decorator
-from numpy import NaN
 
 from pymilvus import Collection
 from pymilvus import MilvusClient

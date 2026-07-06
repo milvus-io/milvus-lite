@@ -8,20 +8,13 @@ import uuid
 from functools import singledispatch
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
 from sklearn import preprocessing
-from npy_append_array import NpyAppendArray
-from faker import Faker
 from pathlib import Path
-from minio import Minio
 from pymilvus import DataType
 from base.schema_wrapper import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper
 from common import common_type as ct
 from utils.util_log import test_log as log
-from customize.milvus_operator import MilvusOperator
 import pickle
-import tensorflow as tf
-fake = Faker()
 """" Methods of processing data """
 
 
@@ -892,6 +885,7 @@ def prepare_bulk_insert_data(schema=None,
         files = gen_npy_files_for_bulk_insert(data, schema, data_dir)
     log.info(f"generated {len(files)} {file_type} files for bulk insert, cost {time.time() - t0} s")
     log.info("upload file to minio")
+    from minio import Minio
     client = Minio(minio_endpoint, access_key="minioadmin", secret_key="minioadmin", secure=False)
     for file_name in files:
         file_size = os.path.getsize(os.path.join(data_dir, file_name)) / 1024 / 1024
@@ -1073,6 +1067,8 @@ def gen_data_by_type(field, nb=None, start=None):
         return ["".join([chr(random.randint(97, 122)) for _ in range(length)]) for _ in range(nb)]
     if data_type == DataType.JSON:
         if nb is None:
+            from faker import Faker
+            fake = Faker()
             return {"name": fake.name(), "address": fake.address()}
         data = [{"name": str(i), "address": i} for i in range(nb)]
         return data
@@ -1082,6 +1078,7 @@ def gen_data_by_type(field, nb=None, start=None):
             return [random.random() for i in range(dim)]
         return [[random.random() for i in range(dim)] for _ in range(nb)]
     if data_type == DataType.BFLOAT16_VECTOR:
+        import jax.numpy as jnp
         dim = field.params['dim']
         if nb is None:
             raw_vector = [random.random() for _ in range(dim)]
@@ -1179,6 +1176,7 @@ def gen_json_files_for_bulk_insert(data, schema, data_dir):
 
 
 def gen_npy_files_for_bulk_insert(data, schema, data_dir):
+    from npy_append_array import NpyAppendArray
     for d in data:
         if len(d) > 0:
             nb = len(d)
@@ -1949,6 +1947,7 @@ def install_milvus_operator_specific_config(namespace, milvus_mode, release_name
         'spec.config.quotaAndLimits.enable': rate_limit_enable,
         'spec.config.quotaAndLimits.ddl.collectionRate': collection_rate_limit,
     }
+    from customize.milvus_operator import MilvusOperator
     mil = MilvusOperator()
     mil.install(data_config)
     if mil.wait_for_healthy(release_name, NAMESPACE, timeout=TIMEOUT):
@@ -2071,6 +2070,7 @@ def gen_bf16_vectors(num, dim):
     bf16_vectors: the bytes used for insert
     return: raw_vectors and bf16_vectors
     """
+    import tensorflow as tf
     raw_vectors = []
     bf16_vectors = []
     for _ in range(num):
