@@ -160,7 +160,7 @@ class TestRerankerUnit:
         from milvus_lite.adapter.grpc.servicer import _hit_score_for_chain
 
         assert _hit_score_for_chain({"distance": 0.9}, "IP") == 0.9
-        assert _hit_score_for_chain({"distance": 0.1}, "COSINE") == 0.9
+        assert _hit_score_for_chain({"distance": 0.9}, "COSINE") == 0.9
         assert _hit_score_for_chain({"distance": 0.1}, "L2") == 0.1
         assert _hit_score_for_chain({"distance": -2.5}, "BM25") == 2.5
 

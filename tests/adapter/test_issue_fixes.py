@@ -179,3 +179,49 @@ def test_autoindex_uses_hnsw():
     vectors = np.random.rand(100, 16).astype(np.float32)
     idx = build_index_from_spec(spec, vectors)
     assert idx.index_type == "HNSW"
+
+
+# ---------------------------------------------------------------------------
+# #343: raw distance semantics should match Milvus server
+# ---------------------------------------------------------------------------
+
+def test_raw_distance_semantics_match_milvus_server(milvus_client):
+    """Issue #343: COSINE is similarity and L2 is squared distance."""
+    expected = {
+        "COSINE": [(1, 1.0), (2, 0.0)],
+        "IP": [(1, 1.0), (2, 0.0)],
+        "L2": [(1, 0.0), (2, 2.0)],
+    }
+
+    for metric, metric_expected in expected.items():
+        collection = f"metric_semantics_{metric.lower()}"
+        milvus_client.create_collection(
+            collection_name=collection,
+            dimension=2,
+            metric_type=metric,
+            auto_id=False,
+        )
+        milvus_client.insert(
+            collection_name=collection,
+            data=[
+                {"id": 1, "vector": [1.0, 0.0]},
+                {"id": 2, "vector": [0.0, 1.0]},
+            ],
+        )
+
+        results = milvus_client.search(
+            collection_name=collection,
+            data=[[1.0, 0.0]],
+            anns_field="vector",
+            limit=2,
+            search_params={"metric_type": metric},
+            output_fields=["id"],
+        )
+
+        actual = [
+            (row.get("id") or row["entity"]["id"], row["distance"])
+            for row in results[0]
+        ]
+        assert [row[0] for row in actual] == [row[0] for row in metric_expected]
+        for (_, distance), (_, expected_distance) in zip(actual, metric_expected):
+            assert distance == pytest.approx(expected_distance)
