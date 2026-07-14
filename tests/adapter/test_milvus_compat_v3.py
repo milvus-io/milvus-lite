@@ -509,25 +509,25 @@ class TestMixedFilter:
 class TestDistanceOrdering:
     """Adapted from test_milvus_client_e2e search distance verification."""
 
-    def test_cosine_distances_ascending(self, milvus_client):
-        """COSINE search distances must be in ascending order."""
+    def test_cosine_scores_descending(self, milvus_client):
+        """COSINE search scores must be in descending order."""
         _create_simple(milvus_client, "do1")
         q = _rng(42).standard_normal((1, DIM)).astype(np.float32).tolist()
 
         res = milvus_client.search("do1", data=q, limit=NB)
         distances = [h["distance"] for h in res[0]]
-        assert distances == sorted(distances), \
-            "COSINE distances should be in ascending order"
+        assert distances == sorted(distances, reverse=True), \
+            "COSINE scores should be in descending order"
         milvus_client.drop_collection("do1")
 
-    def test_self_query_distance_near_zero(self, milvus_client):
+    def test_self_query_cosine_score_near_one(self, milvus_client):
         """Searching with an inserted vector should return itself at
-        distance ~0 (COSINE)."""
+        score ~1 (COSINE)."""
         rows = _create_simple(milvus_client, "do2")
         q = [rows[5]["vec"]]
         res = milvus_client.search("do2", data=q, limit=1)
         assert res[0][0]["id"] == 5
-        assert res[0][0]["distance"] < 1e-4
+        assert res[0][0]["distance"] == pytest.approx(1.0, abs=1e-4)
         milvus_client.drop_collection("do2")
 
 

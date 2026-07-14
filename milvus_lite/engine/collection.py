@@ -804,11 +804,7 @@ class Collection:
             raw_results = [hits[offset:offset + top_k] for hits in raw_results]
         elif ranker is not None:
             raw_results = [hits[:top_k] for hits in raw_results]
-        # Convert IP distances to Milvus convention
-        if metric_type == "IP":
-            for hits in raw_results:
-                for hit in hits:
-                    hit["distance"] = -hit["distance"]
+        _convert_hits_to_milvus_distances(raw_results, metric_type)
 
         if _boost_field_injected or _group_by_field_injected:
             raw_results = _strip_injected_output_fields(raw_results, _user_output_fields)
@@ -2248,36 +2244,53 @@ def _apply_range_filter(
     """Filter search results by distance range.
 
     Milvus range search semantics:
-        L2/COSINE: radius = max distance (outer), range_filter = min distance (inner)
-            Keep: range_filter <= distance <= radius
-        IP: radius = min score (inner), range_filter = max score (outer)
-            Keep: radius <= distance <= range_filter
-            (note: at this point IP distances are still internal -dot form)
+        L2: range_filter <= distance < radius
+        IP/COSINE: radius < score <= range_filter
 
     Either bound can be None (no bound on that side).
     After filtering, truncates to *limit* hits per query.
     """
+    metric = metric_type.upper()
     out: List[List[dict]] = []
     for query_hits in results:
         filtered = []
         for hit in query_hits:
-            d = hit["distance"]
-            if metric_type == "IP":
-                # IP internal convention: -dot (smaller = more similar)
-                # radius/range_filter are user-facing (positive dot values)
-                # but _apply_range_filter runs BEFORE IP sign flip, so
-                # negate the bounds for comparison
-                if radius is not None and not (d <= -radius):
+            d = _internal_distance_to_milvus_distance(hit["distance"], metric)
+            if metric in {"IP", "COSINE"}:
+                if radius is not None and not (d > radius):
                     continue
-                if range_filter is not None and not (d >= -range_filter):
+                if range_filter is not None and not (d <= range_filter):
                     continue
             else:
-                # L2/COSINE: smaller distance = closer
-                # radius = outer bound (max), range_filter = inner bound (min)
-                if radius is not None and not (d <= radius):
+                if radius is not None and not (d < radius):
                     continue
                 if range_filter is not None and not (d >= range_filter):
                     continue
             filtered.append(hit)
         out.append(filtered[:limit])
     return out
+
+
+def _convert_hits_to_milvus_distances(
+    results: List[List[dict]],
+    metric_type: str,
+) -> None:
+    """Convert internal search distances to Milvus public score semantics."""
+    metric = metric_type.upper()
+
+    for hits in results:
+        for hit in hits:
+            hit["distance"] = _internal_distance_to_milvus_distance(
+                hit["distance"], metric,
+            )
+
+
+def _internal_distance_to_milvus_distance(distance: float, metric_type: str) -> float:
+    """Map the engine's smaller-is-better distance to Milvus public semantics."""
+    if metric_type == "COSINE":
+        return 1.0 - distance
+    if metric_type == "IP":
+        return -distance
+    if metric_type == "L2":
+        return distance * distance
+    return distance

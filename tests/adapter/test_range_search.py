@@ -34,16 +34,16 @@ class TestRangeSearchEngine:
         col = Collection(name="test_rs", data_dir=tmpdir, schema=schema)
         # Insert vectors at known positions
         col.insert([
-            {"id": 1, "vec": [1.0, 0.0, 0.0, 0.0]},   # dist ~0 from query
-            {"id": 2, "vec": [0.7, 0.7, 0.0, 0.0]},   # dist ~0.29
-            {"id": 3, "vec": [0.0, 1.0, 0.0, 0.0]},   # dist ~1.0
-            {"id": 4, "vec": [0.0, 0.0, 1.0, 0.0]},   # dist ~1.0
-            {"id": 5, "vec": [-1.0, 0.0, 0.0, 0.0]},  # dist ~2.0
+            {"id": 1, "vec": [1.0, 0.0, 0.0, 0.0]},   # cosine score ~1.0
+            {"id": 2, "vec": [0.7, 0.7, 0.0, 0.0]},   # cosine score ~0.71
+            {"id": 3, "vec": [0.0, 1.0, 0.0, 0.0]},   # cosine score ~0.0
+            {"id": 4, "vec": [0.0, 0.0, 1.0, 0.0]},   # cosine score ~0.0
+            {"id": 5, "vec": [-1.0, 0.0, 0.0, 0.0]},  # cosine score ~-1.0
         ])
         return col
 
     def test_range_both_bounds(self):
-        """radius < distance <= range_filter."""
+        """COSINE range keeps radius < score <= range_filter."""
         with tempfile.TemporaryDirectory() as d:
             col = self._make_collection(d)
             results = col.search(
@@ -58,7 +58,7 @@ class TestRangeSearchEngine:
                 assert hit["distance"] <= 1.5
 
     def test_range_only_radius(self):
-        """Only radius (outer bound for COSINE): distance <= radius."""
+        """Only radius keeps COSINE scores greater than radius."""
         with tempfile.TemporaryDirectory() as d:
             col = self._make_collection(d)
             results = col.search(
@@ -68,10 +68,10 @@ class TestRangeSearchEngine:
                 radius=0.5,
             )
             for hit in results[0]:
-                assert hit["distance"] <= 0.5
+                assert hit["distance"] > 0.5
 
     def test_range_only_range_filter(self):
-        """Only range_filter (inner bound for COSINE): distance >= range_filter."""
+        """Only range_filter keeps COSINE scores up to range_filter."""
         with tempfile.TemporaryDirectory() as d:
             col = self._make_collection(d)
             results = col.search(
@@ -81,7 +81,7 @@ class TestRangeSearchEngine:
                 range_filter=0.5,
             )
             for hit in results[0]:
-                assert hit["distance"] >= 0.5
+                assert hit["distance"] <= 0.5
 
     def test_range_empty_result(self):
         """No results in range."""
@@ -174,7 +174,7 @@ def test_grpc_range_only_range_filter(milvus_client):
         limit=10,
     )
     for hit in results[0]:
-        assert hit["distance"] >= 0.5
+        assert hit["distance"] <= 0.5
     milvus_client.drop_collection("rs_rf")
 
 

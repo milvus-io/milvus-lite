@@ -224,9 +224,9 @@ def test_search_distances_returned(loaded_collection):
         assert isinstance(hit["distance"], (int, float))
 
 
-def test_search_results_sorted_ascending(loaded_collection):
+def test_search_results_sorted_by_cosine_score_descending(loaded_collection):
     res = loaded_collection.search(
         "demo", data=[[5.0, 6.0, 0.0, 0.0]], limit=10
     )
     distances = [hit["distance"] for hit in res[0]]
-    assert distances == sorted(distances)
+    assert distances == sorted(distances, reverse=True)

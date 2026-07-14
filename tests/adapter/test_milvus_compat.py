@@ -246,12 +246,12 @@ class TestSearch:
             assert "float_field" in hit["entity"]
         milvus_client.drop_collection("out_f")
 
-    def test_search_results_sorted_ascending(self, milvus_client):
+    def test_search_results_sorted_by_cosine_score_descending(self, milvus_client):
         _create_loaded(milvus_client, "sorted")
         q = _rng().standard_normal((1, DIM)).astype(np.float32).tolist()
         res = milvus_client.search("sorted", data=q, limit=20)
         distances = [hit["distance"] for hit in res[0]]
-        assert distances == sorted(distances)
+        assert distances == sorted(distances, reverse=True)
         milvus_client.drop_collection("sorted")
 
 

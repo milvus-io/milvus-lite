@@ -118,11 +118,9 @@ def _hit_score_for_chain(hit: dict, metric_type: str) -> float:
     """
     distance = hit["distance"]
     metric = metric_type.upper()
-    if metric == "COSINE":
-        return 1.0 - distance
     if metric == "BM25":
         return -distance
-    if metric in {"IP", "L2"}:
+    if metric in {"COSINE", "IP", "L2"}:
         return distance
     return distance
 
