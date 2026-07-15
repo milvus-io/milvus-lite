@@ -16,6 +16,40 @@ pymilvus = pytest.importorskip("pymilvus")
 grpc = pytest.importorskip("grpc")
 
 
+def _cleanup_all_databases(client):
+    try:
+        database_names = client.list_databases()
+    except Exception:
+        database_names = ["default"]
+
+    for database_name in database_names:
+        try:
+            client.using_database(database_name)
+        except Exception:
+            continue
+        try:
+            collection_names = client.list_collections()
+        except Exception:
+            collection_names = []
+        for collection_name in collection_names:
+            try:
+                client.drop_collection(collection_name)
+            except Exception:
+                pass
+
+    try:
+        client.using_database("default")
+    except Exception:
+        pass
+
+    for database_name in database_names:
+        if database_name != "default":
+            try:
+                client.drop_database(database_name)
+            except Exception:
+                pass
+
+
 @pytest.fixture(scope="session")
 def grpc_server():
     """Start a single MilvusLite gRPC server for the entire adapter
@@ -36,7 +70,8 @@ def grpc_server():
 def milvus_client(grpc_server):
     """A pymilvus MilvusClient connected to the session server.
 
-    Cleans up all collections after each test to maintain isolation.
+    Teardown best-effort cleans all collections in every database, then drops
+    all non-default databases to maintain isolation.
     """
     from pymilvus import MilvusClient
     port, _db = grpc_server
@@ -44,10 +79,5 @@ def milvus_client(grpc_server):
     try:
         yield client
     finally:
-        # Clean up all collections created during this test
-        for name in client.list_collections():
-            try:
-                client.drop_collection(name)
-            except Exception:
-                pass
+        _cleanup_all_databases(client)
         client.close()

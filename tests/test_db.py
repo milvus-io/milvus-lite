@@ -11,6 +11,9 @@ from milvus_lite.db import MilvusLite, LOCK_FILENAME, SCHEMA_FILENAME
 from milvus_lite.exceptions import (
     CollectionAlreadyExistsError,
     CollectionNotFoundError,
+    DatabaseAlreadyExistsError,
+    DatabaseNotEmptyError,
+    DatabaseNotFoundError,
     DataDirLockedError,
     SchemaValidationError,
 )
@@ -67,6 +70,210 @@ def test_construction_idempotent_on_existing(tmp_path):
     db1.close()
     db2 = MilvusLite(data_dir)
     db2.close()  # no error
+
+
+# ---------------------------------------------------------------------------
+# Database CRUD
+# ---------------------------------------------------------------------------
+
+
+def test_default_database_uses_legacy_layout(tmp_path, schema):
+    data_dir = tmp_path / "data"
+    db = MilvusLite(str(data_dir))
+    try:
+        db.create_collection("docs", schema)
+        assert db.list_databases() == ["default"]
+        assert (data_dir / "collections" / "docs" / SCHEMA_FILENAME).exists()
+        assert not (data_dir / "databases" / "default").exists()
+    finally:
+        db.close()
+
+
+def test_create_list_describe_drop_database(db):
+    db.create_database("tenant_a", properties={"timezone": "UTC"})
+    assert db.has_database("tenant_a")
+    assert db.list_databases() == ["default", "tenant_a"]
+    assert db.describe_database("tenant_a") == {
+        "name": "tenant_a",
+        "properties": {"timezone": "UTC"},
+    }
+    db.drop_database("tenant_a")
+    assert not db.has_database("tenant_a")
+    assert db.list_databases() == ["default"]
+
+
+def test_create_duplicate_database_raises(db):
+    db.create_database("tenant_a")
+    with pytest.raises(DatabaseAlreadyExistsError):
+        db.create_database("tenant_a")
+    with pytest.raises(DatabaseAlreadyExistsError):
+        db.create_database("default")
+
+
+def test_create_database_invalid_properties_is_atomic_and_retryable(db):
+    with pytest.raises(SchemaValidationError):
+        db.create_database(
+            "tenant_a",
+            properties={"timezone": "Invalid/Timezone"},
+        )
+
+    assert not db.has_database("tenant_a")
+    assert db.list_databases() == ["default"]
+
+    db.create_database("tenant_a", properties={"timezone": "UTC"})
+    assert db.describe_database("tenant_a")["properties"] == {"timezone": "UTC"}
+
+
+def test_create_database_metadata_write_failure_is_atomic_and_retryable(
+    db,
+    monkeypatch,
+):
+    import milvus_lite.db as db_module
+
+    original_dump = db_module.json.dump
+
+    def fail_dump(*args, **kwargs):
+        raise OSError("injected database properties write failure")
+
+    monkeypatch.setattr(db_module.json, "dump", fail_dump)
+    with pytest.raises(OSError, match="injected database properties write failure"):
+        db.create_database("tenant_a", properties={"timezone": "UTC"})
+
+    assert not db.has_database("tenant_a")
+    assert db.list_databases() == ["default"]
+
+    monkeypatch.setattr(db_module.json, "dump", original_dump)
+    db.create_database("tenant_a", properties={"timezone": "UTC"})
+    assert db.describe_database("tenant_a")["properties"] == {"timezone": "UTC"}
+
+
+def test_reopen_cleans_orphaned_database_staging_directory(tmp_path):
+    data_dir = tmp_path / "data"
+    db = MilvusLite(str(data_dir))
+    db.close()
+
+    orphan_dir = data_dir / ".database-staging" / "tenant_a-orphan"
+    (orphan_dir / "collections").mkdir(parents=True)
+
+    reopened = MilvusLite(str(data_dir))
+    try:
+        assert not orphan_dir.exists()
+        assert reopened.list_databases() == ["default"]
+    finally:
+        reopened.close()
+
+
+def test_unknown_database_raises(db, schema):
+    with pytest.raises(DatabaseNotFoundError):
+        db.create_collection("docs", schema, database_name="missing")
+    with pytest.raises(DatabaseNotFoundError):
+        db.list_collections(database_name="missing")
+
+
+def test_drop_nonempty_database_raises(db, schema):
+    db.create_database("tenant_a")
+    db.create_collection("docs", schema, database_name="tenant_a")
+    with pytest.raises(DatabaseNotEmptyError):
+        db.drop_database("tenant_a")
+
+
+def test_same_collection_name_isolated_across_databases(db, schema):
+    db.create_database("tenant_a")
+    default_col = db.create_collection("docs", schema)
+    tenant_col = db.create_collection("docs", schema, database_name="tenant_a")
+
+    default_col.insert([_make_record(1, prefix="default")])
+    tenant_col.insert([_make_record(1, prefix="tenant")])
+
+    assert db.list_collections() == ["docs"]
+    assert db.list_collections(database_name="tenant_a") == ["docs"]
+    assert default_col.get(["default_0001"])[0]["id"] == "default_0001"
+    assert default_col.get(["tenant_0001"]) == []
+    assert tenant_col.get(["tenant_0001"])[0]["id"] == "tenant_0001"
+    assert tenant_col.get(["default_0001"]) == []
+
+
+def test_database_local_aliases(db, schema):
+    db.create_database("tenant_a")
+    db.create_collection("default_docs", schema)
+    db.create_collection("tenant_docs", schema, database_name="tenant_a")
+
+    db.create_alias("default_docs", "current")
+    db.create_alias("tenant_docs", "current", database_name="tenant_a")
+
+    assert db.describe_alias("current") == {
+        "alias": "current",
+        "collection": "default_docs",
+    }
+    assert db.describe_alias("current", database_name="tenant_a") == {
+        "alias": "current",
+        "collection": "tenant_docs",
+    }
+    assert db.get_collection("current").name == "default_docs"
+    assert db.get_collection("current", database_name="tenant_a").name == "tenant_docs"
+
+
+def test_database_properties_are_local(db):
+    db.create_database("tenant_a", properties={"timezone": "UTC"})
+    db.alter_database_properties(properties={"timezone": "Asia/Shanghai"})
+
+    assert db.describe_database()["properties"] == {"timezone": "Asia/Shanghai"}
+    assert db.describe_database("tenant_a")["properties"] == {"timezone": "UTC"}
+
+
+def test_alter_database_properties_write_failure_preserves_memory_and_disk(
+    tmp_path,
+    schema,
+    monkeypatch,
+):
+    data_dir = str(tmp_path / "data")
+    db = MilvusLite(data_dir)
+    try:
+        db.create_database("tenant_a", properties={"timezone": "UTC"})
+        loaded = db.create_collection(
+            "loaded_docs",
+            schema,
+            database_name="tenant_a",
+        )
+        original_write = db._write_database_properties_file
+
+        def fail_write(path, properties):
+            raise OSError("injected database properties write failure")
+
+        monkeypatch.setattr(db, "_write_database_properties_file", fail_write)
+        with pytest.raises(OSError, match="injected database properties write failure"):
+            db.alter_database_properties(
+                "tenant_a",
+                properties={"timezone": "Asia/Shanghai"},
+            )
+
+        assert db.describe_database("tenant_a")["properties"] == {"timezone": "UTC"}
+        assert loaded._database_properties == {"timezone": "UTC"}
+
+        created_after_failure = db.create_collection(
+            "new_docs",
+            schema,
+            database_name="tenant_a",
+        )
+        assert created_after_failure._database_properties == {"timezone": "UTC"}
+        monkeypatch.setattr(db, "_write_database_properties_file", original_write)
+    finally:
+        db.close()
+
+    reopened = MilvusLite(data_dir)
+    try:
+        assert reopened.describe_database("tenant_a")["properties"] == {
+            "timezone": "UTC"
+        }
+        reopened.alter_database_properties(
+            "tenant_a",
+            properties={"timezone": "Asia/Shanghai"},
+        )
+        assert reopened.describe_database("tenant_a")["properties"] == {
+            "timezone": "Asia/Shanghai"
+        }
+    finally:
+        reopened.close()
 
 
 # ---------------------------------------------------------------------------
