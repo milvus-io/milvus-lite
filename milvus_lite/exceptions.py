@@ -14,6 +14,18 @@ class CollectionAlreadyExistsError(MilvusLiteError):
     """Collection already exists."""
 
 
+class DatabaseNotFoundError(MilvusLiteError):
+    """Database does not exist."""
+
+
+class DatabaseAlreadyExistsError(MilvusLiteError):
+    """Database already exists."""
+
+
+class DatabaseNotEmptyError(MilvusLiteError):
+    """Database cannot be dropped because it contains collections."""
+
+
 class PartitionNotFoundError(MilvusLiteError):
     """Partition does not exist."""
 
