@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "milvus-lite"
-version = "3.0"
+version = "3.1.0"
 description = "Lightweight version of Milvus for local development and testing"
 readme = "README.md"
 license = {text = "Apache-2.0"}
