@@ -6,6 +6,8 @@ from milvus_lite.function.chain import FuncChain
 from milvus_lite.function.dataframe import DataFrame
 from milvus_lite.function.operator import Operator
 from milvus_lite.function.types import (
+    ID_FIELD,
+    SCORE_FIELD,
     STAGE_INGESTION,
     STAGE_L2_RERANK,
     FuncContext,
@@ -161,13 +163,28 @@ def test_group_by_rejects_unknown_scorer():
         GroupByOp("field", group_size=1, limit=10, scorer="invalid")
 
 
+# ── Legacy Sort tie-break behavior ──────────────────────────
+
+
+def test_chain_sort_preserves_legacy_id_tie_break():
+    chain = FuncChain("test", STAGE_L2_RERANK)
+    chain.sort(SCORE_FIELD, desc=True)
+    df = DataFrame.from_records([
+        {ID_FIELD: 3, SCORE_FIELD: 0.5},
+        {ID_FIELD: 1, SCORE_FIELD: 0.5},
+        {ID_FIELD: 2, SCORE_FIELD: 0.5},
+    ])
+
+    result = chain.execute(df)
+
+    assert [record[ID_FIELD] for record in result.to_records()] == [1, 2, 3]
+
+
 # ── Merge → Sort → Limit full pipeline ──────────────────────
 
 
 def test_merge_sort_limit_pipeline():
     """MergeOp as first op followed by Sort and Limit."""
-    from milvus_lite.function.types import ID_FIELD, SCORE_FIELD
-
     chain = FuncChain("test", STAGE_L2_RERANK)
     chain.merge("rrf", rrf_k=60)
     chain.sort(SCORE_FIELD, desc=True)
@@ -198,8 +215,6 @@ def test_merge_sort_limit_pipeline():
 
 def test_merge_map_sort_limit_pipeline():
     """MergeOp → MapOp → SortOp → LimitOp end-to-end."""
-    from milvus_lite.function.types import ID_FIELD, SCORE_FIELD
-
     class _NegateScoreExpr(FunctionExpr):
         name = "negate"
         supported_stages = frozenset({STAGE_L2_RERANK})

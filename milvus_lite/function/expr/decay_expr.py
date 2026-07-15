@@ -8,9 +8,18 @@ Corresponds to Milvus: internal/util/function/chain/expr/decay_expr.go
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import FrozenSet, List
 
 from milvus_lite.function.types import STAGE_L2_RERANK, FuncContext, FunctionExpr
+
+
+def _numeric_decay_value(value) -> float:
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("TIMESTAMPTZ decay input must be timezone-aware")
+        return value.timestamp()
+    return float(value)
 
 
 class DecayExpr(FunctionExpr):
@@ -50,5 +59,5 @@ class DecayExpr(FunctionExpr):
             if val is None:
                 factors.append(0.0)
             else:
-                factors.append(compute(float(val)))
+                factors.append(compute(_numeric_decay_value(val)))
         return [factors]
