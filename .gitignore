@@ -139,3 +139,6 @@ cmake-build-debug/
 # Claude Code
 CLAUDE.md
 AGENTS.md
+
+# Agent worktrees
+.worktrees/
