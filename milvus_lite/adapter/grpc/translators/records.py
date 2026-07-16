@@ -38,6 +38,10 @@ from typing import Any, Dict, List, Optional
 from pymilvus.grpc_gen import schema_pb2
 
 from milvus_lite.exceptions import SchemaValidationError
+from milvus_lite.engine.projection import (
+    ProjectionPlan,
+    extract_dynamic_fields,
+)
 from milvus_lite.schema.types import CollectionSchema, DataType
 from milvus_lite.schema.timestamptz import (
     extract_time_fields,
@@ -378,6 +382,7 @@ def records_to_fields_data(
     records: List[Dict[str, Any]],
     schema: CollectionSchema,
     output_fields: Optional[List[str]] = None,
+    projection_plan: Optional[ProjectionPlan] = None,
     time_fields: Optional[List[str] | str] = None,
     timezone: str | None = None,
 ) -> List:
@@ -399,7 +404,12 @@ def records_to_fields_data(
     pk_field = next((f for f in schema.fields if f.is_primary), None)
     pk_name = pk_field.name if pk_field else None
 
-    if output_fields is None:
+    if projection_plan is not None:
+        emit = set(projection_plan.response_schema_fields)
+        if pk_name:
+            emit.add(pk_name)
+        emit_names = [f.name for f in schema.fields if f.name in emit]
+    elif output_fields is None:
         emit_names = [f.name for f in schema.fields]
     else:
         emit = set(output_fields)
@@ -434,13 +444,17 @@ def records_to_fields_data(
     # bool/list/dict).
     if schema.enable_dynamic_field:
         import json
-        schema_names = {f.name for f in schema.fields}
         meta_column: list[bytes] = []
         for r in records:
-            meta_dict = {
-                k: v for k, v in r.items()
-                if k not in schema_names and k != "$meta"
-            }
+            dynamic = extract_dynamic_fields(r, schema)
+            if projection_plan is None or projection_plan.include_all_dynamic:
+                meta_dict = dynamic
+            else:
+                meta_dict = {
+                    name: dynamic[name]
+                    for name in projection_plan.explicit_dynamic_fields
+                    if name in dynamic
+                }
             meta_column.append(json.dumps(meta_dict).encode("utf-8"))
         fd = schema_pb2.FieldData()
         fd.field_name = "$meta"

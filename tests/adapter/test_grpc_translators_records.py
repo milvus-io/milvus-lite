@@ -23,6 +23,7 @@ from milvus_lite.adapter.grpc.translators.records import (
     records_to_fields_data,
 )
 from milvus_lite.exceptions import SchemaValidationError
+from milvus_lite.engine.projection import build_projection_plan
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
 from milvus_lite.schema.timestamptz import micros_to_iso_z, parse_timestamptz
 
@@ -220,6 +221,17 @@ def _schema_basic():
     ])
 
 
+def _schema_dynamic():
+    return CollectionSchema(
+        fields=[
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+            FieldSchema(name="text", dtype=DataType.VARCHAR),
+        ],
+        enable_dynamic_field=True,
+    )
+
+
 def test_encode_basic_round_trip():
     schema = _schema_basic()
     records_in = [
@@ -334,6 +346,33 @@ def test_encode_output_fields_none_emits_all():
     fields_data = records_to_fields_data(records_in, schema, output_fields=None)
     field_names = sorted([fd.field_name for fd in fields_data])
     assert field_names == sorted(["id", "vec", "title", "active", "score"])
+
+
+def test_records_to_fields_data_preserves_raw_meta():
+    schema = _schema_dynamic()
+    plan = build_projection_plan(["$meta"], schema, api_kind="query")
+    fields_data = records_to_fields_data(
+        [{"id": 1, "$meta": '{"page": 1, "source": "test"}'}],
+        schema,
+        projection_plan=plan,
+    )
+    meta = next(fd for fd in fields_data if fd.field_name == "$meta")
+    assert json.loads(meta.scalars.json_data.data[0]) == {
+        "page": 1,
+        "source": "test",
+    }
+
+
+def test_records_to_fields_data_selects_explicit_dynamic():
+    schema = _schema_dynamic()
+    plan = build_projection_plan(["page"], schema, api_kind="query")
+    fields_data = records_to_fields_data(
+        [{"id": 1, "page": 1, "source": "test"}],
+        schema,
+        projection_plan=plan,
+    )
+    meta = next(fd for fd in fields_data if fd.field_name == "$meta")
+    assert json.loads(meta.scalars.json_data.data[0]) == {"page": 1}
 
 
 def test_encode_with_null_value():

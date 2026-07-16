@@ -47,6 +47,7 @@ from milvus_lite.constants import (
 from milvus_lite.engine.compaction import CompactionManager
 from milvus_lite.engine.flush import execute_flush
 from milvus_lite.engine.operation import DeleteOp, InsertOp, Operation
+from milvus_lite.engine.projection import build_projection_plan, project_record
 from milvus_lite.engine.recovery import execute_recovery
 from milvus_lite.exceptions import (
     CollectionNotLoadedError,
@@ -154,23 +155,25 @@ def _row_matches_filter(record: dict, compiled_filter) -> bool:
 
 def _strip_injected_output_fields(
     results: List[List[dict]],
+    schema: CollectionSchema,
     output_fields: Optional[List[str]],
 ) -> List[List[dict]]:
     """Restore the user's projection after internal field injection."""
     if output_fields is None:
         return results
 
-    keep = set(output_fields)
+    projection_plan = build_projection_plan(
+        output_fields, schema, api_kind="search"
+    )
     stripped: List[List[dict]] = []
     for hits in results:
         out_hits = []
         for hit in hits:
             new_hit = dict(hit)
             entity = hit.get("entity") or {}
-            new_hit["entity"] = {
-                k: v for k, v in entity.items()
-                if k in keep
-            }
+            new_hit["entity"] = project_record(
+                entity, schema, projection_plan
+            )
             out_hits.append(new_hit)
         stripped.append(out_hits)
     return stripped
@@ -588,6 +591,9 @@ class Collection:
         self._require_loaded()
 
         partition_filter = set(partition_names) if partition_names else None
+        projection_plan = build_projection_plan(
+            output_fields, self._schema, api_kind="get"
+        )
         compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
         # Snapshot tombstones so the bg worker's gc_below doesn't
         # invalidate entries we rely on during this read.
@@ -633,7 +639,7 @@ class Collection:
             if compiled_filter is not None and not _row_matches_filter(rec, compiled_filter):
                 continue
 
-            out.append(self._project_record(rec, output_fields))
+            out.append(project_record(rec, self._schema, projection_plan))
 
         return out
 
@@ -724,10 +730,13 @@ class Collection:
         _boost_field_injected = False
         if ranker is not None and output_fields is not None:
             requested = set(output_fields)
-            output_fields = [
+            schema_output_fields = [
                 f.name for f in self._schema.fields
                 if f.name == self._pk_name or f.name in requested or not f.is_primary
             ]
+            output_fields = list(dict.fromkeys(
+                schema_output_fields + list(output_fields)
+            ))
             _boost_field_injected = True
 
         # If grouping is active, ensure the group key is available for
@@ -737,6 +746,10 @@ class Collection:
             if group_by_field not in output_fields:
                 output_fields = list(output_fields) + [group_by_field]
                 _group_by_field_injected = True
+
+        search_projection_plan = build_projection_plan(
+            output_fields, self._schema, api_kind="search"
+        )
 
         if field_schema.dtype == DataType.SPARSE_FLOAT_VECTOR:
             raw_results = self._search_sparse(
@@ -773,6 +786,9 @@ class Collection:
                 compiled_filter=compiled_filter,
                 output_fields=output_fields,
                 indexed_filter_plan=indexed_filter_plan,
+                project_record_fn=lambda record: project_record(
+                    record, self._schema, search_projection_plan
+                ),
             )
 
         # Apply range filter (before group_by)
@@ -807,7 +823,9 @@ class Collection:
         _convert_hits_to_milvus_distances(raw_results, metric_type)
 
         if _boost_field_injected or _group_by_field_injected:
-            raw_results = _strip_injected_output_fields(raw_results, _user_output_fields)
+            raw_results = _strip_injected_output_fields(
+                raw_results, self._schema, _user_output_fields
+            )
 
         return raw_results
 
@@ -868,9 +886,9 @@ class Collection:
         from milvus_lite.index.sparse_inverted import SparseInvertedIndex
 
         partition_filter = set(partition_names) if partition_names else None
-        _exclude_fields = {f.name for f in self._schema.fields
-                          if f.is_primary or f.dtype in (
-                              DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR)}
+        projection_plan = build_projection_plan(
+            output_fields, self._schema, api_kind="search"
+        )
 
         # BM25 params
         bm25_k1 = 1.5
@@ -1032,29 +1050,19 @@ class Collection:
                 entity = {}
                 if _is_memtable_sparse_ref(source):
                     source, _seq = source
-                    if output_fields is None:
-                        entity = {
-                            k: v for k, v in source.items()
-                            if k not in ("_seq", "_partition") and k not in _exclude_fields
-                        }
-                    elif output_fields:
-                        entity = {
-                            fname: source[fname]
-                            for fname in output_fields
-                            if fname != self._pk_name and fname in source
-                        }
+                    entity = project_record(
+                        source, self._schema, projection_plan
+                    )
                 else:
                     tbl, row_i = source
-                    if output_fields is None:
-                        for col in tbl.column_names:
-                            if col in ("_seq", "_partition") or col in _exclude_fields:
-                                continue
-                            entity[col] = tbl.column(col)[row_i].as_py()
-                    elif output_fields:
-                        for fname in output_fields:
-                            if fname == self._pk_name:
-                                continue
-                            entity[fname] = tbl.column(fname)[row_i].as_py()
+                    record = {
+                        name: tbl.column(name)[row_i].as_py()
+                        for name in tbl.column_names
+                        if name not in ("_seq", "_partition")
+                    }
+                    entity = project_record(
+                        record, self._schema, projection_plan
+                    )
                 hits.append({"id": pk, "distance": dist, "entity": entity})
                 if len(hits) >= top_k:
                     break
@@ -1145,6 +1153,9 @@ class Collection:
         self._require_loaded()
 
         compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
+        projection_plan = build_projection_plan(
+            output_fields, self._schema, api_kind="query"
+        )
         indexed_filter_plan = self._indexed_filter_plan(compiled_filter)
 
         seg_snap, delta_snap = self._read_snapshot()
@@ -1177,7 +1188,7 @@ class Collection:
         out: List[dict] = []
         for i in live_indices:
             rec = materialize_record(all_rec_sources[int(i)])
-            out.append(self._project_record(rec, output_fields))
+            out.append(project_record(rec, self._schema, projection_plan))
             if effective_limit is not None and len(out) >= effective_limit:
                 break
         return out[offset:]
@@ -1259,23 +1270,6 @@ class Collection:
             self._schema.properties.get("timezone")
             or self._database_properties.get("timezone")
         )
-
-    def _project_record(
-        self,
-        record: dict,
-        output_fields: Optional[List[str]],
-    ) -> dict:
-        """Apply output_fields projection to a record dict.
-
-        - None → return all fields (stripping internal $meta key)
-        - list → keep only the named fields, plus the pk field
-        """
-        if output_fields is None:
-            return {k: v for k, v in record.items() if k != "$meta"}
-        keep = set(output_fields)
-        keep.add(self._pk_name)
-        keep.discard("$meta")
-        return {k: v for k, v in record.items() if k in keep}
 
     def flush(self) -> None:
         """Force a synchronous flush of the current MemTable.

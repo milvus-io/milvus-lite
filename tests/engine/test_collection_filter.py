@@ -528,13 +528,17 @@ def col_dynamic(tmp_path, schema_dynamic):
 def _populate_dynamic(col):
     col.insert([
         {"id": "a", "vec": [1.0, 0.0, 0.0, 0.0], "age": 18,
-         "category": "tech", "priority": 1, "score": 0.5},
+         "category": "tech", "priority": 1, "score": 0.5,
+         "array_field": [0, 1, 2]},
         {"id": "b", "vec": [0.0, 1.0, 0.0, 0.0], "age": 25,
-         "category": "news", "priority": 5, "score": 0.7},
+         "category": "news", "priority": 5, "score": 0.7,
+         "array_field": [1, 2, 3]},
         {"id": "c", "vec": [0.0, 0.0, 1.0, 0.0], "age": 30,
-         "category": "tech", "priority": 3, "score": 0.9},
+         "category": "tech", "priority": 3, "score": 0.9,
+         "array_field": [2, 3, 4]},
         {"id": "d", "vec": [0.0, 0.0, 0.0, 1.0], "age": 50,
-         "category": "blog", "priority": 2, "score": 0.3},
+         "category": "blog", "priority": 2, "score": 0.3,
+         "array_field": [3, 4, 5]},
     ])
 
 
@@ -596,6 +600,20 @@ def test_search_with_meta_filter(col_dynamic):
     [hits] = results
     ids = {h["id"] for h in hits}
     assert ids == {"a", "c"}
+
+
+@pytest.mark.parametrize("flush", [False, True])
+def test_search_dynamic_array_index_filter(col_dynamic, flush):
+    _populate_dynamic(col_dynamic)
+    if flush:
+        col_dynamic.flush()
+    results = col_dynamic.search(
+        [[1.0, 0.0, 0.0, 0.0]],
+        top_k=10,
+        metric_type="L2",
+        expr="array_field[0] < 1",
+    )
+    assert {hit["id"] for hit in results[0]} == {"a"}
 
 
 def test_get_with_meta_filter(col_dynamic):
@@ -722,6 +740,18 @@ def test_query_dynamic_bare_after_flush(col_dynamic):
     out = col_dynamic.query('category == "tech"')
     ids = {r["id"] for r in out}
     assert ids == {"a", "c"}
+
+
+@pytest.mark.parametrize("method", ["query", "get"])
+@pytest.mark.parametrize("fields", [["*"], ["$meta"], ["age", "$meta"]])
+def test_dynamic_projection_across_reads(col_dynamic, method, fields):
+    _populate_dynamic(col_dynamic)
+    if method == "query":
+        rows = col_dynamic.query('id == "a"', output_fields=fields)
+    else:
+        rows = col_dynamic.get(["a"], output_fields=fields)
+    assert rows[0]["id"] == "a"
+    assert rows[0]["category"] == "tech"
 
 
 # ===========================================================================

@@ -2,9 +2,12 @@
 
 import pytest
 
+import milvus_lite.search.filter.ast as filter_ast
 from milvus_lite.search.filter.ast import (
     And,
     ArithOp,
+    ArrayContainsOp,
+    ArrayLengthOp,
     BoolLit,
     CmpOp,
     FieldRef,
@@ -554,3 +557,54 @@ def test_meta_in_in_expression():
     ref, but $meta is not a FieldRef. Currently rejected by parser."""
     with pytest.raises(FilterParseError, match="field reference"):
         parse_expr('$meta["category"] in ["tech", "news"]')
+
+
+# ---------------------------------------------------------------------------
+# Composable JSON / array path access
+# ---------------------------------------------------------------------------
+
+def test_array_access_parses_as_path_access():
+    expr = parse_expr("array_field[0] < 1")
+    assert isinstance(expr, CmpOp)
+    assert isinstance(expr.left, filter_ast.PathAccess)
+    assert isinstance(expr.left.base, FieldRef)
+    assert expr.left.base.name == "array_field"
+    assert expr.left.path == (0,)
+
+
+def test_mixed_json_array_path():
+    expr = parse_expr('payload["items"][0]["score"] > 0')
+    assert isinstance(expr, CmpOp)
+    assert isinstance(expr.left, filter_ast.PathAccess)
+    assert isinstance(expr.left.base, FieldRef)
+    assert expr.left.base.name == "payload"
+    assert expr.left.path == ("items", 0, "score")
+
+
+def test_meta_array_path():
+    expr = parse_expr('$meta["array_field"][0] < 1')
+    assert isinstance(expr, CmpOp)
+    assert isinstance(expr.left, filter_ast.PathAccess)
+    assert isinstance(expr.left.base, MetaAccess)
+    assert expr.left.base.key == "array_field"
+    assert expr.left.path == (0,)
+
+
+def test_array_contains_accepts_path_value():
+    expr = parse_expr('array_contains(payload["tags"], "a")')
+    assert isinstance(expr, ArrayContainsOp)
+    assert isinstance(expr.value, filter_ast.PathAccess)
+    assert expr.value.path == ("tags",)
+
+
+def test_array_length_accepts_dynamic_field():
+    expr = parse_expr("array_length(array_field) > 2")
+    assert isinstance(expr, CmpOp)
+    assert isinstance(expr.left, ArrayLengthOp)
+    assert isinstance(expr.left.value, FieldRef)
+    assert expr.left.value.name == "array_field"
+
+
+def test_negative_path_index_rejected():
+    with pytest.raises(FilterParseError, match="non-negative"):
+        parse_expr("array_field[-1] == 1")
