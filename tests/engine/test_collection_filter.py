@@ -616,6 +616,121 @@ def test_search_dynamic_array_index_filter(col_dynamic, flush):
     assert {hit["id"] for hit in results[0]} == {"a"}
 
 
+@pytest.mark.parametrize("flush", [False, True])
+@pytest.mark.parametrize("method", ["query", "get", "search"])
+def test_dynamic_nested_path_across_reads(col_dynamic, flush, method):
+    col_dynamic.insert([
+        {
+            "id": "a",
+            "vec": [1.0, 0.0, 0.0, 0.0],
+            "age": 18,
+            "payload": {"items": [{"score": 2}]},
+        },
+        {
+            "id": "b",
+            "vec": [0.0, 1.0, 0.0, 0.0],
+            "age": 25,
+            "payload": {"items": [{"score": 0}]},
+        },
+        {
+            "id": "c",
+            "vec": [0.0, 0.0, 1.0, 0.0],
+            "age": 30,
+            "payload": {"items": []},
+        },
+    ])
+    if flush:
+        col_dynamic.flush()
+
+    expr = 'payload["items"][0]["score"] > 0'
+    if method == "query":
+        ids = {row["id"] for row in col_dynamic.query(expr)}
+    elif method == "get":
+        ids = {
+            row["id"]
+            for row in col_dynamic.get(["a", "b", "c"], expr=expr)
+        }
+    else:
+        ids = {
+            hit["id"]
+            for hit in col_dynamic.search(
+                [[1.0, 0.0, 0.0, 0.0]],
+                top_k=10,
+                metric_type="L2",
+                expr=expr,
+            )[0]
+        }
+
+    assert ids == {"a"}
+
+
+@pytest.mark.parametrize("flush", [False, True])
+@pytest.mark.parametrize(
+    "expr",
+    [
+        'payload["items"][99]["score"] > 0',
+        'payload["missing"][0] > 0',
+        'payload["items"][0]["missing"] == 1',
+        'category[0] == "t"',
+        "nullable[0] == 1",
+    ],
+)
+def test_dynamic_path_invalid_values_do_not_match(col_dynamic, flush, expr):
+    col_dynamic.insert([
+        {
+            "id": "a",
+            "vec": [1.0, 0.0, 0.0, 0.0],
+            "age": 18,
+            "category": "tech",
+            "payload": {"items": [{"score": 2}]},
+            "nullable": None,
+        },
+    ])
+    if flush:
+        col_dynamic.flush()
+
+    assert col_dynamic.query(expr) == []
+
+
+@pytest.mark.parametrize("flush", [False, True])
+@pytest.mark.parametrize(
+    "expr, expected_ids",
+    [
+        ("array_contains(array_field, 0)", {"a"}),
+        ("array_contains_all(array_field, [1, 2])", {"a", "b"}),
+        ("array_contains_any(array_field, [0, 9])", {"a"}),
+        ("array_length(array_field) == 0", {"c"}),
+    ],
+)
+def test_dynamic_array_functions_across_storage(
+    col_dynamic, flush, expr, expected_ids
+):
+    col_dynamic.insert([
+        {
+            "id": "a",
+            "vec": [1.0, 0.0, 0.0, 0.0],
+            "age": 18,
+            "array_field": [0, 1, 2],
+        },
+        {
+            "id": "b",
+            "vec": [0.0, 1.0, 0.0, 0.0],
+            "age": 25,
+            "array_field": [1, 2],
+        },
+        {
+            "id": "c",
+            "vec": [0.0, 0.0, 1.0, 0.0],
+            "age": 30,
+            "array_field": [],
+        },
+    ])
+    if flush:
+        col_dynamic.flush()
+
+    assert {row["id"] for row in col_dynamic.query(expr)} == expected_ids
+
+
 def test_get_with_meta_filter(col_dynamic):
     _populate_dynamic(col_dynamic)
     out = col_dynamic.get(
