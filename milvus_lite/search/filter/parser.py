@@ -36,15 +36,14 @@ from milvus_lite.search.filter.ast import (
     InOp,
     IntLit,
     IntervalLit,
-    ArrayAccessOp,
     ArrayContainsOp,
     ArrayLengthOp,
     IsNullOp,
-    JsonAccess,
     LikeOp,
     ListLit,
     Literal,
     MetaAccess,
+    PathAccess,
     Not,
     Or,
     StringLit,
@@ -244,7 +243,10 @@ class Parser:
             )
         self._consume()  # ]
 
-        return MetaAccess(key=key_tok.value, pos=meta_tok.pos)
+        base = MetaAccess(key=key_tok.value, pos=meta_tok.pos)
+        if self._peek().kind == TokenKind.LBRACKET:
+            return self._parse_path_suffix(base, meta_tok.pos)
+        return base
 
     def _parse_is_null_tail(self, left: Expr) -> Expr:
         """`<field> IS NULL` or `<field> IS NOT NULL`.
@@ -415,61 +417,40 @@ class Parser:
         )
 
     def _parse_bracket_access(self, ident_tok: Token) -> Expr:
-        """``field["key"]``, ``field["a"]["b"]`` (JSON path) or ``field[N]`` (array index).
+        """Parse one or more string-key / integer-index suffixes."""
+        return self._parse_path_suffix(
+            FieldRef(name=ident_tok.text, pos=ident_tok.pos),
+            ident_tok.pos,
+        )
 
-        The IDENT has already been consumed; we expect '[' (STRING|INT) ']'.
-        For string keys, chained bracket access is supported.
-        """
-        self._consume()  # '['
-        key_tok = self._peek()
-        if key_tok.kind == TokenKind.STRING:
+    def _parse_path_suffix(self, base: Expr, pos: int) -> Expr:
+        parts: list[str | int] = []
+        while self._peek().kind == TokenKind.LBRACKET:
             self._consume()
+            token = self._peek()
+            if token.kind == TokenKind.STRING:
+                parts.append(token.value)
+                self._consume()
+            elif token.kind == TokenKind.INT:
+                parts.append(token.value)
+                self._consume()
+            elif token.kind == TokenKind.SUB:
+                raise FilterParseError(
+                    "array index must be non-negative",
+                    self.source, token.pos,
+                )
+            else:
+                raise FilterParseError(
+                    "field access: expected string key or non-negative integer index",
+                    self.source, token.pos,
+                )
             if self._peek().kind != TokenKind.RBRACKET:
                 raise FilterParseError(
                     "field access: expected ']'",
                     self.source, self._peek().pos,
                 )
             self._consume()
-            # Collect chained keys: field["a"]["b"]["c"]
-            keys = [key_tok.value]
-            while self._peek().kind == TokenKind.LBRACKET:
-                self._consume()  # '['
-                next_key = self._peek()
-                if next_key.kind != TokenKind.STRING:
-                    raise FilterParseError(
-                        "chained JSON access: expected string key",
-                        self.source, next_key.pos,
-                    )
-                self._consume()
-                if self._peek().kind != TokenKind.RBRACKET:
-                    raise FilterParseError(
-                        "chained JSON access: expected ']'",
-                        self.source, self._peek().pos,
-                    )
-                self._consume()
-                keys.append(next_key.value)
-            return JsonAccess(
-                field_name=ident_tok.text,
-                keys=tuple(keys),
-                pos=ident_tok.pos,
-            )
-        if key_tok.kind == TokenKind.INT:
-            self._consume()
-            if self._peek().kind != TokenKind.RBRACKET:
-                raise FilterParseError(
-                    "array index: expected ']'",
-                    self.source, self._peek().pos,
-                )
-            self._consume()
-            return ArrayAccessOp(
-                field_name=ident_tok.text,
-                index=key_tok.value,
-                pos=ident_tok.pos,
-            )
-        raise FilterParseError(
-            f"field access: expected string key or integer index, got {key_tok.text!r}",
-            self.source, key_tok.pos,
-        )
+        return PathAccess(base=base, path=tuple(parts), pos=pos)
 
     def _parse_array_contains(self, func_tok: Token, mode: str) -> Expr:
         """``array_contains(field, value)`` or ``json_contains(field["key"], value)``."""
@@ -503,7 +484,7 @@ class Parser:
                 self.source, self._peek().pos,
             )
         self._consume()
-        return ArrayContainsOp(field=field, values=values, mode=mode, pos=func_tok.pos)
+        return ArrayContainsOp(value=field, values=values, mode=mode, pos=func_tok.pos)
 
     def _parse_array_length(self, func_tok: Token) -> Expr:
         """``array_length(field)`` — returns int, used in comparisons."""
@@ -521,7 +502,7 @@ class Parser:
                 self.source, self._peek().pos,
             )
         self._consume()
-        return ArrayLengthOp(field=FieldRef(name=field_tok.text, pos=field_tok.pos),
+        return ArrayLengthOp(value=FieldRef(name=field_tok.text, pos=field_tok.pos),
                              pos=func_tok.pos)
 
     def _parse_in_tail(self, left: Expr, negate: bool) -> Expr:

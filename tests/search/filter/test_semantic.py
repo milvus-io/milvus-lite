@@ -3,6 +3,7 @@
 import pytest
 
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
+from milvus_lite.search.filter.ast import MetaAccess, PathAccess
 from milvus_lite.search.filter.exceptions import FilterFieldError, FilterTypeError
 from milvus_lite.search.filter.parser import parse_expr
 from milvus_lite.search.filter.semantic import compile_expr
@@ -424,3 +425,24 @@ def test_normal_expression_still_arrow(schema_dynamic):
 def test_meta_with_like(schema_dynamic):
     c = compile_str('$meta["title"] like "AI%"', schema_dynamic)
     assert c.backend == "hybrid"
+
+
+def test_dynamic_array_path_compiles_to_python(schema_dynamic):
+    compiled = compile_str("array_field[0] < 1", schema_dynamic)
+    assert compiled.backend == "python"
+    assert isinstance(compiled.ast.left, PathAccess)
+    assert isinstance(compiled.ast.left.base, MetaAccess)
+
+
+def test_dynamic_array_functions_compile_to_python(schema_dynamic):
+    assert compile_str(
+        "array_contains(array_field, 1)", schema_dynamic
+    ).backend == "python"
+    assert compile_str(
+        "array_length(array_field) > 1", schema_dynamic
+    ).backend == "python"
+
+
+def test_path_unknown_field_rejected_without_dynamic(schema):
+    with pytest.raises(FilterFieldError, match="unknown field"):
+        compile_str("array_field[0] < 1", schema)

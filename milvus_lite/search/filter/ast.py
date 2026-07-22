@@ -194,21 +194,11 @@ class MetaAccess:
     pos: int
 
 
-# ── JSON field path access ────────────────────────────────────────────────
-
 @dataclass(frozen=True)
-class JsonAccess:
-    """``field_name["key"]`` or ``field_name["a"]["b"]`` — JSON path lookup.
-
-    Unlike MetaAccess (which is specifically for ``$meta["key"]``),
-    JsonAccess works on any JSON-typed schema field. The result type
-    is dynamic (not known until runtime). Forces python backend.
-
-    ``keys`` is a tuple of one or more string keys for chained access:
-    ``info["a"]["b"]`` → ``keys=("a", "b")``.
-    """
-    field_name: str
-    keys: Tuple[str, ...]
+class PathAccess:
+    """String-key and integer-index access on any value expression."""
+    base: "Expr"
+    path: Tuple[Union[str, int], ...]
     pos: int
 
 
@@ -257,7 +247,7 @@ class GeometryDWithinOp:
 @dataclass(frozen=True)
 class ArrayContainsOp:
     """``array_contains(field, value)`` / ``array_contains_all`` / ``array_contains_any``."""
-    field: FieldRef
+    value: "Expr"
     values: "Expr"  # single value or ListLit
     mode: str       # "any_one" | "all" | "any"
     pos: int
@@ -266,15 +256,7 @@ class ArrayContainsOp:
 @dataclass(frozen=True)
 class ArrayLengthOp:
     """``array_length(field)`` — returns the length of an array field."""
-    field: FieldRef
-    pos: int
-
-
-@dataclass(frozen=True)
-class ArrayAccessOp:
-    """``field[index]`` — integer index access on an array field."""
-    field_name: str
-    index: int
+    value: "Expr"
     pos: int
 
 
@@ -286,7 +268,7 @@ Expr = Union[
     FieldRef,
     CmpOp, InOp, And, Or, Not,
     ArithOp, LikeOp, IsNullOp,
-    MetaAccess, JsonAccess,
+    MetaAccess, PathAccess,
     TextMatchOp, GeometryOp, GeometryIsValidOp, GeometryDWithinOp,
-    ArrayContainsOp, ArrayLengthOp, ArrayAccessOp,
+    ArrayContainsOp, ArrayLengthOp,
 ]

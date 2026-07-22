@@ -50,6 +50,10 @@ from milvus_lite.adapter.grpc.translators.schema import (
 from milvus_lite.adapter.grpc.translators.search import parse_search_request
 from milvus_lite._version import get_version
 from milvus_lite.db import DEFAULT_DATABASE_NAME
+from milvus_lite.engine.projection import (
+    build_projection_plan,
+    projection_output_fields,
+)
 from milvus_lite.exceptions import CollectionNotFoundError, MilvusLiteError
 from milvus_lite.schema.types import DataType
 
@@ -430,10 +434,6 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     except (ValueError, TypeError):
                         pass
 
-            # Expand output_fields=["*"] → all schema field names
-            if output_fields and "*" in output_fields:
-                output_fields = [f.name for f in col.schema.fields]
-
             # Handle count(*) aggregation
             if output_fields and "count(*)" in output_fields:
                 expr = request.expr if request.expr else None
@@ -458,6 +458,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     output_fields=["count(*)"],
                 )
 
+            projection_plan = build_projection_plan(
+                output_fields, col.schema, api_kind="query"
+            )
+
             expr = request.expr if request.expr else None
             pks = self._extract_pks_from_expr(expr, col) if expr else None
             if pks is not None:
@@ -479,11 +483,14 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     rows,
                     col.schema,
                     output_fields=output_fields,
+                    projection_plan=projection_plan,
                     time_fields=time_fields,
                     timezone=col._effective_timezone(timezone),  # noqa: SLF001
                 ),
                 collection_name=col.name,
-                output_fields=output_fields or [],
+                output_fields=list(projection_output_fields(
+                    projection_plan, col.schema, include_primary=True
+                )) if output_fields is not None else [],
                 primary_field_name=col._pk_name,
             )
         except MilvusLiteError as e:
@@ -534,6 +541,9 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             group_size = parsed.get("group_size") or 1
             strict = parsed.get("group_size_strict") or False
             requested_output_fields = parsed["output_fields"]
+            response_projection_plan = build_projection_plan(
+                requested_output_fields, col.schema, api_kind="search"
+            )
             l2_func = parsed.get("rerank")
 
             internal_output_fields = []
@@ -642,6 +652,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 top_k=parsed["top_k"],
                 pk_name=col._pk_name,  # noqa: SLF001
                 output_fields=requested_output_fields,
+                projection_plan=response_projection_plan,
                 group_by_field=group_by_field,
                 time_fields=parsed.get("time_fields"),
                 timezone=col._effective_timezone(parsed.get("timezone")),  # noqa: SLF001
@@ -1133,6 +1144,9 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             top_level_l0_ranker = function_score.get("boost")
             top_level_l2_func = function_score.get("rerank")
             requested_output_fields = list(request.output_fields) or None
+            response_projection_plan = build_projection_plan(
+                requested_output_fields, col.schema, api_kind="search"
+            )
             hybrid_timezone = _extract_timezone(request.rank_params)
             hybrid_time_fields = _extract_time_fields(request.rank_params)
             output_timezone = hybrid_timezone
@@ -1262,6 +1276,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 top_k=rp["limit"],
                 pk_name=col._pk_name,  # noqa: SLF001
                 output_fields=output_fields,
+                projection_plan=response_projection_plan,
                 group_by_field=gb_field,
                 time_fields=output_time_fields,
                 timezone=col._effective_timezone(output_timezone),  # noqa: SLF001

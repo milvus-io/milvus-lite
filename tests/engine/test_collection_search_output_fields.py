@@ -196,3 +196,77 @@ def test_output_fields_with_filter_expr(col):
     # Only id=1 and id=3 are active.
     assert sorted(ids) == [1, 3]
     assert all(set(h["entity"].keys()) == {"title"} for h in res[0])
+
+
+@pytest.fixture
+def dynamic_col(tmp_path):
+    schema = CollectionSchema(
+        fields=[
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+            FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+            FieldSchema(name="text", dtype=DataType.VARCHAR),
+            FieldSchema(name="bucket", dtype=DataType.VARCHAR),
+        ],
+        enable_dynamic_field=True,
+    )
+    c = Collection("dynamic", str(tmp_path / "dynamic"), schema)
+    c.insert([{
+        "id": 1,
+        "vec": [0.0, 0.0],
+        "text": "foo",
+        "bucket": "one",
+        "page": 1,
+        "source": "test",
+    }])
+    yield c
+    c.close()
+
+
+@pytest.mark.parametrize("flush", [False, True])
+@pytest.mark.parametrize(
+    "fields, expected",
+    [
+        (["*"], {"text", "vec", "bucket", "page", "source"}),
+        (["$meta"], {"page", "source"}),
+        (["text", "$meta"], {"text", "page", "source"}),
+        (["text", "page"], {"text", "page"}),
+    ],
+)
+def test_dynamic_search_projection(dynamic_col, flush, fields, expected):
+    if flush:
+        dynamic_col.flush()
+    result = dynamic_col.search(
+        [[0.0, 0.0]], top_k=1, metric_type="L2", output_fields=fields
+    )
+    assert set(result[0][0]["entity"]) == expected
+
+
+def test_dynamic_star_projection_survives_group_by_injection(dynamic_col):
+    result = dynamic_col.search(
+        [[0.0, 0.0]],
+        top_k=1,
+        metric_type="L2",
+        output_fields=["*"],
+        group_by_field="bucket",
+    )
+    assert result[0][0]["entity"]["page"] == 1
+    assert result[0][0]["entity"]["source"] == "test"
+
+
+def test_dynamic_star_projection_survives_ranker_injection(dynamic_col):
+    ranker = {
+        "functions": [{
+            "name": "boost_all",
+            "params": {"reranker": "boost", "weight": 1.0},
+        }],
+        "params": {"boost_mode": "multiply", "function_mode": "multiply"},
+    }
+    result = dynamic_col.search(
+        [[0.0, 0.0]],
+        top_k=1,
+        metric_type="L2",
+        output_fields=["*"],
+        ranker=ranker,
+    )
+    assert result[0][0]["entity"]["page"] == 1
+    assert result[0][0]["entity"]["source"] == "test"
