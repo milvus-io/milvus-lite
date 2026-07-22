@@ -186,6 +186,21 @@ def test_close_and_delete_removes_files(wal_dir, wal_data_schema, wal_delta_sche
     assert not os.path.exists(delta_path)
 
 
+def test_close_and_delete_releases_writer_and_sink_references(
+    wal_dir, wal_data_schema, wal_delta_schema
+):
+    wal = WAL(wal_dir, wal_data_schema, wal_delta_schema, wal_number=1)
+    wal.write_insert(_make_data_batch(wal_data_schema))
+    wal.write_delete(_make_delta_batch(wal_delta_schema))
+
+    wal.close_and_delete()
+
+    assert wal._data_writer is None
+    assert wal._data_sink is None
+    assert wal._delta_writer is None
+    assert wal._delta_sink is None
+
+
 def test_close_and_delete_idempotent(wal_dir, wal_data_schema, wal_delta_schema):
     wal = WAL(wal_dir, wal_data_schema, wal_delta_schema, wal_number=1)
     wal.write_insert(_make_data_batch(wal_data_schema))

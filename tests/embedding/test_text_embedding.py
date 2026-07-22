@@ -4,6 +4,7 @@ Uses a mock EmbeddingProvider to avoid real API calls. Tests the full
 insert → auto-embed → search → auto-embed-query pipeline.
 """
 
+from contextlib import closing
 import tempfile
 from typing import List
 from unittest.mock import patch
@@ -111,8 +112,9 @@ class TestTextEmbeddingInsert:
 
     @patch("milvus_lite.embedding.factory.create_embedding_provider", side_effect=_mock_factory)
     def test_insert_auto_generates_vector(self, mock_create):
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=_make_schema())
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=_make_schema())
+        ) as col:
             pks = col.insert([
                 {"id": 1, "text": "hello world"},
                 {"id": 2, "text": "goodbye world"},
@@ -129,8 +131,9 @@ class TestTextEmbeddingInsert:
 
     @patch("milvus_lite.embedding.factory.create_embedding_provider", side_effect=_mock_factory)
     def test_different_texts_get_different_vectors(self, mock_create):
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=_make_schema())
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=_make_schema())
+        ) as col:
             col.insert([
                 {"id": 1, "text": "cats are fluffy"},
                 {"id": 2, "text": "dogs are loyal"},
@@ -157,8 +160,9 @@ class TestTextEmbeddingInsert:
                 params={"provider": "openai", "dimensions": 8},
             ),
         ])
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=schema)
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=schema)
+        ) as col:
             col.insert([{"id": 1, "text": None}])
             col.load()
             rows = col.query("id == 1", output_fields=["vec"], limit=1)
@@ -170,8 +174,9 @@ class TestTextEmbeddingSearch:
 
     @patch("milvus_lite.embedding.factory.create_embedding_provider", side_effect=_mock_factory)
     def test_search_with_text_query(self, mock_create):
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=_make_schema())
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=_make_schema())
+        ) as col:
             col.insert([
                 {"id": 1, "text": "machine learning"},
                 {"id": 2, "text": "deep learning"},
@@ -199,8 +204,9 @@ class TestTextEmbeddingSearch:
     @patch("milvus_lite.embedding.factory.create_embedding_provider", side_effect=_mock_factory)
     def test_search_with_vector_query(self, mock_create):
         """Passing a pre-computed vector should also work."""
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=_make_schema())
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=_make_schema())
+        ) as col:
             col.insert([
                 {"id": 1, "text": "hello"},
                 {"id": 2, "text": "world"},
@@ -229,8 +235,9 @@ class TestTextEmbeddingSearch:
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
             FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=8),
         ])
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d, schema=schema)
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(name="test", data_dir=d, schema=schema)
+        ) as col:
             col.insert([{"id": 1, "vec": [0.1] * 8}])
             col.create_index("vec", {
                 "index_type": "BRUTE_FORCE",

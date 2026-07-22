@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import shutil
 import uuid
@@ -15,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 from milvus_lite.index.files import parse_index_sidecar_name
+from milvus_lite.storage.paths import normalize_rel_path, persisted_rel_path
 
 
 SNAPSHOTS_DIRNAME = "snapshots"
@@ -104,10 +106,10 @@ def create_snapshot(
             "created_at": created_at,
             "created_seq": int(current_seq),
             "manifest_version": int(manifest_version),
-            "schema_file": os.path.join(
+            "schema_file": persisted_rel_path(
                 SNAPSHOTS_DIRNAME, SNAPSHOT_MANIFESTS_DIRNAME, snapshot_name, schema_filename
             ),
-            "manifest_file": os.path.join(
+            "manifest_file": persisted_rel_path(
                 SNAPSHOTS_DIRNAME, SNAPSHOT_MANIFESTS_DIRNAME, snapshot_name, manifest_filename
             ),
             "data_files": _copy_file_map(data_files),
@@ -139,6 +141,7 @@ def load_snapshot(collection_dir: str, snapshot_name: str) -> Dict[str, Any]:
         data = json.load(f)
     if not isinstance(data, dict):
         raise ValueError(f"snapshot metadata {path!r} must be an object")
+    _normalize_snapshot_paths(data)
     validate_snapshot_metadata(data)
     return data
 
@@ -188,6 +191,7 @@ def list_snapshots(collection_dir: str) -> List[Dict[str, Any]]:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
+                _normalize_snapshot_paths(data)
                 out.append(data)
         except (OSError, json.JSONDecodeError):
             continue
@@ -233,19 +237,19 @@ def collect_index_files(
             if sidecar is None:
                 continue
             if sidecar.source_stem in stems:
-                rels.append(os.path.join("indexes", entry))
+                rels.append(persisted_rel_path("indexes", entry))
         if rels:
             out[partition] = sorted(rels)
     return out
 
 
 def _validate_rel_path(path: str, allowed_prefixes: Tuple[str, ...]) -> None:
-    if not path or os.path.isabs(path):
+    if not path or path.startswith("/"):
         raise ValueError(f"snapshot path must be relative: {path!r}")
-    normalized = os.path.normpath(path)
+    normalized = posixpath.normpath(path)
     if normalized != path or normalized in {".", ".."}:
         raise ValueError(f"snapshot path is not normalized: {path!r}")
-    parts = normalized.split(os.sep)
+    parts = normalized.split("/")
     if any(part in {"", ".", ".."} for part in parts):
         raise ValueError(f"snapshot path contains invalid component: {path!r}")
     if parts[0] not in allowed_prefixes:
@@ -257,7 +261,7 @@ def _validate_rel_path(path: str, allowed_prefixes: Tuple[str, ...]) -> None:
 def _validate_path_component(value: str, label: str) -> None:
     if value in {".", ".."} or os.path.isabs(value):
         raise ValueError(f"snapshot {label} is invalid: {value!r}")
-    if os.path.normpath(value) != value or os.sep in value:
+    if os.path.normpath(value) != value or "/" in value or "\\" in value:
         raise ValueError(f"snapshot {label} is invalid: {value!r}")
 
 
@@ -281,7 +285,23 @@ def _fsync_dir(path: str) -> None:
 
 
 def _copy_file_map(values: Dict[str, List[str]]) -> Dict[str, List[str]]:
-    return {str(k): list(v) for k, v in values.items() if v}
+    return {
+        str(k): [normalize_rel_path(rel) for rel in v]
+        for k, v in values.items()
+        if v
+    }
+
+
+def _normalize_snapshot_paths(data: Dict[str, Any]) -> None:
+    for key in ("schema_file", "manifest_file"):
+        value = data.get(key)
+        if isinstance(value, str):
+            data[key] = normalize_rel_path(value)
+
+    for key in ("data_files", "delta_files", "index_files"):
+        values = data.get(key)
+        if isinstance(values, dict):
+            data[key] = _copy_file_map(values)
 
 
 def _merge_refs(target: Dict[str, set[str]], values: Any) -> None:
@@ -293,4 +313,4 @@ def _merge_refs(target: Dict[str, set[str]], values: Any) -> None:
         bucket = target.setdefault(partition, set())
         for rel in rels:
             if isinstance(rel, str):
-                bucket.add(rel)
+                bucket.add(normalize_rel_path(rel))

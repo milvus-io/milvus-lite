@@ -21,7 +21,7 @@ Format (one schema = one JSON file):
       ]
     }
 
-Atomic write: dump to ``path + ".tmp"`` then ``os.rename`` over the target.
+Atomic write: dump to ``path + ".tmp"`` then ``os.replace`` over the target.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def save_schema(
     collection_name: str,
     path: str,
 ) -> None:
-    """Serialize *schema* to *path* atomically (write-tmp + rename)."""
+    """Serialize *schema* to *path* atomically (write-tmp + replace)."""
     payload: dict[str, Any] = {
         "collection_name": collection_name,
         "schema_format_version": SCHEMA_FORMAT_VERSION,

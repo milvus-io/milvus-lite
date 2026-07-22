@@ -1,5 +1,6 @@
 """Tests for GitHub issue fixes #1-#7."""
 
+from contextlib import closing
 import tempfile
 
 import numpy as np
@@ -98,8 +99,9 @@ def test_ip_distance_sign():
         FieldSchema(name="id", dtype=LDT.INT64, is_primary=True),
         FieldSchema(name="vec", dtype=LDT.FLOAT_VECTOR, dim=4),
     ])
-    with tempfile.TemporaryDirectory() as d:
-        col = Collection(name="ip_test", data_dir=d, schema=schema)
+    with tempfile.TemporaryDirectory() as d, closing(
+        Collection(name="ip_test", data_dir=d, schema=schema)
+    ) as col:
         col.insert([
             {"id": 1, "vec": [1, 0, 0, 0]},
             {"id": 2, "vec": [0, 1, 0, 0]},

@@ -13,7 +13,7 @@ This is the most fundamental constraint of the entire system:
 - **Data Files (Parquet)**: Never modified after writing, only deleted entirely during Compaction
 - **Delta Log (Parquet)**: Never modified after writing, deleted entirely after Compaction consumes them
 - **WAL Files**: Append-only writing, deleted entirely after successful flush
-- **Manifest**: The only state file updated through atomic replacement (write-tmp + rename)
+- **Manifest**: The only state file updated through atomic replacement (write-tmp + replace)
 - **No mutable auxiliary files** (no bitmaps, no sidecar files)
 
 ### Insert Data and Delete Records Are Separated
@@ -577,7 +577,7 @@ The Manifest organizes file lists by Partition; WAL and `_seq` are shared at the
 
 #### Atomic Update
 
-Atomicity is guaranteed through **write-tmp + rename**:
+Atomicity is guaranteed through **write-tmp + replace**:
 
 ```python
 class Manifest:
@@ -590,14 +590,14 @@ class Manifest:
         self.active_wal = {"data": None, "delta": None}
 
     def save(self):
-        """Atomic update: write temporary file → rename"""
+        """Atomic update: write temporary file → replace"""
         self.version += 1
         tmp_path = self.path + ".tmp"
         with open(tmp_path, "w") as f:
             json.dump(self.to_dict(), f)
             f.flush()
             os.fsync(f.fileno())
-        os.rename(tmp_path, self.path)  # Atomic operation
+        os.replace(tmp_path, self.path)  # Atomic overwrite
 
     @classmethod
     def load(cls, data_dir: str) -> "Manifest":
@@ -608,7 +608,7 @@ class Manifest:
         return cls(data_dir)  # First-time creation
 ```
 
-`os.rename` is an atomic operation on POSIX file systems — you either see the old manifest or the new one, never a half-written state.
+`os.replace` atomically overwrites the destination on supported local file systems, including when the destination already exists on Windows.
 
 #### Update Timing
 
@@ -919,7 +919,7 @@ root_dir/                                   # DB root directory
 - **WAL** → Collection-level shared, not split by Partition
 
 Data files and Delta Logs have a lifecycle of: **create → immutable → delete entirely**, no exceptions.
-`manifest.json` and `schema.json` are updated through **write-tmp + rename** atomic replacement.
+`manifest.json` and `schema.json` are updated through **write-tmp + replace** atomic replacement.
 
 ## 8. Code Directory Structure
 

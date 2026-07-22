@@ -11,6 +11,7 @@ Covers:
 
 import math
 import os
+from contextlib import closing
 import tempfile
 
 import numpy as np
@@ -214,8 +215,9 @@ class TestBM25EndToEnd:
 
     def test_basic_bm25_search(self):
         """Insert documents, search by text, verify relevance ordering."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "machine learning algorithms"),
                 self._record(2, "deep learning neural networks"),
@@ -241,8 +243,9 @@ class TestBM25EndToEnd:
 
     def test_text_query_search(self):
         """Search using text string directly (auto-tokenized)."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "python programming language"),
                 self._record(2, "java programming language"),
@@ -263,8 +266,9 @@ class TestBM25EndToEnd:
 
     def test_no_match(self):
         """Query with terms not in any document returns empty."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "hello world")])
 
             query_tf = compute_tf([term_to_id("nonexistent")])
@@ -278,8 +282,9 @@ class TestBM25EndToEnd:
 
     def test_search_after_flush(self):
         """BM25 search works on flushed segments."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "hello world"),
                 self._record(2, "hello there"),
@@ -296,8 +301,9 @@ class TestBM25EndToEnd:
 
     def test_search_with_filter(self):
         """BM25 search respects scalar filter expression."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "hello world"),
                 self._record(2, "hello there"),
@@ -317,8 +323,9 @@ class TestBM25EndToEnd:
             assert 3 in hit_ids
 
     def test_search_with_scalar_index_filter(self, monkeypatch):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d, with_age=True)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d, with_age=True)
+        ) as col:
             col.insert([
                 self._record(1, "hello world", age=18),
                 self._record(2, "hello there", age=25),
@@ -346,8 +353,9 @@ class TestBM25EndToEnd:
 
     def test_search_output_fields(self):
         """output_fields controls which fields appear in entity."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "hello world")])
 
             results = col.search(
@@ -363,8 +371,9 @@ class TestBM25EndToEnd:
 
     def test_upsert_dedup(self):
         """BM25 search respects upsert dedup (latest seq wins)."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "old text about cats")])
             col.insert([self._record(1, "new text about dogs")])
 
@@ -389,8 +398,9 @@ class TestBM25EndToEnd:
 
     def test_delete_excluded(self):
         """Deleted documents are excluded from BM25 search."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "hello world"),
                 self._record(2, "hello there"),
@@ -409,8 +419,9 @@ class TestBM25EndToEnd:
 
     def test_multiple_queries(self):
         """Multiple query vectors in a single search call."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "python programming"),
                 self._record(2, "java programming"),
@@ -428,8 +439,9 @@ class TestBM25EndToEnd:
 
     def test_distance_is_negative_score(self):
         """BM25 distance is negative score (smaller = more relevant)."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "hello hello hello")])
 
             results = col.search(

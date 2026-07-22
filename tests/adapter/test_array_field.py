@@ -8,6 +8,7 @@ Covers:
 5. gRPC: pymilvus create collection with ARRAY + insert + query
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -45,51 +46,58 @@ class TestArrayEngine:
         return col
 
     def test_insert_and_query_array(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query("id >= 1", output_fields=["tags", "scores"])
             assert len(rows) == 3
             assert rows[0]["tags"] == ["python", "ai"]
             assert rows[1]["scores"] == [80, 91, 75]
 
     def test_array_contains(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query('array_contains(tags, "python")')
             ids = {r["id"] for r in rows}
             assert ids == {1, 3}
 
     def test_array_contains_all(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query('array_contains_all(tags, ["python", "ai"])')
             ids = {r["id"] for r in rows}
             assert ids == {1, 3}
 
     def test_array_contains_any(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query('array_contains_any(tags, ["java", "ml"])')
             ids = {r["id"] for r in rows}
             assert ids == {2, 3}
 
     def test_array_length(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query("array_length(scores) >= 2")
             ids = {r["id"] for r in rows}
             assert ids == {1, 2}
 
     def test_array_index_access(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query("scores[0] >= 80")
             ids = {r["id"] for r in rows}
             assert ids == {1, 2}
 
     def test_array_combined_filter(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             rows = col.query('array_contains(tags, "python") and array_length(scores) >= 2')
             ids = {r["id"] for r in rows}
             assert ids == {1}

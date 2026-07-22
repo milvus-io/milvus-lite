@@ -16,7 +16,7 @@ Atomic update protocol (save):
     1. dump payload to manifest.json.tmp
     2. fsync the tmp file
     3. if manifest.json exists, copy it → manifest.json.prev (overwriting)
-    4. os.rename(manifest.json.tmp, manifest.json)
+    4. os.replace(manifest.json.tmp, manifest.json)
     5. fsync the parent directory
 
 Load fallback:
@@ -40,6 +40,7 @@ from milvus_lite.exceptions import (
     PartitionAlreadyExistsError,
     PartitionNotFoundError,
 )
+from milvus_lite.storage.paths import normalize_rel_path
 
 if TYPE_CHECKING:
     from milvus_lite.index.spec import IndexSpec
@@ -84,15 +85,15 @@ class Manifest:
         Steps:
             1. write manifest.json.tmp + fsync
             2. cp manifest.json → manifest.json.prev (if it exists)
-            3. rename manifest.json.tmp → manifest.json  ← commit point
-            4. bump in-memory version (only after rename succeeds)
-            5. fsync parent dir so the rename is durable
+            3. replace manifest.json.tmp → manifest.json  ← commit point
+            4. bump in-memory version (only after replace succeeds)
+            5. fsync parent dir so the replacement is durable
 
         Crash safety:
-            - If any step before rename fails, .tmp is cleaned up and
+            - If any step before replace fails, .tmp is cleaned up and
               in-memory version is unchanged.
             - The .prev copy failing is non-fatal: we still proceed with
-              the rename because the .tmp is already durable. Losing the
+              the replace because the .tmp is already durable. Losing the
               backup is better than failing the entire save.
         """
         os.makedirs(self._data_dir, exist_ok=True)
@@ -114,15 +115,15 @@ class Manifest:
                 os.fsync(f.fileno())
 
             # 2. copy current → prev (best-effort; failure here is non-fatal
-            #    because the .tmp is already durable and the rename can proceed)
+            #    because the .tmp is already durable and the replace can proceed)
             if os.path.exists(target_path):
                 try:
                     shutil.copy2(target_path, prev_path)
                 except OSError as e:
                     logger.warning("manifest: failed to create .prev backup: %s", e)
 
-            # 3. atomic rename — this is the commit point
-            os.rename(tmp_path, target_path)
+            # 3. atomic replacement — this is the commit point
+            os.replace(tmp_path, target_path)
         except BaseException:
             # Clean up orphaned .tmp on any failure before commit point.
             try:
@@ -134,7 +135,7 @@ class Manifest:
         # 4. Version bump only after the commit point succeeds.
         self._version = new_version
 
-        # 5. fsync the directory so the rename survives a crash
+        # 5. fsync the directory so the replacement survives a crash
         try:
             dir_fd = os.open(self._data_dir, os.O_RDONLY)
             try:
@@ -211,8 +212,14 @@ class Manifest:
                     f"manifest at {path!r} partition {name!r} contents not a dict"
                 )
             m._partitions[name] = {
-                "data_files": list(contents.get("data_files", [])),
-                "delta_files": list(contents.get("delta_files", [])),
+                "data_files": [
+                    normalize_rel_path(path)
+                    for path in contents.get("data_files", [])
+                ],
+                "delta_files": [
+                    normalize_rel_path(path)
+                    for path in contents.get("delta_files", [])
+                ],
             }
         if DEFAULT_PARTITION not in m._partitions:
             m._partitions[DEFAULT_PARTITION] = {"data_files": [], "delta_files": []}
@@ -270,7 +277,9 @@ class Manifest:
         """Register a new data Parquet file for *partition*."""
         if partition not in self._partitions:
             raise PartitionNotFoundError(partition)
-        self._partitions[partition]["data_files"].append(filename)
+        self._partitions[partition]["data_files"].append(
+            normalize_rel_path(filename)
+        )
 
     def remove_data_files(self, partition: str, filenames: List[str]) -> None:
         """Unregister data files (used by compaction in Phase 6)."""
@@ -279,7 +288,7 @@ class Manifest:
         bucket = self._partitions[partition]["data_files"]
         for fn in filenames:
             try:
-                bucket.remove(fn)
+                bucket.remove(normalize_rel_path(fn))
             except ValueError:
                 pass  # already absent — idempotent
 
@@ -298,7 +307,9 @@ class Manifest:
     def add_delta_file(self, partition: str, filename: str) -> None:
         if partition not in self._partitions:
             raise PartitionNotFoundError(partition)
-        self._partitions[partition]["delta_files"].append(filename)
+        self._partitions[partition]["delta_files"].append(
+            normalize_rel_path(filename)
+        )
 
     def remove_delta_files(self, partition: str, filenames: List[str]) -> None:
         if partition not in self._partitions:
@@ -306,7 +317,7 @@ class Manifest:
         bucket = self._partitions[partition]["delta_files"]
         for fn in filenames:
             try:
-                bucket.remove(fn)
+                bucket.remove(normalize_rel_path(fn))
             except ValueError:
                 pass
 

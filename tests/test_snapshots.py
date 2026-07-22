@@ -40,6 +40,8 @@ def test_create_list_drop_snapshot(tmp_path, schema):
         assert snap["collection_name"] == "docs"
         assert snap["created_seq"] >= 2
         assert snap["data_files"]
+        assert snap["schema_file"] == "snapshots/manifests/snap_a/schema.json"
+        assert snap["manifest_file"] == "snapshots/manifests/snap_a/manifest.json"
         assert db.list_snapshots("docs")[0]["name"] == "snap_a"
 
         db.drop_snapshot("docs", "snap_a")

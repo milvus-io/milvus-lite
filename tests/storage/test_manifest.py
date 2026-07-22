@@ -80,6 +80,34 @@ def test_save_creates_prev_on_second_save(tmp_path):
     assert m2.has_partition("p1")
 
 
+def test_save_overwrites_existing_manifest_with_windows_rename_semantics(
+    tmp_path, monkeypatch
+):
+    """A repeated save must not rely on POSIX-only rename overwrite behavior."""
+    m = Manifest(str(tmp_path))
+    m.save()
+
+    real_rename = os.rename
+
+    def windows_rename(src, dst):
+        if os.path.exists(dst):
+            raise FileExistsError(
+                183,
+                "Cannot create a file when that file already exists",
+                dst,
+            )
+        return real_rename(src, dst)
+
+    monkeypatch.setattr(os, "rename", windows_rename)
+
+    m.add_partition("p1")
+    m.save()
+
+    reloaded = Manifest.load(str(tmp_path))
+    assert reloaded.version == 2
+    assert reloaded.has_partition("p1")
+
+
 def test_version_increments_per_save(tmp_path):
     m = Manifest(str(tmp_path))
     for expected in (1, 2, 3, 4):
@@ -263,6 +291,17 @@ def test_data_files_persist_through_save_load(tmp_path):
     m2 = Manifest.load(str(tmp_path))
     assert m2.get_data_files(DEFAULT_PARTITION) == ["data/a.parquet"]
     assert m2.get_delta_files(DEFAULT_PARTITION) == ["delta/b.parquet"]
+
+
+def test_file_paths_are_normalized_for_cross_platform_persistence(tmp_path):
+    m = Manifest(str(tmp_path))
+    m.add_data_file(DEFAULT_PARTITION, r"data\a.parquet")
+    m.add_delta_file(DEFAULT_PARTITION, r"delta\b.parquet")
+    m.save()
+
+    reloaded = Manifest.load(str(tmp_path))
+    assert reloaded.get_data_files(DEFAULT_PARTITION) == ["data/a.parquet"]
+    assert reloaded.get_delta_files(DEFAULT_PARTITION) == ["delta/b.parquet"]
 
 
 def test_saved_json_has_expected_keys(tmp_path):
