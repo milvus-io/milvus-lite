@@ -121,7 +121,15 @@ def parse_search_request(request, default_metric_type: str = "COSINE") -> dict:
     if strict_group_size is not None:
         strict_group_size = bool(strict_group_size)
 
-    function_score = decode_hybrid_function_score(request.function_score)
+    function_score_message = getattr(request, "function_score", None)
+    function_score = decode_hybrid_function_score(function_score_message)
+    function_chains = list(getattr(request, "function_chains", ()))
+    descriptor = getattr(request, "DESCRIPTOR", None)
+    fields_by_name = getattr(descriptor, "fields_by_name", {})
+    has_function_score = False
+    if "function_score" in fields_by_name:
+        has_function_score = request.HasField("function_score")
+    order_by_fields = raw_params.get("order_by_fields")
     timezone = raw_params.get("timezone")
     if not isinstance(timezone, str) or not timezone:
         timezone = None
@@ -147,6 +155,9 @@ def parse_search_request(request, default_metric_type: str = "COSINE") -> dict:
         "round_decimal": int(raw_params.get("round_decimal", -1)),
         "ranker": function_score.get("boost"),
         "rerank": function_score.get("rerank"),
+        "function_chains": function_chains,
+        "has_function_score": has_function_score,
+        "order_by_fields": order_by_fields,
         "timezone": timezone,
         "time_fields": time_fields,
     }

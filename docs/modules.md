@@ -12,6 +12,7 @@ milvus_lite/
 ├── analyzer/        # Analyzer layer (Phase 11): text analysis (BM25 tokenizer)
 ├── embedding/       # Embedding layer: vectorization model abstraction + OpenAI provider
 ├── rerank/          # Rerank layer: re-ranking model abstraction + Cohere provider
+├── function/        # Function Chain representation, validation, compilation, and runtime
 ├── adapter/         # Adapter layer (Phase 10): gRPC -> engine protocol translation
 ├── db.py            # DB layer: multi-Collection lifecycle management (MilvusLite)
 ├── server_manager.py # pymilvus integration entry point (background gRPC server lifecycle)
@@ -113,13 +114,44 @@ lite-v2/
 │   │   ├── decay.py                #   decay function
 │   │   └── factory.py              #   create_rerank_provider factory
 │   │
+│   ├── function/                   # == Function Chain runtime ==
+│   │   ├── __init__.py             #   Runtime exports
+│   │   ├── builder.py              #   Legacy FunctionScore chain builders
+│   │   ├── chain.py                #   FuncChain ordered operator execution
+│   │   ├── compiler.py             #   NEW: validated public plan -> existing FuncChain runtime
+│   │   ├── dataframe.py            #   Chunked row container for function execution
+│   │   ├── operator.py             #   Function operator base class
+│   │   ├── repr.py                 #   NEW: protocol-neutral public Function Chain representation
+│   │   ├── types.py                #   Function stages, context, and expression types
+│   │   ├── validator.py            #   NEW: L2 stage, schema, dependency, and expression validation
+│   │   ├── expr/                   #   Function expressions
+│   │   │   ├── __init__.py         #   Expression exports
+│   │   │   ├── bm25_expr.py        #   BM25 expression
+│   │   │   ├── decay_expr.py       #   Numeric and timestamp decay expression
+│   │   │   ├── embedding_expr.py   #   Embedding provider expression
+│   │   │   ├── num_combine.py      #   NEW: public numeric combination expression
+│   │   │   ├── rerank_model.py     #   Rerank provider expression
+│   │   │   ├── round_decimal.py    #   Decimal rounding expression
+│   │   │   └── score_combine.py    #   Legacy score combination expression
+│   │   └── ops/                    #   Function operators
+│   │       ├── __init__.py         #   Operator exports
+│   │       ├── boost_op.py         #   Boost operator
+│   │       ├── group_by_op.py      #   Group-by operator
+│   │       ├── limit_op.py         #   Limit and offset operator
+│   │       ├── map_op.py           #   Expression map operator
+│   │       ├── merge_op.py         #   Multi-input merge operator
+│   │       ├── select_op.py        #   Projection operator
+│   │       └── sort_op.py          #   Sort and optional tie-break operator
+│   │
 │   ├── adapter/                    # == Adapter layer (Phase 10) ==
 │   │   └── grpc/                   # -- gRPC -> engine protocol translation --
 │   │       ├── __init__.py
 │   │       ├── server.py           #   run_server(data_dir, host, port)
 │   │       ├── servicer.py         #   MilvusServicer — all RPC implementations
+│   │       ├── function_chain.py   #   Search-specific planning, execution, and projection
 │   │       ├── errors.py           #   MilvusLiteError -> grpc Status mapping
 │   │       ├── translators/
+│   │       │   ├── function_chain.py # Function Chain protobuf decoding
 │   │       │   ├── schema.py       #   Milvus FieldSchema <-> MilvusLite FieldSchema
 │   │       │   ├── records.py      #   FieldData (columnar) <-> list[dict] (row-wise) transposition
 │   │       │   ├── search.py       #   SearchRequest parsing
@@ -174,6 +206,11 @@ lite-v2/
 │   │       ├── test_python_backend.py   #   Same as above, row-level implementation comparison
 │   │       └── test_e2e.py         #   Differential testing: arrow == python; hybrid == python
 │   │
+│   ├── function/
+│   │   ├── test_function_chain_proto.py      # Public protobuf decoding and immutable representation
+│   │   ├── test_function_chain_validator.py  # Schema-aware public Function Chain validation
+│   │   └── test_public_function_chain.py     # Public compilation, expressions, and execution
+│   │
 │   ├── index/                      #   -- Phase 9 index subsystem unit tests --
 │   │   ├── test_brute_force_index.py    #   BruteForceIndex self-correctness
 │   │   ├── test_faiss_hnsw.py           #   FaissHnswIndex (skipif faiss not available)
@@ -182,6 +219,7 @@ lite-v2/
 │   │   └── test_index_persistence.py    #   .idx file save/load round-trip
 │   │
 │   ├── adapter/                    #   -- Phase 10 gRPC adapter layer tests --
+│   │   ├── test_function_chain.py       # Ordinary Search public L2 Function Chain integration
 │   │   ├── test_grpc_server_startup.py  #   server startup / shutdown / pymilvus.connect
 │   │   ├── test_grpc_translators_schema.py
 │   │   ├── test_grpc_translators_records.py  #   FieldData <-> records bidirectional round-trip
@@ -379,7 +417,18 @@ except ImportError:
 - Index implementations may depend on external libraries (FAISS / hnswlib / USearch); a separate package facilitates optional extras isolation
 - Future extensions may include Sparse / Binary / multi-vector types; a separate package facilitates evolution
 
-### 3.6 adapter/ — Adapter Layer (Phase 10)
+### 3.6 function/ — Function Chain Runtime
+
+**Responsibility boundary**: Represents, validates, and compiles public Function Chains into the existing protocol-independent `FuncChain` runtime.
+
+| Submodule | Responsibility | Core Content |
+|--------|------|---------|
+| `repr.py` | Protocol-neutral representation | Frozen chain, operator, expression, column, and literal representations plus dependency metadata |
+| `validator.py` | Schema-aware validation | L2 stage validation, dependency planning, expression contracts, query-count checks, and credential rejection |
+| `compiler.py` | Runtime compilation | Converts a validated public plan into existing `MapOp`, `SortOp`, `LimitOp`, and expression instances |
+| `expr/num_combine.py` | Numeric combination | Public `multiply`, `sum`, `max`, `min`, `avg`, and `weighted` score combination modes |
+
+### 3.7 adapter/ — Adapter Layer (Phase 10)
 
 **Responsibility boundary**: Translates external protocols (gRPC / HTTP / ...) into engine API calls.
 **Only translates, never adds capability**. Each RPC maps to one engine method; unsupported RPCs return UNIMPLEMENTED. See `plan/grpc-adapter-design.md`.
@@ -388,7 +437,9 @@ except ImportError:
 |--------|------|---------|
 | `grpc/server.py` | gRPC server lifecycle | `run_server(data_dir, host, port, max_workers)` |
 | `grpc/servicer.py` | RPC dispatcher | `MilvusServicer(MilvusServiceServicer)` — implements quickstart subset RPCs, unimplemented ones return UNIMPLEMENTED |
+| `grpc/function_chain.py` | Search Function Chain orchestration | Prepares one public L2 chain, merges hidden inputs, executes independent query chunks, and projects final results |
 | `grpc/errors.py` | Error code translation | `to_grpc_status(MilvusLiteError) → grpc Status code + reason` |
+| `grpc/translators/function_chain.py` | Function Chain protobuf decoding | Converts optional PyMilvus Function Chain messages into the protocol-neutral representation without requiring them in older protobuf packages |
 | `grpc/translators/schema.py` | Schema translation | `milvus_to_milvus_lite_schema(milvus.CollectionSchema) → CollectionSchema`, reverse likewise |
 | `grpc/translators/records.py` | Column-row transposition | `fields_data_to_records(fields_data, num_rows) → List[dict]`, reverse `records_to_fields_data(records, schema, output_fields)` |
 | `grpc/translators/search.py` | Search request parsing | `parse_search_params(search_params_kv)`, `decode_search_query(request)` |
@@ -2561,7 +2612,8 @@ def run_server(
 | `Delete(ids=)` | `col.delete(pks, partition)` | |
 | `Delete(filter=)` | `col.query(filter) -> extract pk -> col.delete` | |
 | `Query` | `col.query(expr, output_fields, partition_names, limit)` or `col.get(pks, ...)` | id expression goes to get |
-| `Search` | `col.search(query_vectors, top_k, metric_type, partition_names, expr, output_fields)` | translator: search.py + result.py |
+| `Search` | `col.search(query_vectors, top_k, metric_type, partition_names, expr, output_fields)` | translator: search.py + result.py; supports exactly one public L2 Function Chain; public Function Chains reject FunctionScore/ranker and `order_by_fields` before ANN Search |
+| `HybridSearch` | existing hybrid rerank path | Public Function Chains are unsupported and rejected |
 | `CreateIndex` | `col.create_index(field, params)` | translator: index.py |
 | `DropIndex` | `col.drop_index(field)` | |
 | `DescribeIndex` | `col.get_index_info()` | |

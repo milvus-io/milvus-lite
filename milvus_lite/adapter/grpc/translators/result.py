@@ -103,7 +103,7 @@ def build_search_result_data(
 
     # Determine emitted output_fields list. pymilvus's parser uses
     # this to know which non-pk fields to attach to each hit.
-    if projection_plan is not None and projection_plan.requested_fields is not None:
+    if projection_plan is not None:
         emitted = list(projection_output_fields(
             projection_plan, schema, include_primary=False
         ))

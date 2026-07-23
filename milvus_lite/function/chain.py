@@ -9,7 +9,7 @@ from typing import List
 
 from milvus_lite.function.dataframe import DataFrame
 from milvus_lite.function.operator import Operator
-from milvus_lite.function.types import FuncContext, FunctionExpr
+from milvus_lite.function.types import ID_FIELD, FuncContext, FunctionExpr
 
 
 class FuncChain:
@@ -75,7 +75,7 @@ class FuncChain:
         """Add a :class:`SortOp`."""
         from milvus_lite.function.ops.sort_op import SortOp
 
-        return self.add(SortOp(column, desc))
+        return self.add(SortOp(column, desc, tie_break_col=ID_FIELD))
 
     def limit(self, limit: int, offset: int = 0) -> FuncChain:
         """Add a :class:`LimitOp`."""

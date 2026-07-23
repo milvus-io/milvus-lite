@@ -48,13 +48,18 @@ from milvus_lite.adapter.grpc.translators.schema import (
     milvus_to_milvus_lite_schema,
 )
 from milvus_lite.adapter.grpc.translators.search import parse_search_request
+from milvus_lite.adapter.grpc.function_chain import hit_score_for_chain
 from milvus_lite._version import get_version
 from milvus_lite.db import DEFAULT_DATABASE_NAME
 from milvus_lite.engine.projection import (
     build_projection_plan,
     projection_output_fields,
 )
-from milvus_lite.exceptions import CollectionNotFoundError, MilvusLiteError
+from milvus_lite.exceptions import (
+    CollectionNotFoundError,
+    MilvusLiteError,
+    SchemaValidationError,
+)
 from milvus_lite.schema.types import DataType
 
 if TYPE_CHECKING:
@@ -114,20 +119,7 @@ def _extract_time_fields(pairs) -> str | None:
     return None
 
 
-def _hit_score_for_chain(hit: dict, metric_type: str) -> float:
-    """Convert Collection.search() hit distance to chain score.
-
-    FuncChain follows Milvus merge semantics: incoming scores keep the
-    metric's natural direction, and MergeOp decides whether it needs to
-    normalize, direction-convert, and sort ascending or descending.
-    """
-    distance = hit["distance"]
-    metric = metric_type.upper()
-    if metric == "BM25":
-        return -distance
-    if metric in {"COSINE", "IP", "L2"}:
-        return distance
-    return distance
+_hit_score_for_chain = hit_score_for_chain
 
 
 class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
@@ -519,6 +511,11 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         the same metric the index was built with.
         """
         try:
+            from milvus_lite.adapter.grpc.function_chain import (
+                execute_search_function_chain,
+                merge_internal_output_fields,
+                prepare_search_function_chain,
+            )
             from milvus_lite.function.builder import build_hybrid_function_score_chain
             from milvus_lite.function.dataframe import DataFrame
             from milvus_lite.function.types import ID_FIELD, SCORE_FIELD
@@ -545,25 +542,39 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 requested_output_fields, col.schema, api_kind="search"
             )
             l2_func = parsed.get("rerank")
+            public_chain_plan = prepare_search_function_chain(
+                function_chains=parsed["function_chains"],
+                has_function_score=parsed["has_function_score"],
+                schema=col.schema,
+                num_queries=len(parsed["query_vectors"]),
+                requested_output_fields=requested_output_fields,
+                order_by_fields=parsed.get("order_by_fields"),
+            )
 
-            internal_output_fields = []
-            if l2_func is not None:
-                if group_by_field is not None:
-                    internal_output_fields.append(group_by_field)
-                internal_output_fields.extend(
-                    list(getattr(l2_func, "input_field_names", []))
+            if public_chain_plan is not None:
+                search_output_fields = merge_internal_output_fields(
+                    requested_output_fields,
+                    public_chain_plan.required_fields,
                 )
-            if requested_output_fields is None:
-                search_output_fields = None
             else:
-                search_output_fields = list(dict.fromkeys(
-                    requested_output_fields + internal_output_fields
-                ))
+                internal_output_fields = []
+                if l2_func is not None:
+                    if group_by_field is not None:
+                        internal_output_fields.append(group_by_field)
+                    internal_output_fields.extend(
+                        list(getattr(l2_func, "input_field_names", []))
+                    )
+                if requested_output_fields is None:
+                    search_output_fields = None
+                else:
+                    search_output_fields = list(dict.fromkeys(
+                        requested_output_fields + internal_output_fields
+                    ))
 
             search_top_k = parsed["top_k"]
             search_offset = parsed.get("offset", 0)
             search_group_by_field = group_by_field
-            if l2_func is not None:
+            if public_chain_plan is None and l2_func is not None:
                 search_top_k = parsed["top_k"] + search_offset
                 if group_by_field is not None:
                     search_top_k = max(search_top_k, parsed["top_k"] * group_size * 3)
@@ -589,14 +600,23 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 timezone=parsed.get("timezone"),
             )
 
-            if l2_func is not None:
+            if public_chain_plan is not None:
+                results = execute_search_function_chain(
+                    public_chain_plan,
+                    results,
+                    metric_type=parsed["metric_type"],
+                    schema=col.schema,
+                    primary_field_name=col._pk_name,  # noqa: SLF001
+                    group_by_field=group_by_field,
+                )
+            elif l2_func is not None:
                 chunks = []
                 for query_hits in results:
                     chunk = []
                     for hit in query_hits:
                         flat = {
                             ID_FIELD: hit["id"],
-                            SCORE_FIELD: _hit_score_for_chain(
+                            SCORE_FIELD: hit_score_for_chain(
                                 hit, parsed["metric_type"]
                             ),
                         }
@@ -1123,6 +1143,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         (MergeOp + Sort/GroupBy + Limit + Select).
         """
         try:
+            if list(getattr(request, "function_chains", ())):
+                raise SchemaValidationError(
+                    "function_chains is not supported for hybrid search yet"
+                )
             from milvus_lite.adapter.grpc.reranker import parse_rank_params
             from milvus_lite.function.builder import (
                 build_hybrid_function_score_chain,
@@ -1218,7 +1242,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     for hit in query_hits:
                         flat = {
                             ID_FIELD: hit["id"],
-                            SCORE_FIELD: _hit_score_for_chain(hit, metric_type),
+                            SCORE_FIELD: hit_score_for_chain(hit, metric_type),
                         }
                         flat.update(hit.get("entity", {}))
                         chunk.append(flat)
