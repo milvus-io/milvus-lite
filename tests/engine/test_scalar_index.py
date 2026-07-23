@@ -484,7 +484,7 @@ def test_load_rejects_scalar_sidx_field_metadata_mismatch(tmp_path):
 
         index_dir = data_dir / "partitions" / "_default" / "indexes"
         sidx_path = next(index_dir.glob("*.age.inverted.sidx"))
-        with pa.memory_map(str(sidx_path), "r") as source:
+        with pa.OSFile(str(sidx_path), "rb") as source:
             table = pa.ipc.RecordBatchFileReader(source).read_all()
         metadata = dict(table.schema.metadata or {})
         metadata[b"field_name"] = b"category"
@@ -511,7 +511,7 @@ def test_load_rejects_scalar_sidx_dtype_metadata_mismatch(tmp_path):
 
         index_dir = data_dir / "partitions" / "_default" / "indexes"
         sidx_path = next(index_dir.glob("*.age.inverted.sidx"))
-        with pa.memory_map(str(sidx_path), "r") as source:
+        with pa.OSFile(str(sidx_path), "rb") as source:
             table = pa.ipc.RecordBatchFileReader(source).read_all()
         metadata = dict(table.schema.metadata or {})
         metadata[b"dtype"] = b"VARCHAR"

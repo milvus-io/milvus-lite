@@ -1,5 +1,6 @@
 """Rerank provider, schema, and decay math tests."""
 
+from contextlib import closing
 import tempfile
 from typing import List, Optional
 from unittest.mock import patch
@@ -181,9 +182,11 @@ class TestMockRerankProvider:
 class TestSearchWithoutSchemaRerank:
     @patch("milvus_lite.embedding.factory.create_embedding_provider", side_effect=_mock_embedding_factory)
     def test_no_rerank_function_normal_search(self, mock_emb):
-        with tempfile.TemporaryDirectory() as d:
-            col = Collection(name="test", data_dir=d,
-                             schema=_make_schema_no_rerank())
+        with tempfile.TemporaryDirectory() as d, closing(
+            Collection(
+                name="test", data_dir=d, schema=_make_schema_no_rerank()
+            )
+        ) as col:
             col.insert([
                 {"id": 1, "text": "machine learning"},
                 {"id": 2, "text": "deep learning"},

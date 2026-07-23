@@ -9,6 +9,7 @@ Covers:
 
 import os
 import struct
+from contextlib import closing
 import tempfile
 
 import pyarrow as pa
@@ -140,8 +141,9 @@ class TestBM25AutoGeneration:
         return {"id": id, "text": text, "vec": [1.0, 0.0, 0.0, 0.0]}
 
     def test_insert_auto_generates_sparse(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 self._record(1, "hello world"),
                 self._record(2, "machine learning algorithms"),
@@ -150,8 +152,9 @@ class TestBM25AutoGeneration:
 
     def test_sparse_vector_content(self):
         """Verify the auto-generated sparse vector has correct term hashes."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             records = [self._record(1, "hello world")]
 
             # Use ingestion chain (replaces removed _apply_bm25_functions)
@@ -165,8 +168,9 @@ class TestBM25AutoGeneration:
             assert sv[term_to_id("world")] == 1.0
 
     def test_repeated_terms_tf(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             records = [self._record(1, "test test test")]
             from milvus_lite.function.dataframe import DataFrame
             col._ingestion_chain.execute(DataFrame.from_records(records))
@@ -174,8 +178,9 @@ class TestBM25AutoGeneration:
             assert sv[term_to_id("test")] == 3.0
 
     def test_empty_text(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             records = [self._record(1, "")]
             from milvus_lite.function.dataframe import DataFrame
             col._ingestion_chain.execute(DataFrame.from_records(records))
@@ -211,16 +216,17 @@ class TestBM25AutoGeneration:
                     ),
                 ],
             )
-            col = Collection(name="test", data_dir=d, schema=schema)
-            records = [{"id": 1, "text": None, "vec": [1.0, 0.0, 0.0, 0.0]}]
-            from milvus_lite.function.dataframe import DataFrame
-            col._ingestion_chain.execute(DataFrame.from_records(records))
-            assert records[0]["sv"] == {}
+            with closing(Collection(name="test", data_dir=d, schema=schema)) as col:
+                records = [{"id": 1, "text": None, "vec": [1.0, 0.0, 0.0, 0.0]}]
+                from milvus_lite.function.dataframe import DataFrame
+                col._ingestion_chain.execute(DataFrame.from_records(records))
+                assert records[0]["sv"] == {}
 
     def test_flush_preserves_sparse(self):
         """Insert + flush → sparse vector in Parquet."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 self._record(1, "hello world"),
                 self._record(2, "foo bar baz"),
@@ -249,8 +255,9 @@ class TestBM25AutoGeneration:
 
     def test_get_returns_sparse(self):
         """get() returns the sparse vector field."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "hello world")])
 
             results = col.get([1])
@@ -259,8 +266,9 @@ class TestBM25AutoGeneration:
             assert sv_raw is not None
 
     def test_multiple_inserts(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([self._record(1, "first document")])
             col.insert([self._record(2, "second document")])
             col.insert([self._record(3, "third one")])

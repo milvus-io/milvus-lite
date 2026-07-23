@@ -79,6 +79,7 @@ from milvus_lite.schema.validation import (
     validate_record,
     validate_schema,
 )
+from milvus_lite.storage.paths import normalize_rel_path, persisted_rel_path
 from milvus_lite.schema.timestamptz import validate_timezone_name
 from milvus_lite.search.assembler import assemble_candidates
 from milvus_lite.search.executor import execute_search
@@ -1370,7 +1371,9 @@ class Collection:
             for root, dirs, files in os.walk(partition_dir, topdown=False):
                 for filename in files:
                     abs_path = os.path.join(root, filename)
-                    rel = os.path.relpath(abs_path, partition_dir)
+                    rel = normalize_rel_path(
+                        os.path.relpath(abs_path, partition_dir)
+                    )
                     if rel in pinned:
                         continue
                     os.remove(abs_path)
@@ -1543,7 +1546,7 @@ class Collection:
                         continue
                     pinned = snapshot_index_refs.get(partition, set())
                     for entry in os.listdir(index_dir):
-                        rel = os.path.join("indexes", entry)
+                        rel = persisted_rel_path("indexes", entry)
                         if entry.endswith(suffix) and rel not in pinned:
                             try:
                                 os.remove(os.path.join(index_dir, entry))
@@ -1960,7 +1963,7 @@ class Collection:
                 sidecar = parse_index_sidecar_name(entry)
                 if sidecar is None:
                     continue
-                rel = os.path.join("indexes", entry)
+                rel = persisted_rel_path("indexes", entry)
                 if rel in pinned_indexes:
                     continue
                 if (

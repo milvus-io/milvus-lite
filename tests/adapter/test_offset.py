@@ -9,6 +9,7 @@ Covers:
 6. offset beyond result count → empty
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -39,8 +40,9 @@ class TestOffsetEngine:
         return col
 
     def test_search_offset_skips_top(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             # Without offset
             no_off = col.search([[10, 0, 0, 0]], top_k=10)
             # With offset=3, top_k=5: should skip best 3, return next 5
@@ -52,21 +54,24 @@ class TestOffsetEngine:
                 assert h["id"] not in top3_ids
 
     def test_search_offset_zero_is_default(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             r1 = col.search([[10, 0, 0, 0]], top_k=5, offset=0)
             r2 = col.search([[10, 0, 0, 0]], top_k=5)
             assert [h["id"] for h in r1[0]] == [h["id"] for h in r2[0]]
 
     def test_search_offset_beyond_count(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search([[10, 0, 0, 0]], top_k=5, offset=100)
             assert results[0] == []
 
     def test_query_offset(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             all_rows = col.query("id >= 0")
             offset_rows = col.query("id >= 0", limit=3, offset=2)
             assert len(offset_rows) == 3
@@ -76,8 +81,9 @@ class TestOffsetEngine:
             assert offset_ids == all_ids[2:5]
 
     def test_query_offset_without_limit(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             all_rows = col.query("id >= 0")
             offset_rows = col.query("id >= 0", offset=5)
             assert len(offset_rows) == len(all_rows) - 5

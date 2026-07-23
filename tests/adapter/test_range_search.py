@@ -9,6 +9,7 @@ Covers:
 6. Range search returns empty when no matches
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -44,8 +45,9 @@ class TestRangeSearchEngine:
 
     def test_range_both_bounds(self):
         """COSINE range keeps radius < score <= range_filter."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=10,
@@ -59,8 +61,9 @@ class TestRangeSearchEngine:
 
     def test_range_only_radius(self):
         """Only radius keeps COSINE scores greater than radius."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=10,
@@ -72,8 +75,9 @@ class TestRangeSearchEngine:
 
     def test_range_only_range_filter(self):
         """Only range_filter keeps COSINE scores up to range_filter."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=10,
@@ -85,8 +89,9 @@ class TestRangeSearchEngine:
 
     def test_range_empty_result(self):
         """No results in range."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=10,
@@ -98,8 +103,9 @@ class TestRangeSearchEngine:
 
     def test_range_respects_limit(self):
         """Limit still applies after range filtering."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=1,
@@ -111,8 +117,9 @@ class TestRangeSearchEngine:
 
     def test_no_range_backward_compat(self):
         """Without range params, behaves normally."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=5,

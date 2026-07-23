@@ -8,6 +8,7 @@ Covers:
 - Non-vector anns_field raises SchemaValidationError
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -60,8 +61,9 @@ def _mixed_collection(tmpdir):
 class TestAnnsField:
     def test_default_uses_float_vector(self):
         """anns_field=None defaults to the FLOAT_VECTOR field."""
-        with tempfile.TemporaryDirectory() as d:
-            col = _mixed_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            _mixed_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=2,
@@ -72,8 +74,9 @@ class TestAnnsField:
 
     def test_explicit_float_vector(self):
         """Explicitly naming the FLOAT_VECTOR field works."""
-        with tempfile.TemporaryDirectory() as d:
-            col = _mixed_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            _mixed_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1.0, 0.0, 0.0, 0.0]],
                 top_k=2,
@@ -85,8 +88,9 @@ class TestAnnsField:
 
     def test_sparse_search_works(self):
         """Searching on SPARSE_FLOAT_VECTOR with BM25 works."""
-        with tempfile.TemporaryDirectory() as d:
-            col = _mixed_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            _mixed_collection(d)
+        ) as col:
             # Use text query (auto-tokenized by BM25 function's analyzer)
             results = col.search(
                 query_vectors=["hello"],
@@ -101,8 +105,9 @@ class TestAnnsField:
 
     def test_invalid_field_name(self):
         """anns_field pointing to a non-existent field raises error."""
-        with tempfile.TemporaryDirectory() as d:
-            col = _mixed_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            _mixed_collection(d)
+        ) as col:
             with pytest.raises(SchemaValidationError, match="not found"):
                 col.search(
                     query_vectors=[[1.0, 0.0, 0.0, 0.0]],
@@ -112,8 +117,9 @@ class TestAnnsField:
 
     def test_non_vector_field(self):
         """anns_field pointing to a scalar field raises error."""
-        with tempfile.TemporaryDirectory() as d:
-            col = _mixed_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            _mixed_collection(d)
+        ) as col:
             with pytest.raises(SchemaValidationError, match="not a vector"):
                 col.search(
                     query_vectors=[[1.0, 0.0, 0.0, 0.0]],
@@ -130,13 +136,15 @@ class TestAnnsField:
                     FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
                 ],
             )
-            col = Collection(name="compat", data_dir=d, schema=schema)
-            col.insert([
-                {"id": 1, "vec": [1.0, 0.0, 0.0, 0.0]},
-            ])
-            results = col.search(
-                query_vectors=[[1.0, 0.0, 0.0, 0.0]],
-                top_k=1,
-            )
-            assert len(results) == 1
-            assert results[0][0]["id"] == 1
+            with closing(
+                Collection(name="compat", data_dir=d, schema=schema)
+            ) as col:
+                col.insert([
+                    {"id": 1, "vec": [1.0, 0.0, 0.0, 0.0]},
+                ])
+                results = col.search(
+                    query_vectors=[[1.0, 0.0, 0.0, 0.0]],
+                    top_k=1,
+                )
+                assert len(results) == 1
+                assert results[0][0]["id"] == 1

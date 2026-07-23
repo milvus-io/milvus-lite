@@ -27,6 +27,7 @@ from milvus_lite.engine.operation import DeleteOp, InsertOp, Operation
 from milvus_lite.index.files import parse_index_sidecar_name
 from milvus_lite.storage.delta_index import DeltaIndex
 from milvus_lite.storage.memtable import MemTable
+from milvus_lite.storage.paths import persisted_rel_path
 from milvus_lite.storage.snapshots import snapshot_references
 from milvus_lite.storage.wal import WAL
 
@@ -223,7 +224,7 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
         if os.path.isdir(data_subdir):
             ref = referenced_data.get(partition, set())
             for fn in os.listdir(data_subdir):
-                rel = os.path.join("data", fn)
+                rel = persisted_rel_path("data", fn)
                 if rel not in ref:
                     abs_path = os.path.join(partition_dir, rel)
                     try:
@@ -237,7 +238,7 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
         if os.path.isdir(delta_subdir):
             ref = referenced_delta.get(partition, set())
             for fn in os.listdir(delta_subdir):
-                rel = os.path.join("delta", fn)
+                rel = persisted_rel_path("delta", fn)
                 if rel not in ref:
                     abs_path = os.path.join(partition_dir, rel)
                     try:
@@ -254,7 +255,7 @@ def _cleanup_orphan_files(data_dir: str, manifest: "Manifest") -> None:
                 sidecar = parse_index_sidecar_name(fn)
                 if sidecar is None:
                     continue
-                rel = os.path.join("indexes", fn)
+                rel = persisted_rel_path("indexes", fn)
                 if sidecar.source_stem not in valid_stems and rel not in referenced_index.get(partition, set()):
                     abs_path = os.path.join(index_subdir, fn)
                     try:

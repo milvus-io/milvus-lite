@@ -49,7 +49,7 @@ lite-v2/
 │   │   ├── data_file.py            #   Data Parquet stateless functions (read/write, naming, seq range parsing)
 │   │   ├── delta_file.py           #   Delta Parquet stateless functions (read/write)
 │   │   ├── delta_index.py          #   DeltaIndex (in-memory pk->max_delete_seq, gc_below)
-│   │   └── manifest.py             #   Manifest (JSON, tmp+rename atomic, .prev backup, Partition file lists)
+│   │   └── manifest.py             #   Manifest (JSON, tmp+replace atomic, .prev backup, Partition file lists)
 │   │
 │   ├── engine/                     # == Engine layer ==
 │   │   ├── __init__.py             #   Exports: Collection
@@ -212,7 +212,7 @@ The following constraints apply across all modules and represent design consensu
 2. **MemTable cross-clear must be seq-aware**. When put and delete clear each other's buffer entries for the same pk, they **must** first compare `_seq`; only when the current operation's `_seq` is larger does it override; otherwise the current operation is discarded. See section 9.7.
 3. **Tombstone GC rule**: A `delta_index` entry `pk -> delete_seq` can be discarded if and only if there is no data file with `seq_min <= delete_seq` that contains that pk. MVP uses the conservative version: all tombstones below the global `min_active_data_seq` can be dropped. See sections 9.9 / 9.16.
 4. **Files are immutable**. All disk files (data Parquet, delta Parquet, WAL Arrow, Manifest) can only be deleted as a whole once written; in-place modification is not allowed. This is the foundation of the LSM approach.
-5. **Manifest is the single source of truth**, atomically updated (write-tmp + rename), with `manifest.json.prev` as a fallback against one serialization failure. See section 9.10.
+5. **Manifest is the single source of truth**, atomically updated (write-tmp + replace), with `manifest.json.prev` as a fallback against one serialization failure. See section 9.10.
 
 **Concurrency Model:**
 
@@ -736,7 +736,7 @@ def save_schema(
 ) -> None:
     """Serialize Schema as JSON and write to path.
     JSON structure includes collection_name (self-describing) + version + fields + enable_dynamic_field.
-    Uses write-tmp + rename for atomic writing."""
+    Uses write-tmp + replace for atomic writing."""
 
 
 def load_schema(path: str) -> Tuple[str, CollectionSchema]:
@@ -1036,7 +1036,7 @@ class DeltaIndex:
 
 ```python
 class Manifest:
-    """Global state snapshot file, updated via atomic replacement (write-tmp + rename).
+    """Global state snapshot file, updated via atomic replacement (write-tmp + replace).
 
     Records current _seq, Schema version, each Partition's file list, active WAL.
     Is the system's only source of truth (architecture invariant section 5).
@@ -1057,8 +1057,8 @@ class Manifest:
         Steps:
         1. Serialize to manifest.json.tmp
         2. If manifest.json exists, cp it -> manifest.json.prev (overwriting old .prev)
-        3. os.rename(manifest.json.tmp, manifest.json)  <- atomic switch
-        4. fsync data_dir directory to ensure rename is durable
+        3. os.replace(manifest.json.tmp, manifest.json)  <- atomic switch
+        4. fsync data_dir directory to ensure replacement is durable
 
         Failure semantics: Step 1 failure -> orphaned tmp file, no impact;
                           Step 2 failure -> raises exception, disk still has previous successful save's manifest;

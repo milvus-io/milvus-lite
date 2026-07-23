@@ -9,6 +9,7 @@ Covers:
 6. group_by with BM25 search
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -55,8 +56,9 @@ class TestGroupByEngine:
         return col
 
     def test_group_by_varchar(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=3,
@@ -71,8 +73,9 @@ class TestGroupByEngine:
             assert len(set(categories)) == 3  # all different
 
     def test_group_by_int64(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=4,
@@ -85,8 +88,9 @@ class TestGroupByEngine:
             assert len(set(group_ids)) == len(group_ids)  # all unique
 
     def test_group_size(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=2,
@@ -104,8 +108,9 @@ class TestGroupByEngine:
                 assert c <= 2
 
     def test_strict_group_size_true(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=10,
@@ -122,8 +127,9 @@ class TestGroupByEngine:
                 assert c == 3  # strict: all groups must have exactly 3
 
     def test_strict_group_size_false(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=10,
@@ -138,8 +144,9 @@ class TestGroupByEngine:
             assert len(categories) >= 3
 
     def test_no_group_by_backward_compat(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=5,
