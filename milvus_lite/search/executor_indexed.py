@@ -32,7 +32,7 @@ is essentially free (just stores a numpy reference).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -59,6 +59,7 @@ def execute_search_with_index(
     compiled_filter: Optional["CompiledExpr"] = None,
     output_fields: Optional[List[str]] = None,
     indexed_filter_plan: Optional["IndexedFilterPlan"] = None,
+    project_record_fn: Optional[Callable[[dict], dict]] = None,
 ) -> List[List[dict]]:
     """Per-source recall + global merge search path.
 
@@ -246,7 +247,9 @@ def execute_search_with_index(
     n_segments = len(in_scope_segments)
 
     # ── 4. global merge + entity projection ─────────────────────
-    if output_fields is None:
+    if project_record_fn is not None:
+        project_entity = project_record_fn
+    elif output_fields is None:
         def project_entity(record: dict) -> dict:
             return {
                 k: v for k, v in record.items()

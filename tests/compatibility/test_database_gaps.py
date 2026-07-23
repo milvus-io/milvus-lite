@@ -5,6 +5,7 @@ The naming cases execute only the upstream
 """
 
 import shutil
+import sys
 import tempfile
 
 import pytest
@@ -79,7 +80,23 @@ def database_client(grpc_server):
         "Milvus Lite currently accepts filesystem-safe names"
     ),
 )
-@pytest.mark.parametrize("database_name", ["12-s", "12 s", "(mn)", "中文", "%$#", "  "])
+@pytest.mark.parametrize(
+    "database_name",
+    [
+        "12-s",
+        "12 s",
+        "(mn)",
+        "中文",
+        "%$#",
+        pytest.param(
+            "  ",
+            marks=pytest.mark.skipif(
+                sys.platform == "win32",
+                reason="Windows cannot represent a directory name of only spaces",
+            ),
+        ),
+    ],
+)
 def test_create_database_rejects_upstream_invalid_names(
     database_client,
     database_name,

@@ -384,9 +384,12 @@ def meta_table():
         "id": ["a", "b", "c", "d", "e"],
         "age": [10, 25, 30, 50, 70],
         "$meta": [
-            '{"category": "tech", "priority": 1, "score": 0.5}',
-            '{"category": "news", "priority": 5, "score": 0.7}',
-            '{"category": "tech", "priority": 3, "score": 0.9}',
+            '{"category": "tech", "priority": 1, "score": 0.5, '
+            '"array_field": [0, 1, 2], "object_field": {"items": [{"score": 1}]}}',
+            '{"category": "news", "priority": 5, "score": 0.7, '
+            '"array_field": [1, 2, 3], "object_field": {"items": [{"score": 0}]}}',
+            '{"category": "tech", "priority": 3, "score": 0.9, '
+            '"array_field": []}',
             None,                                        # null $meta
             '{"category": "blog", "score": 0.2}',         # missing 'priority'
         ],
@@ -447,6 +450,27 @@ def test_meta_arithmetic(meta_table, schema_dynamic):
     result = evaluate(compiled, meta_table)
     # 0.5*2=1.0 (no, strict >), 0.7*2=1.4 (yes), 0.9*2=1.8, null, 0.2*2=0.4
     assert result.to_pylist() == [False, True, True, False, False]
+
+
+@pytest.mark.parametrize(
+    "expression, expected",
+    [
+        ("array_field[0] < 1", [True, False, False, False, False]),
+        ("array_contains(array_field, 2)", [True, True, False, False, False]),
+        ("array_length(array_field) == 3", [True, True, False, False, False]),
+        ('object_field["items"][0]["score"] > 0', [True, False, False, False, False]),
+    ],
+)
+def test_dynamic_path_and_array_evaluation(
+    meta_table, schema_dynamic, expression, expected
+):
+    from milvus_lite.search.filter.eval import evaluate
+
+    compiled = compile_expr(
+        parse_expr(expression), schema_dynamic, source=expression
+    )
+    assert compiled.backend == "python"
+    assert evaluate(compiled, meta_table).to_pylist() == expected
 
 
 def test_meta_null_meta_column(meta_table, schema_dynamic):

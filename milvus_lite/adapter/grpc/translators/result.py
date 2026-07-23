@@ -26,6 +26,10 @@ from typing import List, Optional
 from pymilvus.grpc_gen import schema_pb2
 
 from milvus_lite.adapter.grpc.translators.records import records_to_fields_data
+from milvus_lite.engine.projection import (
+    ProjectionPlan,
+    projection_output_fields,
+)
 from milvus_lite.schema.types import CollectionSchema, DataType
 
 
@@ -35,6 +39,7 @@ def build_search_result_data(
     top_k: int,
     pk_name: str,
     output_fields: Optional[List[str]] = None,
+    projection_plan: Optional[ProjectionPlan] = None,
     group_by_field: Optional[str] = None,
     time_fields: Optional[List[str] | str] = None,
     timezone: str | None = None,
@@ -91,13 +96,18 @@ def build_search_result_data(
         flat_records,
         schema,
         output_fields=output_fields,
+        projection_plan=projection_plan,
         time_fields=time_fields,
         timezone=timezone,
     )
 
     # Determine emitted output_fields list. pymilvus's parser uses
     # this to know which non-pk fields to attach to each hit.
-    if output_fields is None:
+    if projection_plan is not None:
+        emitted = list(projection_output_fields(
+            projection_plan, schema, include_primary=False
+        ))
+    elif output_fields is None:
         emitted = [f.name for f in schema.fields if f.name != pk_name]
     else:
         # Preserve user order; drop pk if user listed it (it's

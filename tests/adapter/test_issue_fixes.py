@@ -1,5 +1,6 @@
 """Tests for GitHub issue fixes #1-#7."""
 
+from contextlib import closing
 import tempfile
 
 import numpy as np
@@ -98,8 +99,9 @@ def test_ip_distance_sign():
         FieldSchema(name="id", dtype=LDT.INT64, is_primary=True),
         FieldSchema(name="vec", dtype=LDT.FLOAT_VECTOR, dim=4),
     ])
-    with tempfile.TemporaryDirectory() as d:
-        col = Collection(name="ip_test", data_dir=d, schema=schema)
+    with tempfile.TemporaryDirectory() as d, closing(
+        Collection(name="ip_test", data_dir=d, schema=schema)
+    ) as col:
         col.insert([
             {"id": 1, "vec": [1, 0, 0, 0]},
             {"id": 2, "vec": [0, 1, 0, 0]},
@@ -225,3 +227,79 @@ def test_raw_distance_semantics_match_milvus_server(milvus_client):
         assert [row[0] for row in actual] == [row[0] for row in metric_expected]
         for (_, distance), (_, expected_distance) in zip(actual, metric_expected):
             assert distance == pytest.approx(expected_distance)
+
+
+# ---------------------------------------------------------------------------
+# #347 / #348: dynamic wildcard output and array filters
+# ---------------------------------------------------------------------------
+
+def _create_dynamic_compat_collection(client, name):
+    schema = MilvusClient.create_schema(enable_dynamic_field=True)
+    schema.add_field("id", DataType.INT64, is_primary=True)
+    schema.add_field("text", DataType.VARCHAR, max_length=128)
+    schema.add_field("vec", DataType.FLOAT_VECTOR, dim=2)
+    client.create_collection(name, schema=schema)
+    client.insert(name, [{
+        "id": 1,
+        "text": "foo",
+        "vec": [0.0, 0.0],
+        "page": 1,
+        "source": "test",
+        "array_field": [0, 1, 2],
+    }])
+    index = client.prepare_index_params()
+    index.add_index(
+        field_name="vec", index_type="FLAT", metric_type="L2", params={}
+    )
+    client.create_index(name, index)
+    client.load_collection(name)
+
+
+@pytest.mark.parametrize(
+    "suffix, fields",
+    [
+        ("star", ["*"]),
+        ("meta", ["$meta"]),
+        ("mixed", ["text", "$meta"]),
+    ],
+)
+def test_dynamic_wildcard_and_meta_search_output(milvus_client, suffix, fields):
+    name = f"dynamic_output_347_{suffix}"
+    _create_dynamic_compat_collection(milvus_client, name)
+    result = milvus_client.search(
+        name,
+        data=[[0.0, 0.0]],
+        anns_field="vec",
+        search_params={"metric_type": "L2", "params": {}},
+        limit=1,
+        output_fields=fields,
+    )
+    entity = result[0][0]["entity"]
+    assert entity["page"] == 1
+    assert entity["source"] == "test"
+
+    rows = milvus_client.query(
+        name,
+        filter="id == 1",
+        output_fields=fields,
+        limit=1,
+    )
+    assert rows[0]["page"] == 1
+    assert rows[0]["source"] == "test"
+    milvus_client.drop_collection(name)
+
+
+def test_dynamic_array_filter_search(milvus_client):
+    name = "dynamic_array_filter_348"
+    _create_dynamic_compat_collection(milvus_client, name)
+    result = milvus_client.search(
+        name,
+        data=[[0.0, 0.0]],
+        anns_field="vec",
+        search_params={"metric_type": "L2", "params": {}},
+        limit=1,
+        filter="array_field[0] < 1",
+        output_fields=["array_field"],
+    )
+    assert result[0][0]["entity"]["array_field"] == [0, 1, 2]
+    milvus_client.drop_collection(name)

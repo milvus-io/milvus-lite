@@ -363,9 +363,10 @@ def test_search_function_chain_limit_changes_each_query_chunk(milvus_client):
     assert [len(chunk) for chunk in result] == [2, 2]
     assert [hit["id"] for hit in result[0]] == [2, 3]
     assert [hit["id"] for hit in result[1]] == [2, 3]
-    assert {"vector", "popularity", "title", "category"}.issubset(
+    assert {"popularity", "title", "category"}.issubset(
         result[0][0]["entity"]
     )
+    assert "vector" not in result[0][0]["entity"]
     assert "tmp_score" not in result[0][0]["entity"]
 
 

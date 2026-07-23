@@ -10,6 +10,7 @@ Covers:
 7. gRPC: search/query on auto_id collection
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -37,8 +38,9 @@ class TestAutoIdEngine:
 
     def test_insert_without_pk(self):
         """Insert records without pk field — IDs auto-generated."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 {"vec": [1, 0, 0, 0], "label": "a"},
                 {"vec": [0, 1, 0, 0], "label": "b"},
@@ -49,8 +51,9 @@ class TestAutoIdEngine:
 
     def test_multiple_inserts_increasing(self):
         """Multiple insert calls produce globally increasing IDs."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks1 = col.insert([{"vec": [1, 0, 0, 0], "label": "a"}])
             pks2 = col.insert([{"vec": [0, 1, 0, 0], "label": "b"}])
             pks3 = col.insert([{"vec": [0, 0, 1, 0], "label": "c"}])
@@ -60,8 +63,9 @@ class TestAutoIdEngine:
 
     def test_get_by_auto_id(self):
         """Can retrieve records by auto-generated ID."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 {"vec": [1, 0, 0, 0], "label": "hello"},
             ])
@@ -72,8 +76,9 @@ class TestAutoIdEngine:
 
     def test_search_on_auto_id_collection(self):
         """Search works on auto_id collection."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 {"vec": [1, 0, 0, 0], "label": "a"},
                 {"vec": [0, 1, 0, 0], "label": "b"},
@@ -86,8 +91,9 @@ class TestAutoIdEngine:
 
     def test_insert_with_pk_still_works(self):
         """User can still provide pk if they want (overrides auto)."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 {"id": 999, "vec": [1, 0, 0, 0], "label": "manual"},
             ])
@@ -95,8 +101,9 @@ class TestAutoIdEngine:
 
     def test_flush_preserves_auto_ids(self):
         """Auto-generated IDs survive flush."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             pks = col.insert([
                 {"vec": [1, 0, 0, 0], "label": "flushed"},
             ])
@@ -121,8 +128,9 @@ class TestAutoIdEngine:
             Collection(name="bad", data_dir="/tmp/bad", schema=schema)
 
     def test_num_entities_with_auto_id(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.insert([
                 {"vec": [1, 0, 0, 0], "label": "a"},
                 {"vec": [0, 1, 0, 0], "label": "b"},

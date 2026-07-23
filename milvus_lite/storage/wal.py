@@ -236,6 +236,14 @@ class WAL:
         if self._delta_sink is not None:
             _safe(self._delta_sink.close)
 
+        # Drop PyArrow/Python IO object references before unlinking. On
+        # Windows, a closed PyArrow writer may retain its underlying file
+        # handle until the writer object itself is released.
+        self._data_writer = None
+        self._data_sink = None
+        self._delta_writer = None
+        self._delta_sink = None
+
         # File deletion happens unconditionally — orphan WAL files are worse
         # than a noisy close. The manifest already says these are gone (we
         # only get here from flush Step 6, after manifest commit).

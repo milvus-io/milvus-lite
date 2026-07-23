@@ -17,6 +17,7 @@ Recovery contract:
     retry. We only verify "no torn state" for committed inserts.
 """
 
+import gc
 import os
 import shutil
 
@@ -26,6 +27,7 @@ import pytest
 from milvus_lite.engine.collection import Collection
 from milvus_lite.engine.flush import execute_flush
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
+from milvus_lite.storage.wal import WAL
 
 
 # ---------------------------------------------------------------------------
@@ -54,10 +56,12 @@ def _record(i, prefix="doc"):
 # ---------------------------------------------------------------------------
 
 def _simulate_crash(col):
-    """Drop the Collection reference without calling close().
+    """Release process-owned resources without committing pending state.
 
-    Important: do not let close() run via __del__ either. Python's GC may
-    or may not run __del__; we just stop using the object.
+    A real process crash closes every OS file handle but does not run
+    Collection.close(), flush the MemTable, or delete WAL files. Reproduce
+    that distinction explicitly so the simulation also works on Windows,
+    where open files cannot be removed during recovery.
 
     Stop the background executor (wait for any in-flight task to finish,
     then cancel pending ones) — a real process crash kills all threads
@@ -66,7 +70,47 @@ def _simulate_crash(col):
     """
     col._bg_closed = True
     col._bg_executor.shutdown(wait=True, cancel_futures=True)
+
+    wal_dir = col._wal.wal_dir
+    for wal in (
+        obj
+        for obj in gc.get_objects()
+        if isinstance(obj, WAL) and obj.wal_dir == wal_dir
+    ):
+        # Finalising the Arrow stream is slightly cleaner than a hard process
+        # death, but it preserves the WAL contents and, crucially, releases
+        # the same OS handles. Truncated-stream recovery has separate tests.
+        if wal._data_writer is not None:
+            wal._data_writer.close()
+        if wal._data_sink is not None and not wal._data_sink.closed:
+            wal._data_sink.close()
+        if wal._delta_writer is not None:
+            wal._delta_writer.close()
+        if wal._delta_sink is not None and not wal._delta_sink.closed:
+            wal._delta_sink.close()
+        wal._data_writer = None
+        wal._data_sink = None
+        wal._delta_writer = None
+        wal._delta_sink = None
+        wal._closed = True
+
     del col
+
+
+def test_simulate_crash_releases_wal_handles_without_deleting_files(
+    tmp_path, schema
+):
+    data_dir = str(tmp_path / "d")
+    col = Collection("c", data_dir, schema)
+    col.insert([_record(0)])
+
+    wal_path = col._wal.data_path
+    data_sink = col._wal._data_sink
+
+    _simulate_crash(col)
+
+    assert data_sink.closed
+    assert os.path.exists(wal_path)
 
 
 # ---------------------------------------------------------------------------

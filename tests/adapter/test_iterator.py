@@ -12,6 +12,7 @@ Covers:
 5. Engine: query(expr=None) returns all records
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -37,13 +38,13 @@ class TestQueryAllRecords:
                 FieldSchema(name="id", dtype=LDT.INT64, is_primary=True),
                 FieldSchema(name="vec", dtype=LDT.FLOAT_VECTOR, dim=4),
             ])
-            col = Collection(name="t", data_dir=d, schema=schema)
-            col.insert([
-                {"id": i, "vec": [float(i), 0, 0, 0]}
-                for i in range(10)
-            ])
-            results = col.query(None)
-            assert len(results) == 10
+            with closing(Collection(name="t", data_dir=d, schema=schema)) as col:
+                col.insert([
+                    {"id": i, "vec": [float(i), 0, 0, 0]}
+                    for i in range(10)
+                ])
+                results = col.query(None)
+                assert len(results) == 10
 
     def test_query_empty_string_returns_all(self):
         from milvus_lite.schema.types import (
@@ -56,13 +57,13 @@ class TestQueryAllRecords:
                 FieldSchema(name="id", dtype=LDT.INT64, is_primary=True),
                 FieldSchema(name="vec", dtype=LDT.FLOAT_VECTOR, dim=4),
             ])
-            col = Collection(name="t", data_dir=d, schema=schema)
-            col.insert([
-                {"id": i, "vec": [float(i), 0, 0, 0]}
-                for i in range(5)
-            ])
-            results = col.query("")
-            assert len(results) == 5
+            with closing(Collection(name="t", data_dir=d, schema=schema)) as col:
+                col.insert([
+                    {"id": i, "vec": [float(i), 0, 0, 0]}
+                    for i in range(5)
+                ])
+                results = col.query("")
+                assert len(results) == 5
 
     def test_query_none_with_limit(self):
         from milvus_lite.schema.types import (
@@ -75,13 +76,13 @@ class TestQueryAllRecords:
                 FieldSchema(name="id", dtype=LDT.INT64, is_primary=True),
                 FieldSchema(name="vec", dtype=LDT.FLOAT_VECTOR, dim=4),
             ])
-            col = Collection(name="t", data_dir=d, schema=schema)
-            col.insert([
-                {"id": i, "vec": [float(i), 0, 0, 0]}
-                for i in range(20)
-            ])
-            results = col.query(None, limit=5)
-            assert len(results) == 5
+            with closing(Collection(name="t", data_dir=d, schema=schema)) as col:
+                col.insert([
+                    {"id": i, "vec": [float(i), 0, 0, 0]}
+                    for i in range(20)
+                ])
+                results = col.query(None, limit=5)
+                assert len(results) == 5
 
 
 # ---------------------------------------------------------------------------

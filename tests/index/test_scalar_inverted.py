@@ -62,7 +62,7 @@ def test_load_rejects_unsupported_version(tmp_path):
     path = tmp_path / "age.sidx"
     idx.save(str(path))
 
-    with pa.memory_map(str(path), "r") as source:
+    with pa.OSFile(str(path), "rb") as source:
         table = pa.ipc.RecordBatchFileReader(source).read_all()
     metadata = dict(table.schema.metadata or {})
     metadata[b"milvus_lite.scalar_index.version"] = b"999"

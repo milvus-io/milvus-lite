@@ -6,6 +6,7 @@ Covers:
 - Engine integration: text_match in query() and search() with filter
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -170,8 +171,9 @@ class TestTextMatchEngine:
 
     def test_query_with_text_match(self):
         """text_match in query() filters correctly."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.query(
                 expr="text_match(text, 'python')",
                 output_fields=["text"],
@@ -181,8 +183,9 @@ class TestTextMatchEngine:
 
     def test_query_multi_token(self):
         """Multi-token text_match uses OR logic."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.query(
                 expr="text_match(text, 'python java')",
                 output_fields=["text"],
@@ -192,8 +195,9 @@ class TestTextMatchEngine:
 
     def test_text_match_combined_with_scalar(self):
         """text_match combined with scalar filter."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.query(
                 expr="text_match(text, 'learning') and id >= 3",
                 output_fields=["id"],
@@ -203,8 +207,9 @@ class TestTextMatchEngine:
 
     def test_text_match_with_dense_search(self):
         """text_match as filter in dense vector search."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=[[1, 0, 0, 0]],
                 top_k=10,
@@ -217,8 +222,9 @@ class TestTextMatchEngine:
 
     def test_text_match_with_bm25_search(self):
         """text_match as filter in BM25 search."""
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             results = col.search(
                 query_vectors=["learning"],
                 top_k=10,

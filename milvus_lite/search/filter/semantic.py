@@ -36,15 +36,14 @@ from milvus_lite.search.filter.ast import (
     ListLit,
     Literal,
     MetaAccess,
+    PathAccess,
     Not,
     Or,
     StringLit,
     TimestampLit,
-    JsonAccess,
     TextMatchOp,
     ArrayContainsOp,
     ArrayLengthOp,
-    ArrayAccessOp,
 )
 from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.schema import validate_geometry_wkt
@@ -214,7 +213,25 @@ def _rewrite_dynamic_field_refs(
     if isinstance(node, IsNullOp):
         new_field = _rewrite_dynamic_field_refs(node.field, schema_fields)
         return IsNullOp(field=new_field, negate=node.negate, pos=node.pos)
-    # Leaves (literals, MetaAccess, JsonAccess, TextMatchOp, Array*Op)
+    if isinstance(node, PathAccess):
+        return PathAccess(
+            base=_rewrite_dynamic_field_refs(node.base, schema_fields),
+            path=node.path,
+            pos=node.pos,
+        )
+    if isinstance(node, ArrayContainsOp):
+        return ArrayContainsOp(
+            value=_rewrite_dynamic_field_refs(node.value, schema_fields),
+            values=_rewrite_dynamic_field_refs(node.values, schema_fields),
+            mode=node.mode,
+            pos=node.pos,
+        )
+    if isinstance(node, ArrayLengthOp):
+        return ArrayLengthOp(
+            value=_rewrite_dynamic_field_refs(node.value, schema_fields),
+            pos=node.pos,
+        )
+    # Leaves (literals, MetaAccess, TextMatchOp, geometry nodes)
     # are returned unchanged.
     return node
 
@@ -472,17 +489,10 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
         ctx.has_meta_access = True
         return SEM_DYNAMIC
 
-    # ── JsonAccess (JSON field path) ────────────────────────
-    if isinstance(node, JsonAccess):
-        # Validate field exists in schema
-        if node.field_name not in ctx.schema_fields:
-            raise FilterFieldError(
-                f"unknown field {node.field_name!r}",
-                ctx.source, node.pos,
-                field_name=node.field_name,
-                available_fields=ctx.field_names,
-            )
-        ctx.has_meta_access = True  # force python backend
+    # ── Composable JSON / array path access ──────────────────
+    if isinstance(node, PathAccess):
+        _check_node(node.base, ctx)
+        ctx.requires_python = True
         return SEM_DYNAMIC
 
     # ── TextMatchOp (Phase 11.6) ─────────────────────────────
@@ -529,25 +539,32 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
 
     # ── Array functions ──────────────────────────────────────
     if isinstance(node, ArrayContainsOp):
-        _check_node(node.field, ctx)
-        ctx.has_meta_access = True
+        value_type = _check_node(node.value, ctx)
+        if value_type != SEM_DYNAMIC and not (
+            isinstance(node.value, FieldRef)
+            and ctx.schema_fields[node.value.name].dtype == DataType.JSON
+        ):
+            raise FilterTypeError(
+                f"array_contains requires an array or dynamic value, "
+                f"got {value_type}",
+                ctx.source, node.pos,
+            )
+        ctx.requires_python = True
         return SEM_BOOL
 
     if isinstance(node, ArrayLengthOp):
-        _check_node(node.field, ctx)
-        ctx.has_meta_access = True
-        return SEM_INT
-
-    if isinstance(node, ArrayAccessOp):
-        if node.field_name not in ctx.schema_fields:
-            raise FilterFieldError(
-                f"unknown field {node.field_name!r}",
+        value_type = _check_node(node.value, ctx)
+        if value_type != SEM_DYNAMIC and not (
+            isinstance(node.value, FieldRef)
+            and ctx.schema_fields[node.value.name].dtype == DataType.JSON
+        ):
+            raise FilterTypeError(
+                f"array_length requires an array or dynamic value, "
+                f"got {value_type}",
                 ctx.source, node.pos,
-                field_name=node.field_name,
-                available_fields=ctx.field_names,
             )
-        ctx.has_meta_access = True
-        return SEM_DYNAMIC
+        ctx.requires_python = True
+        return SEM_INT
 
     raise TypeError(f"unknown AST node type: {type(node).__name__}")
 

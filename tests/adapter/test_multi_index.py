@@ -9,6 +9,7 @@ Covers:
 6. gRPC: search on each field works after loading
 """
 
+from contextlib import closing
 import tempfile
 
 import pytest
@@ -52,8 +53,9 @@ class TestMultiIndexEngine:
         return col
 
     def test_create_two_indexes(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.create_index("dense", {
                 "index_type": "BRUTE_FORCE", "metric_type": "COSINE",
                 "params": {},
@@ -67,8 +69,9 @@ class TestMultiIndexEngine:
             assert col.has_index()  # any index
 
     def test_load_builds_both(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.create_index("dense", {
                 "index_type": "BRUTE_FORCE", "metric_type": "COSINE",
                 "params": {},
@@ -90,8 +93,9 @@ class TestMultiIndexEngine:
             assert len(r2[0]) >= 1
 
     def test_drop_one_keeps_other(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.create_index("dense", {
                 "index_type": "BRUTE_FORCE", "metric_type": "COSINE",
                 "params": {},
@@ -106,8 +110,9 @@ class TestMultiIndexEngine:
             assert not col.has_index("sparse")
 
     def test_get_index_info_per_field(self):
-        with tempfile.TemporaryDirectory() as d:
-            col = self._make_collection(d)
+        with tempfile.TemporaryDirectory() as d, closing(
+            self._make_collection(d)
+        ) as col:
             col.create_index("dense", {
                 "index_type": "BRUTE_FORCE", "metric_type": "COSINE",
                 "params": {},
