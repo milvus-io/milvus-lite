@@ -446,3 +446,68 @@ def test_dynamic_array_functions_compile_to_python(schema_dynamic):
 def test_path_unknown_field_rejected_without_dynamic(schema):
     with pytest.raises(FilterFieldError, match="unknown field"):
         compile_str("array_field[0] < 1", schema)
+
+
+# ---------------------------------------------------------------------------
+# Phase F2b — exists / IS NULL on JSON paths
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def schema_json():
+    return CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=4),
+        FieldSchema(name="metadata", dtype=DataType.JSON),
+    ])
+
+
+def test_exists_json_path_compiles_to_python(schema_json):
+    c = compile_str('exists metadata["key"]', schema_json)
+    assert c.backend == "python"
+
+
+def test_is_null_json_path_compiles_to_python(schema_json):
+    c = compile_str('metadata["key"] is not null', schema_json)
+    assert c.backend == "python"
+
+
+def test_exists_meta_access_compiles_to_hybrid(schema_dynamic):
+    c = compile_str('exists $meta["category"]', schema_dynamic)
+    assert c.backend == "hybrid"
+
+
+def test_is_null_meta_access_compiles_to_hybrid(schema_dynamic):
+    c = compile_str('$meta["category"] is null', schema_dynamic)
+    assert c.backend == "hybrid"
+
+
+def test_exists_dynamic_field_rewritten_to_meta(schema_dynamic):
+    """`exists dyn` on a dynamic field ≡ `exists $meta["dyn"]`, as on
+    the server."""
+    c = compile_str("exists dyn", schema_dynamic)
+    assert isinstance(c.ast.field, MetaAccess)
+    assert c.ast.field.key == "dyn"
+    assert c.backend == "hybrid"
+
+
+def test_exists_whole_json_field_rejected(schema_json):
+    """Server: `exists json_col` is a plan error — only keys are allowed."""
+    with pytest.raises(FilterTypeError, match="whole JSON field"):
+        compile_str("exists metadata", schema_json)
+
+
+def test_exists_scalar_field_rejected(schema):
+    """Server: exists on a non-JSON field is a plan error."""
+    with pytest.raises(FilterTypeError, match="only supported on JSON keys"):
+        compile_str("exists title", schema)
+
+
+def test_exists_unknown_field_without_dynamic_rejected(schema):
+    with pytest.raises(FilterFieldError, match="unknown field"):
+        compile_str("exists nonexistent", schema)
+
+
+def test_is_null_scalar_field_still_allowed(schema):
+    """The exists restriction must not leak into plain IS NULL."""
+    c = compile_str("title is null", schema)
+    assert c.backend == "arrow"

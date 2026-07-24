@@ -212,7 +212,10 @@ def _rewrite_dynamic_field_refs(
         )
     if isinstance(node, IsNullOp):
         new_field = _rewrite_dynamic_field_refs(node.field, schema_fields)
-        return IsNullOp(field=new_field, negate=node.negate, pos=node.pos)
+        return IsNullOp(
+            field=new_field, negate=node.negate, pos=node.pos,
+            from_exists=node.from_exists,
+        )
     if isinstance(node, PathAccess):
         return PathAccess(
             base=_rewrite_dynamic_field_refs(node.base, schema_fields),
@@ -470,10 +473,29 @@ def _check_node(node: Expr, ctx: "_CompileCtx") -> str:
             )
         return SEM_BOOL
 
-    # ── IsNullOp (Phase F2a) ────────────────────────────────────
+    # ── IsNullOp (Phase F2a; JSON paths + exists in F2b) ────────
     if isinstance(node, IsNullOp):
-        # The parser enforces FieldRef as the operand. We don't restrict
-        # the field's type — IS NULL is meaningful for any field.
+        # The parser enforces FieldRef / PathAccess / MetaAccess as the
+        # operand. IS NULL itself is meaningful for any field, but the
+        # server restricts EXISTS to JSON keys and dynamic fields:
+        # `exists json_col` and `exists scalar_col` are both plan errors.
+        # A bare FieldRef surviving to this point is an in-schema field
+        # (unknown names were rewritten to MetaAccess when dynamic
+        # fields are enabled, and error in _check_node below otherwise).
+        if node.from_exists and isinstance(node.field, FieldRef):
+            field = ctx.schema_fields.get(node.field.name)
+            if field is not None:
+                if field.dtype == DataType.JSON:
+                    raise FilterTypeError(
+                        "'exists' on a whole JSON field is not supported, "
+                        "only on a key within it",
+                        ctx.source, node.field.pos, span=len(node.field.name),
+                    )
+                raise FilterTypeError(
+                    f"'exists' is only supported on JSON keys and dynamic "
+                    f"fields, but {node.field.name!r} is {field.dtype.value}",
+                    ctx.source, node.field.pos, span=len(node.field.name),
+                )
         _check_node(node.field, ctx)
         return SEM_BOOL
 

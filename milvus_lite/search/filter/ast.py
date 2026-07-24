@@ -166,14 +166,21 @@ class LikeOp:
 
 @dataclass(frozen=True)
 class IsNullOp:
-    """`field IS NULL` or `field IS NOT NULL`.
+    """`x IS NULL` / `x IS NOT NULL` / `exists x`. Returns bool.
 
-    The operand must be a FieldRef. Returns bool. Phase F2a only supports
-    plain field refs; JSON path access (`$meta["key"] is null`) lands in F2b.
+    The operand may be a plain FieldRef, a JSON path (PathAccess), or a
+    dynamic-field access (MetaAccess). A missing JSON key and an explicit
+    JSON null both count as null, matching the server.
+
+    `exists x` parses as IsNullOp(negate=True, from_exists=True): the
+    server restricts EXISTS to JSON keys and dynamic fields, and the
+    from_exists marker lets semantic.py enforce the same restriction —
+    the backends evaluate both spellings identically.
     """
-    field: FieldRef
+    field: "Expr"
     negate: bool      # True for "IS NOT NULL"
     pos: int
+    from_exists: bool = False
 
 
 # ── Phase F2b: dynamic field access ─────────────────────────────────────────

@@ -21,6 +21,7 @@ from milvus_lite.search.filter.ast import (
     MetaAccess,
     Not,
     Or,
+    PathAccess,
     StringLit,
     TimestampLit,
 )
@@ -497,6 +498,91 @@ def test_is_null_in_and():
 def test_is_null_lhs_must_be_field():
     with pytest.raises(FilterParseError, match="field reference"):
         parse_expr("'literal' is null")
+
+
+def test_is_null_on_json_path():
+    e = parse_expr('metadata["key"] is null')
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, PathAccess)
+    assert e.field.path == ("key",)
+    assert e.negate is False
+    assert e.from_exists is False
+
+
+def test_is_not_null_on_nested_json_path():
+    e = parse_expr('metadata["a"]["b"] is not null')
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, PathAccess)
+    assert e.field.path == ("a", "b")
+    assert e.negate is True
+
+
+def test_is_null_on_meta_access():
+    e = parse_expr('$meta["key"] is null')
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, MetaAccess)
+    assert e.field.key == "key"
+    assert e.negate is False
+
+
+# ---------------------------------------------------------------------------
+# Phase F2b — exists (desugars to IS NOT NULL with from_exists)
+# ---------------------------------------------------------------------------
+
+def test_exists_on_json_path():
+    e = parse_expr('exists metadata["key"]')
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, PathAccess)
+    assert e.field.path == ("key",)
+    assert e.negate is True
+    assert e.from_exists is True
+
+
+def test_exists_uppercase():
+    e = parse_expr('EXISTS metadata["key"]')
+    assert isinstance(e, IsNullOp)
+    assert e.from_exists is True
+
+
+def test_exists_on_meta_access():
+    e = parse_expr('exists $meta["key"]')
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, MetaAccess)
+    assert e.negate is True
+
+
+def test_exists_on_bare_field():
+    """Bare identifiers parse fine — semantic.py decides whether the
+    field is dynamic (allowed) or an in-schema column (rejected)."""
+    e = parse_expr("exists dyn")
+    assert isinstance(e, IsNullOp)
+    assert isinstance(e.field, FieldRef)
+    assert e.from_exists is True
+
+
+def test_not_exists():
+    e = parse_expr('not exists metadata["key"]')
+    assert isinstance(e, Not)
+    assert isinstance(e.operand, IsNullOp)
+    assert e.operand.negate is True
+    assert e.operand.from_exists is True
+
+
+def test_exists_in_and():
+    e = parse_expr('exists metadata["a"] and metadata["a"] == "x"')
+    assert isinstance(e, And)
+    assert isinstance(e.operands[0], IsNullOp)
+    assert e.operands[0].from_exists is True
+
+
+def test_exists_requires_field_or_path():
+    with pytest.raises(FilterParseError, match="field reference or JSON path"):
+        parse_expr("exists 5")
+
+
+def test_exists_rejects_string_literal():
+    with pytest.raises(FilterParseError, match="field reference or JSON path"):
+        parse_expr("exists 'key'")
 
 
 def test_is_missing_null_keyword():

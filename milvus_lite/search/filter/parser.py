@@ -251,16 +251,19 @@ class Parser:
     def _parse_is_null_tail(self, left: Expr) -> Expr:
         """`<field> IS NULL` or `<field> IS NOT NULL`.
 
-        IS NULL only applies to a FieldRef LHS. Anything else is a
-        compile-time error in semantic.py — but we already enforce the
-        FieldRef constraint here at parse time for a more direct error.
+        The LHS may be a plain field reference, a JSON path
+        (`metadata["key"] is null`), or a dynamic-field access
+        (`$meta["key"] is null`) — matching the server, which treats a
+        missing JSON key and an explicit null the same way. Anything
+        else is rejected here for a more direct error than semantic.py
+        would give.
         """
         is_tok = self._consume()  # IS
-        if not isinstance(left, FieldRef):
+        if not isinstance(left, (FieldRef, PathAccess, MetaAccess)):
             raise FilterParseError(
-                "left side of 'is null' must be a field reference",
+                "left side of 'is null' must be a field reference or JSON path",
                 self.source, is_tok.pos,
-                hint="example: title is null",
+                hint="examples: title is null, metadata[\"key\"] is null",
             )
         negate = False
         if self._peek().kind == TokenKind.NOT:
@@ -525,7 +528,23 @@ class Parser:
         return InOp(field=left, values=list_lit, negate=negate, pos=in_tok.pos)
 
     def parse_unary(self) -> Expr:
-        """prec 7: unary minus (prefix)."""
+        """prec 7: unary minus and `exists` (prefix)."""
+        if self._peek().kind == TokenKind.EXISTS:
+            exists_tok = self._consume()
+            operand = self.parse_primary()
+            if not isinstance(operand, (FieldRef, PathAccess, MetaAccess)):
+                raise FilterParseError(
+                    "'exists' must be followed by a field reference or JSON path",
+                    self.source, exists_tok.pos,
+                    hint="example: exists metadata[\"key\"]",
+                )
+            # Desugar: `exists x` ≡ `x is not null` (the server treats a
+            # missing JSON key and an explicit null identically), with
+            # from_exists letting semantic.py enforce the server's
+            # JSON-key-only restriction on EXISTS.
+            return IsNullOp(
+                field=operand, negate=True, pos=exists_tok.pos, from_exists=True,
+            )
         if self._peek().kind == TokenKind.SUB:
             sub_tok = self._consume()
             operand = self.parse_unary()

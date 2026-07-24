@@ -68,6 +68,11 @@ class TokenKind(Enum):
     IS = "IS"
     NULL = "NULL"
 
+    # JSON key-existence test. `exists json_field["key"]` is Milvus
+    # server grammar (Plan.g4 EXISTS); the parser desugars it into
+    # IsNullOp(negate=True, from_exists=True).
+    EXISTS = "EXISTS"
+
     # Dynamic-field marker (Phase F2b). The lexer emits META on `$meta`,
     # the parser then expects '[' STRING ']' to form a MetaAccess node.
     META = "META"
@@ -99,6 +104,7 @@ _KEYWORD_MAP = {
     "like": TokenKind.LIKE, "LIKE": TokenKind.LIKE,
     "is": TokenKind.IS, "IS": TokenKind.IS,
     "null": TokenKind.NULL, "NULL": TokenKind.NULL,
+    "exists": TokenKind.EXISTS, "EXISTS": TokenKind.EXISTS,
     "iso": TokenKind.ISO, "ISO": TokenKind.ISO,
     "interval": TokenKind.INTERVAL, "INTERVAL": TokenKind.INTERVAL,
 }

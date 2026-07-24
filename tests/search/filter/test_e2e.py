@@ -549,6 +549,11 @@ _META_DIFF_EXPRS = [
     # parser is extended to allow it (Phase F4+), add it here.
     '$meta["title"] like "AI%"',
     '$meta["nonexistent"] == "x"',
+    '$meta["priority"] is null',
+    '$meta["priority"] is not null',
+    'exists $meta["priority"]',
+    'not exists $meta["category"]',
+    'exists $meta["category"] and $meta["priority"] > 2',
 ]
 
 
@@ -625,3 +630,75 @@ def test_meta_hybrid_record_batch_input(meta_table, schema_dynamic):
     from milvus_lite.search.filter.eval.hybrid_backend import evaluate_hybrid
     result = evaluate_hybrid(compiled, batch)
     assert result.to_pylist() == [True, False, True, False, False]
+
+
+# ===========================================================================
+# Phase F2b — exists / IS NULL on JSON columns and dynamic fields
+# ===========================================================================
+#
+# Server ground truth (verified against Milvus standalone v2.5.12): both
+# `exists j["k"]` and `j["k"] is not null` match only rows where the key
+# is present AND not JSON null — a missing key and an explicit null are
+# indistinguishable.
+
+@pytest.fixture
+def schema_json():
+    return CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True),
+        FieldSchema(name="vec", dtype=DataType.FLOAT_VECTOR, dim=2),
+        FieldSchema(name="metadata", dtype=DataType.JSON),
+    ])
+
+
+@pytest.fixture
+def json_table():
+    """Rows: key present / key missing / key explicitly null."""
+    return pa.table({
+        "id": ["present", "missing", "explicit_null"],
+        "metadata": [
+            '{"agent_id": "x", "nested": {"a": 1}}',
+            '{"other": "z"}',
+            '{"agent_id": null}',
+        ],
+    })
+
+
+@pytest.mark.parametrize(
+    "expression, expected",
+    [
+        ('exists metadata["agent_id"]', [True, False, False]),
+        ('metadata["agent_id"] is not null', [True, False, False]),
+        ('metadata["agent_id"] is null', [False, True, True]),
+        ('not exists metadata["agent_id"]', [False, True, True]),
+        ('exists metadata["nested"]["a"]', [True, False, False]),
+        ('metadata["nested"]["a"] is not null', [True, False, False]),
+        ('exists metadata["agent_id"] and metadata["agent_id"] == "x"',
+         [True, False, False]),
+        ('exists metadata["agent_id"] or exists metadata["other"]',
+         [True, True, False]),
+    ],
+)
+def test_exists_and_is_null_on_json_column(
+    json_table, schema_json, expression, expected
+):
+    from milvus_lite.search.filter.eval import evaluate
+
+    compiled = compile_expr(
+        parse_expr(expression), schema_json, source=expression
+    )
+    assert compiled.backend == "python"
+    assert evaluate(compiled, json_table).to_pylist() == expected
+
+
+def test_exists_dynamic_field_via_meta(meta_table, schema_dynamic):
+    """`exists priority` on a dynamic field ≡ `exists $meta["priority"]`."""
+    from milvus_lite.search.filter.eval import evaluate
+
+    compiled = compile_expr(
+        parse_expr("exists priority"), schema_dynamic, source="exists priority"
+    )
+    assert compiled.backend == "hybrid"
+    # a, b, c have priority; d has $meta=null; e is missing the key.
+    assert evaluate(compiled, meta_table).to_pylist() == [
+        True, True, True, False, False,
+    ]

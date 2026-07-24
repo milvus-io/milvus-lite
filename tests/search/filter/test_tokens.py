@@ -382,6 +382,12 @@ def test_null_keyword(text):
     assert tokens[0].kind == TokenKind.NULL
 
 
+@pytest.mark.parametrize("text", ["exists", "EXISTS", "Exists"])
+def test_exists_keyword(text):
+    tokens = tokenize(text)
+    assert tokens[0].kind == TokenKind.EXISTS
+
+
 def test_is_null_two_tokens():
     """`is null` is two tokens; parser will combine."""
     assert kinds("title is null") == [

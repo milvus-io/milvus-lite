@@ -220,8 +220,11 @@ def _eval_row(node, row: dict) -> Any:
         return regex.match(value) is not None
 
     if isinstance(node, IsNullOp):
-        # IS NULL on a missing key in row dict counts as null too.
-        val = row.get(node.field.name)
+        # The operand may be a FieldRef, PathAccess, or MetaAccess; all
+        # three evaluate missing data to None, so a missing column value,
+        # a missing JSON key, and an explicit JSON null all count as
+        # null — matching the server for IS NULL and exists alike.
+        val = _eval_row(node.field, row)
         is_null = val is None
         return (not is_null) if node.negate else is_null
 
