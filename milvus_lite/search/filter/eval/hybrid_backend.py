@@ -229,7 +229,10 @@ def _rewrite_meta_access(node: Expr, keys: Set[str]) -> Expr:
     if isinstance(node, IsNullOp):
         new_field = _rewrite_meta_access(node.field, keys)
         if new_field is not node.field:
-            return IsNullOp(field=new_field, negate=node.negate, pos=node.pos)
+            return IsNullOp(
+                field=new_field, negate=node.negate, pos=node.pos,
+                from_exists=node.from_exists,
+            )
         return node
     # Literals and FieldRef are leaves — return unchanged.
     return node
