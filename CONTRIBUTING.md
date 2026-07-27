@@ -5,9 +5,23 @@ Welcome contributors! This guide will help you get started with contributing to 
 Please always find the latest version of this guide at [CONTRIBUTING.md:main](https://github.com/milvus-io/milvus-lite/blob/main/CONTRIBUTING.md)
 
 ## How to set up the development environment
-The Milvus-lite project is written in Python. To set up the development environment, you need to install Python 3.8 or later. We recommend that you use a virtual environment to install the dependencies, although the Milvus-lite project requires a very small number of external packages.
 
-The main dependencies for build Milvus-lite is to install dependencies of milvis, so generally you could refer to Milvus's [install_deps.sh](https://github.com/milvus-io/milvus/blob/master/scripts/install_deps.sh) as a reference. Please note, you should follow the related branch of Milvus. For example, if you want to build Milvus-lite with Milvus 2.4.0, you should checkout the branch of Milvus 2.4.0.
+Milvus Lite is written in Python and requires Python 3.10 or later. We recommend using a virtual environment for development.
+
+From the repository root, create the environment and install the package with its development dependencies:
+
+```bash
+make dev
+source .venv/bin/activate
+```
+
+Alternatively, install the project in editable mode in an existing virtual environment:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+The core dependencies include PyArrow, NumPy, FAISS, and gRPC. They are installed through `pyproject.toml`; building Milvus Lite does not require a Milvus source checkout or the Milvus C++ build dependencies.
 
 For Python package builds, we use the `build` module with the Hatchling backend configured in `pyproject.toml`.
 

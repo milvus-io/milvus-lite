@@ -29,8 +29,9 @@ Milvus Lite is intended for prototyping and local workloads. For large-scale pro
 - Drop-in local usage with `MilvusClient("./demo.db")`.
 - Pure Python implementation with inspectable code and Python stack traces.
 - Dense vector search, sparse BM25 search, and hybrid search.
-- FAISS-backed indexes: `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, plus `FLAT` / `BRUTE_FORCE` / `AUTOINDEX`.
-- Milvus-style scalar filters, dynamic fields, JSON fields, array fields, partitions, aliases, iterators, and group-by search.
+- FAISS-backed vector indexes and `INVERTED` scalar indexes.
+- Milvus-style scalar and geometry filters, dynamic fields, JSON fields, array fields, partitions, aliases, iterators, and group-by search.
+- Named databases and embedded-engine collection snapshots.
 - Optional schema functions for BM25 and text embedding.
 - Standalone local gRPC server for multi-client development.
 
@@ -38,6 +39,8 @@ Milvus Lite is intended for prototyping and local workloads. For large-scale pro
 
 - Python 3.10 or newer
 - macOS, Linux, or Windows where the Python dependencies are available
+
+Continuous integration tests cover Linux and macOS on Python 3.10–3.13 and Windows on Python 3.10. Installation on other Windows/Python combinations depends on compatible wheels being available for dependencies such as `faiss-cpu` and `pyarrow`.
 
 Core dependencies are installed by default: `pyarrow`, `numpy`, `faiss-cpu`, and `grpcio`. `pymilvus` is intentionally not a dependency of `milvus-lite`; it installs Milvus Lite as its local backend.
 
@@ -67,6 +70,8 @@ pip install -U milvus-lite
 ## Quick Start
 
 ### Local `.db` File
+
+This example requires `pymilvus`; install it with `pip install -U "pymilvus[milvus-lite]"`.
 
 Passing a local `.db` path to `MilvusClient` starts Milvus Lite automatically.
 
@@ -223,8 +228,13 @@ client.query("docs", filter="name like 'John%'")
 client.query("docs", filter='array_contains(tags, "python")')
 client.query("docs", filter="array_length(scores) >= 3")
 client.query("docs", filter='$meta["color"] == "red"')
+client.query("docs", filter='exists metadata["source"]')
+client.query("docs", filter='$meta["priority"] is not null')
 client.query("docs", filter="text_match(text, 'machine learning')")
+client.query("places", filter="ST_WITHIN(location, 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')")
 ```
+
+JSON path and dynamic-field expressions support `exists`, `is null`, and `is not null`. A missing JSON key and an explicit JSON `null` are both treated as null. `GEOMETRY` fields use WKT values and support `ST_CONTAINS`, `ST_WITHIN`, `ST_INTERSECTS`, `ST_ISVALID`, and `ST_DWITHIN`; spatial predicates currently use scan-based filtering.
 
 ## Dump Data
 
@@ -249,24 +259,31 @@ The command reads rows through `pymilvus` query iterators and writes BulkWriter 
 | Area | Support |
 |---|---|
 | Vector types | `FLOAT_VECTOR`, `SPARSE_FLOAT_VECTOR` |
-| Scalar types | `BOOL`, integer types, `FLOAT`, `DOUBLE`, `VARCHAR`, `JSON`, `ARRAY`, `TIMESTAMPTZ` |
+| Scalar types | `BOOL`, integer types, `FLOAT`, `DOUBLE`, `VARCHAR`, `JSON`, `ARRAY`, `GEOMETRY`, `TIMESTAMPTZ` |
 | Metrics | `COSINE`, `L2`, `IP`, `BM25` |
-| Indexes | `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, `FLAT`, `BRUTE_FORCE`, `AUTOINDEX`, `SPARSE_INVERTED_INDEX` |
+| Indexes | `HNSW`, `HNSW_SQ`, `IVF_FLAT`, `IVF_SQ8`, `FLAT`, `BRUTE_FORCE`, `AUTOINDEX`, sparse `SPARSE_INVERTED_INDEX`, scalar `INVERTED` |
 | CRUD | insert, upsert, partial update, delete by ID/filter, get, query, search, truncate |
 | Collection management | create, drop, rename, describe, statistics, aliases |
+| Databases | create, drop, list, switch, database properties |
+| Snapshots | create, list, drop, and restore to a new collection through the embedded engine API |
 | Partitions | create, drop, list, partition-specific insert/search, partition key routing |
-| Search features | dense search, sparse search, hybrid search, range search, group-by, iterators, offset, `round_decimal` |
-| Schema features | auto ID, nullable fields, default values, dynamic fields, BM25 functions, text embedding functions |
+| Search features | dense and sparse search, multiple dense-vector fields selected with `anns_field`, hybrid search, request-level boost/model/decay reranking, range search, group-by, iterators, offset, `round_decimal` |
+| Schema features | auto ID, nullable fields, default values, dynamic fields, BM25 functions, OpenAI text embedding functions |
+| Filtering | scalar, JSON path, dynamic field, array, text-match, and scan-based WKT geometry predicates |
 | Text search | standard analyzer, optional Jieba analyzer, `text_match`, BM25 sparse inverted index |
-| Adapter | Milvus-compatible gRPC server used by `pymilvus` |
+| Adapter | gRPC server implementing the supported local `pymilvus` workflow subset |
 
 ## Known Limitations
 
 - Single process per `data_dir`; Milvus Lite uses a file lock to protect local storage.
-- Single logical database namespace; database APIs expose the default namespace only.
-- No authentication, users, roles, or RBAC.
-- No binary, float16, or bfloat16 vector fields.
+- The gRPC server supports concurrent reads, but writes to the same collection must be serialized; concurrent writers are not supported safely.
+- The gRPC adapter implements the supported local `pymilvus` workflow subset. Unsupported Milvus RPCs return `UNIMPLEMENTED`; schema alteration and partition-level load/release are not available.
+- No authentication, users, roles, RBAC, or TLS; do not expose the local gRPC server on an untrusted network.
+- No binary, float16, bfloat16, or int8 vector fields.
 - No Product Quantization indexes.
+- `TEXT_EMBEDDING` currently supports OpenAI only, and semantic model reranking currently supports Cohere only; both require external credentials and network access.
+- Snapshot operations are currently available through the embedded engine API rather than `pymilvus` Snapshot RPCs.
+- Geometry predicates use scan-based filtering; spatial indexes are not available.
 - BM25 IDF statistics are segment-local rather than global.
 - The engine is designed for local development and small-scale workloads, not distributed production serving.
 
@@ -281,15 +298,15 @@ adapter/grpc
       v
 engine/Collection
       |
-      +-- storage/   WAL, MemTable, Parquet segments, deltas, manifest
-      +-- search/    bitmap pipeline, scalar filters, dense/sparse executors
-      +-- index/     FAISS indexes, brute-force index, sparse inverted index
+      +-- storage/   WAL, MemTable, Parquet segments, deltas, manifest, snapshots
+      +-- search/    bitmap pipeline, scalar/geometry filters, dense/sparse executors
+      +-- index/     FAISS vector indexes, scalar/sparse inverted indexes
       +-- analyzer/  standard and Jieba analyzers, BM25 term hashing
       +-- function/  BM25, text embedding, hybrid merge, rerank chains
       +-- schema/    data types, validation, Arrow schema builders
 ```
 
-The storage path is LSM-tree style: writes go to the WAL and MemTable, flush creates immutable Parquet files, and compaction merges segments and garbage-collects tombstones. Vector indexes are bound to immutable segments one-to-one and persisted as `.idx` files. The manifest is the source of truth and is updated atomically.
+The storage path is LSM-tree style: writes go to the WAL and MemTable, flush creates immutable Parquet files, and compaction merges segments and garbage-collects tombstones. Vector and scalar indexes are bound to immutable segments and persisted as `.idx` files. Collection snapshots pin immutable data, delta, and index files and preserve copies of the schema and manifest so they can be restored into a new collection. The manifest is the source of truth and is updated atomically.
 
 ## Development
 
