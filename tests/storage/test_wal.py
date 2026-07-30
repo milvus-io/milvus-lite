@@ -1,5 +1,6 @@
 """Tests for storage/wal.py — WAL write/recover round-trip, lifecycle, truncation."""
 
+import logging
 import os
 
 import pyarrow as pa
@@ -261,6 +262,70 @@ def test_find_wal_files_ignores_non_wal(wal_dir):
 # ---------------------------------------------------------------------------
 # Truncation handling
 # ---------------------------------------------------------------------------
+
+def test_read_wal_file_discards_batch_that_fails_full_validation(
+    monkeypatch, tmp_path, caplog
+):
+    path = tmp_path / "wal_data_000001.arrow"
+    path.write_bytes(b"reader is replaced by the test")
+
+    validation_calls = []
+
+    class FakeBatch:
+        def __init__(self, name, error=None):
+            self.name = name
+            self.error = error
+
+        def validate(self, *, full):
+            validation_calls.append((self.name, full))
+            if self.error is not None:
+                raise self.error
+
+    good = FakeBatch("good")
+    corrupted = FakeBatch("corrupted", pa.ArrowInvalid("invalid offsets"))
+    unread = FakeBatch("unread")
+
+    monkeypatch.setattr(
+        pa.ipc,
+        "open_stream",
+        lambda source: iter([good, corrupted, unread]),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="milvus_lite.storage.wal"):
+        batches = _read_wal_file(str(path))
+
+    assert batches == [good]
+    assert validation_calls == [("good", True), ("corrupted", True)]
+    assert str(path) in caplog.text
+    assert "batch boundary 1" in caplog.text
+    assert "invalid offsets" in caplog.text
+
+
+def test_read_wal_file_full_validates_every_returned_batch(
+    monkeypatch, tmp_path
+):
+    path = tmp_path / "wal_data_000001.arrow"
+    path.write_bytes(b"reader is replaced by the test")
+
+    validation_calls = []
+
+    class FakeBatch:
+        def __init__(self, name):
+            self.name = name
+
+        def validate(self, *, full):
+            validation_calls.append((self.name, full))
+
+    first = FakeBatch("first")
+    second = FakeBatch("second")
+    monkeypatch.setattr(
+        pa.ipc,
+        "open_stream",
+        lambda source: iter([first, second]),
+    )
+
+    assert _read_wal_file(str(path)) == [first, second]
+    assert validation_calls == [("first", True), ("second", True)]
 
 def test_truncated_file_recovers_partial(wal_dir, wal_data_schema, wal_delta_schema):
     """A truncated WAL file should return the batches read before truncation."""

@@ -197,14 +197,13 @@ class TestPartitionKeyInvalid:
 
     def test_partition_key_on_multi_fields_raises(self, milvus_client):
         """Two fields with is_partition_key=True should be rejected."""
-        schema = MilvusClient.create_schema(auto_id=True)
-        schema.add_field("pk", DataType.INT64, is_primary=True)
-        schema.add_field("f1", DataType.INT64, is_partition_key=True)
-        schema.add_field("f2", DataType.VARCHAR, max_length=64,
-                         is_partition_key=True)
-        schema.add_field("vec", DataType.FLOAT_VECTOR, dim=DIM)
-
         with pytest.raises(Exception):
+            schema = MilvusClient.create_schema(auto_id=True)
+            schema.add_field("pk", DataType.INT64, is_primary=True)
+            schema.add_field("f1", DataType.INT64, is_partition_key=True)
+            schema.add_field("f2", DataType.VARCHAR, max_length=64,
+                             is_partition_key=True)
+            schema.add_field("vec", DataType.FLOAT_VECTOR, dim=DIM)
             milvus_client.create_collection("pk_multi", schema=schema)
 
     def test_partition_key_on_invalid_type_raises(self, milvus_client):
