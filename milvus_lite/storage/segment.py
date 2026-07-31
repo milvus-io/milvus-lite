@@ -68,6 +68,7 @@ class Segment:
         "scalar_indexes",
         "_pk_field",
         "_vector_field",
+        "_vector_data_by_field",
     )
 
     def __init__(
@@ -93,6 +94,13 @@ class Segment:
         # Boolean mask: True = vector is valid, False = null vector.
         # None means all vectors are valid (no nullable vector field).
         self.vector_null_mask = vector_null_mask
+        self._vector_data_by_field: Dict[
+            str, Tuple[np.ndarray, Optional[np.ndarray]]
+        ] = {}
+        if vector_field:
+            self._vector_data_by_field[vector_field] = (
+                vectors, vector_null_mask,
+            )
         self.pk_to_row: Dict[Any, int] = {pk: i for i, pk in enumerate(pks)}
         # Phase 9.2 / Phase 18: per-field attached indexes.
         # self.index is backward-compat shortcut (first/only index).
@@ -252,15 +260,11 @@ class Segment:
         )
 
         path = self.index_file_path(index_dir, spec.index_type, field_name)
+        vectors, _ = self.vector_data(field_name)
 
         if os.path.exists(path):
-            idx = load_index_from_spec(spec, path, self.vector_dim)
+            idx = load_index_from_spec(spec, path, vectors.shape[1])
         else:
-            # Use the correct vector data for the requested field
-            if field_name == self._vector_field:
-                vectors = self.vectors
-            else:
-                vectors, _ = _extract_vector_array(self.table.column(field_name))
             idx = build_index_from_spec(spec, vectors)
             os.makedirs(index_dir, exist_ok=True)
             idx.save(path)
@@ -302,6 +306,16 @@ class Segment:
     @property
     def vector_dim(self) -> int:
         return self.vectors.shape[1] if self.vectors.size > 0 else 0
+
+    def vector_data(
+        self, field_name: str
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """Return vectors and null mask for a dense vector field."""
+        cached = self._vector_data_by_field.get(field_name)
+        if cached is None:
+            cached = _extract_vector_array(self.table.column(field_name))
+            self._vector_data_by_field[field_name] = cached
+        return cached
 
 
 # ---------------------------------------------------------------------------

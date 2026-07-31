@@ -3,6 +3,7 @@
 Covers:
 - Default anns_field (None → first FLOAT_VECTOR)
 - Explicit anns_field pointing to FLOAT_VECTOR works
+- Explicit anns_field selects the matching data and index with multiple dense fields
 - Explicit anns_field pointing to SPARSE_FLOAT_VECTOR raises NotImplementedError
 - Invalid anns_field raises SchemaValidationError
 - Non-vector anns_field raises SchemaValidationError
@@ -11,6 +12,7 @@ Covers:
 from contextlib import closing
 import tempfile
 
+import numpy as np
 import pytest
 
 from milvus_lite.engine.collection import Collection
@@ -58,6 +60,12 @@ def _mixed_collection(tmpdir):
     return col
 
 
+def _vector(dim: int, position: int) -> list[float]:
+    vector = np.zeros(dim, dtype=np.float32)
+    vector[position] = 1.0
+    return vector.tolist()
+
+
 class TestAnnsField:
     def test_default_uses_float_vector(self):
         """anns_field=None defaults to the FLOAT_VECTOR field."""
@@ -85,6 +93,49 @@ class TestAnnsField:
             )
             assert len(results) == 1
             assert len(results[0]) == 2
+
+    def test_explicit_field_selects_matching_segment_index(self):
+        """Each dense field uses its own segment vectors and index."""
+        with tempfile.TemporaryDirectory() as d:
+            schema = CollectionSchema(fields=[
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+                FieldSchema(name="vec768", dtype=DataType.FLOAT_VECTOR, dim=768),
+                FieldSchema(name="vec3072", dtype=DataType.FLOAT_VECTOR, dim=3072),
+            ])
+            with closing(Collection(name="multi", data_dir=d, schema=schema)) as col:
+                col.insert([
+                    {
+                        "id": 1,
+                        "vec768": _vector(768, 0),
+                        "vec3072": _vector(3072, 1),
+                    },
+                    {
+                        "id": 2,
+                        "vec768": _vector(768, 1),
+                        "vec3072": _vector(3072, 0),
+                    },
+                ])
+                col.flush()
+                index_params = {
+                    "index_type": "BRUTE_FORCE",
+                    "metric_type": "L2",
+                    "params": {},
+                }
+                col.create_index("vec768", index_params)
+                col.create_index("vec3072", index_params)
+                col.load()
+
+                first = col.search(
+                    [_vector(768, 0)], top_k=1, metric_type="L2",
+                    anns_field="vec768",
+                )
+                second = col.search(
+                    [_vector(3072, 0)], top_k=1, metric_type="L2",
+                    anns_field="vec3072",
+                )
+
+                assert first[0][0]["id"] == 1
+                assert second[0][0]["id"] == 2
 
     def test_sparse_search_works(self):
         """Searching on SPARSE_FLOAT_VECTOR with BM25 works."""

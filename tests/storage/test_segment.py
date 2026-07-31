@@ -86,6 +86,41 @@ def test_load_vectors_values(parquet_file):
     )
 
 
+def test_vector_data_caches_non_default_field(tmp_path):
+    pks = ["a", "b"]
+    seqs = np.array([1, 2], dtype=np.uint64)
+    first_vectors = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    table = pa.table({
+        "id": pks,
+        "_seq": seqs,
+        "first": pa.array(first_vectors.tolist(), type=pa.list_(pa.float32(), 2)),
+        "second": pa.array(
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            type=pa.list_(pa.float32(), 3),
+        ),
+    })
+    segment = Segment(
+        file_path=str(tmp_path / "fake.parquet"),
+        partition="_default",
+        pk_field="id",
+        vector_field="first",
+        pks=pks,
+        seqs=seqs,
+        vectors=first_vectors,
+        table=table,
+    )
+
+    vectors, null_mask = segment.vector_data("second")
+    cached_vectors, cached_null_mask = segment.vector_data("second")
+
+    assert vectors is cached_vectors
+    assert null_mask is cached_null_mask
+    np.testing.assert_array_equal(
+        vectors,
+        np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=np.float32),
+    )
+
+
 # ---------------------------------------------------------------------------
 # pk_to_row + find_row
 # ---------------------------------------------------------------------------
