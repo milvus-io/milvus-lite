@@ -21,7 +21,11 @@ def test_default_dynamic_search_declares_meta_output_field():
             {
                 "id": 1,
                 "distance": 1.0,
-                "entity": {"popularity": 2.0, "dynamic_tag": "first"},
+                "entity": {
+                    "vector": [1.0, 0.0],
+                    "popularity": 2.0,
+                    "dynamic_tag": "first",
+                },
             }
         ]],
         schema=schema,
@@ -30,6 +34,6 @@ def test_default_dynamic_search_declares_meta_output_field():
         projection_plan=projection_plan,
     )
 
-    assert list(result.output_fields) == ["popularity", "$meta"]
+    assert list(result.output_fields) == ["vector", "popularity", "$meta"]
     assert result.fields_data[-1].field_name == "$meta"
     assert result.fields_data[-1].is_dynamic is True

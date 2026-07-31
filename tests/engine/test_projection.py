@@ -91,7 +91,7 @@ def test_default_projection_includes_dynamic_fields(schema):
     assert query_plan.include_all_dynamic is True
     assert query_plan.response_schema_fields == ("pk", "text", "vector")
     assert search_plan.include_all_dynamic is True
-    assert search_plan.response_schema_fields == ("text",)
+    assert search_plan.response_schema_fields == ("text", "vector")
 
 
 def test_projection_deduplicates_requested_fields(schema):
