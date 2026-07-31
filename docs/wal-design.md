@@ -362,29 +362,39 @@ def _read_wal_file(path: str) -> List[pa.RecordBatch]:
         source = pa.OSFile(path, "rb")
         reader = pa.ipc.open_stream(source)
         for batch in reader:
+            batch.validate(full=True)
             batches.append(batch)
     except pa.ArrowInvalid:
-        # File truncated: some RecordBatch after Schema is incomplete
-        # Already-read batches are complete, discard the incomplete part
+        # File truncated or decoded batch has invalid internal buffers.
+        # Keep only the previously validated prefix.
         pass
-    except Exception:
-        # Can't even read the Schema → file is severely corrupted
-        # Return empty, let upper layer decide how to handle
-        # (Don't raise WALCorruptedError, because recovery should try to recover as much as possible)
+    except (OSError, IOError):
+        # File-level I/O failure: keep the previously validated prefix.
         pass
+
+    # Do not catch generic Exception: programming errors in recovery must escape.
 
     return batches
 ```
 
 **Design Decision -- Truncation Handling**:
 
-Arrow IPC Streaming characteristic: `pa.ipc.open_stream()` succeeds → Schema is complete. Then reading RecordBatches one by one,
-if a batch is half-read when the file ends → raises `ArrowInvalid`. Already successfully read batches are all complete.
+Arrow IPC framing can identify batch boundaries, but successful decoding does not
+guarantee that all nested offsets and buffers are internally valid. Recovery calls
+`RecordBatch.validate(full=True)` before accepting each batch. If decoding or full
+validation fails, recovery retains only the previously validated prefix and stops
+reading that WAL stream.
 
 We choose **best-effort recovery**:
-- Read as much as possible, discard the truncated part
+- Read and validate as much as possible, then discard the invalid or truncated part
 - This is better than "discard everything if the file has any corruption"
-- What's discarded is the data from the last write_batch call (the batch being written when the crash occurred)
+- Recovery discards the first invalid/incomplete batch and any later batches that
+  cannot be safely reached after the stream error
+
+Write-time validation is not part of WAL corruption recovery. Validating the
+in-memory input batch after `write_batch()` cannot detect truncation or storage
+corruption introduced after serialization. Schema compatibility remains enforced by
+the Arrow writer; durability policy remains controlled separately by `sync_mode`.
 
 ---
 

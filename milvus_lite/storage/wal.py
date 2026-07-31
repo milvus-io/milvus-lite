@@ -8,6 +8,7 @@ first write so that unused files are never created.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import re
 from typing import BinaryIO, List, Optional, Tuple
@@ -17,21 +18,25 @@ import pyarrow as pa
 from milvus_lite.constants import SEQ_FORMAT_WIDTH, WAL_DATA_TEMPLATE, WAL_DELTA_TEMPLATE
 
 
+logger = logging.getLogger(__name__)
+
+
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
 
 def _read_wal_file(path: str) -> List[pa.RecordBatch]:
-    """Read a single WAL file and return its RecordBatch list.
+    """Read and fully validate recoverable batches from a WAL stream.
 
     * File does not exist → []
-    * File is complete   → all batches
-    * File is truncated  → batches read before the truncation point
-    * File severely corrupted (schema unreadable) → []
+    * File is complete   → all fully validated batches
+    * File is truncated or contains an invalid batch → validated prefix
+    * File schema is unreadable → []
 
-    The file handle is always released, even on the truncation path —
-    this matters because crash-recovery hits the truncation path on
-    every dirty shutdown.
+    Arrow IPC decoding does not guarantee that every internal array buffer is
+    valid. Full validation therefore happens before a batch crosses the WAL
+    recovery boundary. Once a batch is invalid, the stream is not consumed
+    further because there is no safe batch-resynchronisation contract.
     """
     if not os.path.exists(path):
         return []
@@ -41,15 +46,17 @@ def _read_wal_file(path: str) -> List[pa.RecordBatch]:
         with pa.OSFile(path, "rb") as source:
             reader = pa.ipc.open_stream(source)
             for batch in reader:
+                batch.validate(full=True)
                 batches.append(batch)
-    except pa.ArrowInvalid:
-        # Truncated RecordBatch — keep whatever was successfully read.
-        # Open-stream succeeded (schema is fine), some later batch was cut.
-        pass
-    except (OSError, IOError):
-        # File-level IO error (permissions, broken pipe, etc.) — give up,
-        # return whatever was read before the failure.
-        pass
+    except pa.ArrowInvalid as exc:
+        logger.warning(
+            "WAL recovery stopped at batch boundary %d in %s: %s",
+            len(batches),
+            path,
+            exc,
+        )
+    except (OSError, IOError) as exc:
+        logger.warning("WAL recovery stopped by I/O error in %s: %s", path, exc)
     # NOTE: deliberately do NOT catch generic Exception — that would hide
     # real bugs (AttributeError / TypeError / KeyError) in the recovery path.
 
