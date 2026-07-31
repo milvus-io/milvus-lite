@@ -24,10 +24,10 @@ Differs from `execute_search` in two architectural ways:
 Result-equivalence with the old path is guaranteed by the
 differential test in tests/search/test_executor_with_index.py.
 
-Phase 9.2 always builds an ad-hoc BruteForceIndex if `segment.index`
-is None — this exercises the new architecture from day one even
-before Collection.create_index lands in 9.3. Building a BruteForceIndex
-is essentially free (just stores a numpy reference).
+Phase 9.2 always builds an ad-hoc BruteForceIndex if the segment has no
+index for the selected vector field — this exercises the new architecture
+from day one even before Collection.create_index lands in 9.3. Building a
+BruteForceIndex is essentially free (just stores a numpy reference).
 """
 
 from __future__ import annotations
@@ -212,21 +212,22 @@ def execute_search_with_index(
 
     # Segments first.
     for seg in in_scope_segments:
-        sources.append((list(seg.pks), seg.seqs, seg.vectors))
+        seg_vectors, seg_vector_null_mask = seg.vector_data(vector_field)
+        sources.append((list(seg.pks), seg.seqs, seg_vectors))
         # Combine scalar filter mask with vector null mask
         combined_mask = seg_filter_masks.get(id(seg))
-        if seg.vector_null_mask is not None:
+        if seg_vector_null_mask is not None:
             if combined_mask is not None:
-                combined_mask = combined_mask & seg.vector_null_mask
+                combined_mask = combined_mask & seg_vector_null_mask
             else:
-                combined_mask = seg.vector_null_mask
+                combined_mask = seg_vector_null_mask
         _recall_source(
             source_idx=len(sources) - 1,
             pks=sources[-1][0],
             seqs=sources[-1][1],
             vectors=sources[-1][2],
             filter_mask=combined_mask,
-            index=seg.index,
+            index=seg.indexes.get(vector_field),
         )
 
     # Memtable last (always brute-force; never has an attached index).

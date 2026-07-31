@@ -41,6 +41,12 @@ def _vec(i):
     return [float(i), float(i + 1), float(i + 2), float(i + 3)]
 
 
+def _unit_vector(dim: int, position: int) -> list[float]:
+    vector = np.zeros(dim, dtype=np.float32)
+    vector[position] = 1.0
+    return vector.tolist()
+
+
 BRUTE_PARAMS = {"index_type": "BRUTE_FORCE", "metric_type": "L2", "params": {}}
 
 
@@ -162,6 +168,46 @@ def test_restart_load_then_search_results_correct(tmp_path, schema):
         assert [r["id"] for r in actual[0]] == [r["id"] for r in expected[0]]
     finally:
         c2.close()
+
+
+def test_restart_load_uses_each_vector_field_dimension(tmp_path):
+    schema = CollectionSchema(fields=[
+        FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
+        FieldSchema(name="vec768", dtype=DataType.FLOAT_VECTOR, dim=768),
+        FieldSchema(name="vec3072", dtype=DataType.FLOAT_VECTOR, dim=3072),
+    ])
+    data_dir = str(tmp_path / "data")
+    collection = Collection("multi", data_dir, schema)
+    collection.insert([
+        {
+            "id": 1,
+            "vec768": _unit_vector(768, 0),
+            "vec3072": _unit_vector(3072, 0),
+        },
+        {
+            "id": 2,
+            "vec768": _unit_vector(768, 1),
+            "vec3072": _unit_vector(3072, 1),
+        },
+    ])
+    collection.flush()
+    collection.create_index("vec768", BRUTE_PARAMS)
+    collection.create_index("vec3072", BRUTE_PARAMS)
+    collection.load()
+    collection.close()
+
+    reopened = Collection("multi", data_dir, schema)
+    try:
+        reopened.load()
+        result = reopened.search(
+            [_unit_vector(3072, 1)],
+            top_k=1,
+            metric_type="L2",
+            anns_field="vec3072",
+        )
+        assert result[0][0]["id"] == 2
+    finally:
+        reopened.close()
 
 
 # ---------------------------------------------------------------------------
