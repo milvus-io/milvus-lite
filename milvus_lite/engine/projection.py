@@ -6,11 +6,10 @@ from dataclasses import dataclass
 import json
 from typing import Any, Dict, Iterable, Optional, Tuple
 
-from milvus_lite.schema.types import CollectionSchema, DataType
+from milvus_lite.schema.types import CollectionSchema
 
 
 _INTERNAL_FIELDS = frozenset({"_seq", "_partition", "$meta"})
-_VECTOR_TYPES = frozenset({DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR})
 _API_KINDS = frozenset({"search", "query", "get"})
 
 
@@ -45,7 +44,7 @@ def build_projection_plan(
             response_schema = tuple(
                 field.name
                 for field in schema.fields
-                if not field.is_primary and field.dtype not in _VECTOR_TYPES
+                if not field.is_primary
             )
         else:
             response_schema = schema_names

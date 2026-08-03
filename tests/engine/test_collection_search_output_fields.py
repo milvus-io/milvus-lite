@@ -1,7 +1,7 @@
 """Phase 9.1.3 — Collection.search(output_fields=...) tests.
 
 Three semantics to validate:
-    output_fields=None  → entity = all fields except pk + vector (legacy)
+    output_fields=None  → entity = all fields except pk
     output_fields=[]    → entity = {} (only id + distance)
     output_fields=[..]  → entity = exactly those fields (vector included
                           only if listed; pk excluded since it's "id")
@@ -36,14 +36,14 @@ def col(tmp_path, schema):
     c.close()
 
 
-def test_default_output_fields_none_keeps_legacy_behavior(col):
-    """output_fields=None → entity = all fields except pk and vector."""
+def test_default_output_fields_none_returns_all_non_primary_fields(col):
+    """output_fields=None → entity = all fields except the primary key."""
     res = col.search([[1.0, 0.0, 0.0, 0.0]], top_k=1)
     hit = res[0][0]
     assert hit["id"] == 1
-    assert set(hit["entity"].keys()) == {"title", "score", "active"}
+    assert set(hit["entity"].keys()) == {"vec", "title", "score", "active"}
     assert hit["entity"]["title"] == "alpha"
-    assert "vec" not in hit["entity"]
+    assert hit["entity"]["vec"] == pytest.approx([1.0, 0.0, 0.0, 0.0])
     assert "id" not in hit["entity"]
 
 

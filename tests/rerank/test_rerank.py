@@ -11,7 +11,10 @@ import pytest
 from milvus_lite.embedding.protocol import EmbeddingProvider
 from milvus_lite.engine.collection import Collection
 from milvus_lite.rerank.decay import DecayReranker
-from milvus_lite.rerank.factory import create_rerank_provider
+from milvus_lite.rerank.factory import (
+    create_rerank_provider,
+    rerank_provider_param_names,
+)
 from milvus_lite.rerank.protocol import RerankProvider, RerankResult
 from milvus_lite.schema.types import (
     CollectionSchema,
@@ -92,6 +95,15 @@ def _make_schema_no_rerank(dim=8):
 
 
 class TestFactory:
+    def test_provider_param_names_normalize_provider(self):
+        assert rerank_provider_param_names("COHERE") == frozenset(
+            {"provider", "model_name", "api_key", "base_url"}
+        )
+
+    def test_provider_param_names_reject_unknown_provider(self):
+        with pytest.raises(ValueError, match="Unknown rerank provider"):
+            rerank_provider_param_names("unknown")
+
     def test_missing_provider(self):
         with pytest.raises(ValueError, match="requires 'provider'"):
             create_rerank_provider({})

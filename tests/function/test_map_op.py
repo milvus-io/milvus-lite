@@ -1,9 +1,11 @@
 """Tests for MapOp."""
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from milvus_lite.function.dataframe import DataFrame
-from milvus_lite.function.ops.map_op import MapOp
+from milvus_lite.function.ops.map_op import ColumnBinding, LiteralBinding, MapOp
 from milvus_lite.function.types import (
     STAGE_INGESTION,
     FuncContext,
@@ -30,12 +32,67 @@ class _ConcatExpr(FunctionExpr):
 
 def test_map_op_single_column():
     op = MapOp(_DoubleExpr(), ["x"], ["y"])
+    assert op.input_cols == ["x"]
+    assert op.input_bindings == [ColumnBinding("x")]
+
     df = DataFrame.from_records([{"x": 3}, {"x": 5}])
     ctx = FuncContext(STAGE_INGESTION)
     op.execute(ctx, df)
     assert df.column("y", 0) == [6, 10]
     # original column unchanged
     assert df.column("x", 0) == [3, 5]
+
+
+def test_map_op_normalizes_strings_to_frozen_column_bindings():
+    op = MapOp(_DoubleExpr(), ["x"], ["y"])
+
+    bindings = op.input_bindings
+    bindings.append(LiteralBinding(1))
+
+    assert op.input_bindings == [ColumnBinding("x")]
+    with pytest.raises(FrozenInstanceError):
+        bindings[0].name = "other"
+
+
+def test_map_op_expands_literal_inputs_per_chunk():
+    seen_inputs = []
+
+    class _RecordInputs(FunctionExpr):
+        name = "record_inputs"
+        supported_stages = frozenset({STAGE_INGESTION})
+
+        def execute(self, ctx, inputs):
+            seen_inputs.append(inputs)
+            return [inputs[0]]
+
+    op = MapOp(
+        _RecordInputs(),
+        [ColumnBinding("x"), LiteralBinding("suffix")],
+        ["y"],
+    )
+    df = DataFrame([
+        [{"x": 1}, {"x": 2}],
+        [{"x": 3}],
+        [],
+    ])
+
+    op.execute(FuncContext(STAGE_INGESTION), df)
+
+    assert seen_inputs == [
+        [[1, 2], ["suffix", "suffix"]],
+        [[3], ["suffix"]],
+        [[], []],
+    ]
+    assert op.input_cols == ["x"]
+    assert df.column("y", 0) == [1, 2]
+    assert df.column("y", 1) == [3]
+    assert df.column("y", 2) == []
+
+
+@pytest.mark.parametrize("unsupported", [None, 1, object()])
+def test_map_op_rejects_unsupported_input_specs(unsupported):
+    with pytest.raises(TypeError, match="input spec at index 1"):
+        MapOp(_ConcatExpr(), ["x", unsupported], ["y"])
 
 
 def test_map_op_overwrite_input():
