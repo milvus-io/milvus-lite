@@ -507,13 +507,35 @@ class MilvusLite:
         col_dir = self._collection_dir(name, database_name)
         _schema_name, schema = load_schema(os.path.join(col_dir, SCHEMA_FILENAME))
         key = (database_name, name)
+        col = self.get_collection(name, database_name=database_name)
+        partition_names = col._manifest.list_partitions()
+        index_specs = col._manifest.index_specs
+        schema_version = col._manifest.schema_version
+        was_loaded = col.load_state == "loaded"
         if key in self._collections:
-            self._collections[key].close()
+            col.close()
             del self._collections[key]
 
         shutil.rmtree(col_dir, ignore_errors=False)
         os.makedirs(col_dir, exist_ok=False)
         save_schema(schema, name, os.path.join(col_dir, SCHEMA_FILENAME))
+        manifest = Manifest(col_dir)
+        for partition_name in partition_names:
+            if not manifest.has_partition(partition_name):
+                manifest.add_partition(partition_name)
+        for spec in index_specs.values():
+            manifest.set_index_spec(spec)
+        manifest.schema_version = schema_version
+        manifest.save()
+        fresh = Collection(
+            name,
+            col_dir,
+            schema,
+            database_properties=self._database_properties(database_name),
+        )
+        if was_loaded:
+            fresh.load()
+        self._collections[key] = fresh
 
     def alter_collection_properties(
         self,
