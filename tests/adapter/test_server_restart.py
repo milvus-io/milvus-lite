@@ -35,6 +35,14 @@ def _stop(server, db):
     db.close()
 
 
+def _basic_schema():
+    schema = MilvusClient.create_schema(auto_id=False)
+    schema.add_field("id", DataType.INT64, is_primary=True)
+    schema.add_field("vec", DataType.FLOAT_VECTOR, dim=4)
+    schema.add_field("text", DataType.VARCHAR, max_length=128)
+    return schema
+
+
 # ---------------------------------------------------------------------------
 # 1. Basic data persistence across restart
 # ---------------------------------------------------------------------------
@@ -270,3 +278,61 @@ def test_db_mode_restart():
         assert results[0][0]["id"] == 1
 
         mgr2.release_all()
+
+
+def test_collection_properties_survive_restart():
+    with tempfile.TemporaryDirectory() as data_dir:
+        server, db, uri = _start(data_dir)
+        client = MilvusClient(uri=uri)
+        client.create_collection("restart_props", schema=_basic_schema())
+        client.alter_collection_properties(
+            "restart_props", {"custom.persist": "yes"}
+        )
+        _stop(server, db)
+
+        server2, db2, uri2 = _start(data_dir)
+        try:
+            client2 = MilvusClient(uri=uri2)
+            assert (
+                client2.describe_collection("restart_props")["properties"][
+                    "custom.persist"
+                ]
+                == "yes"
+            )
+        finally:
+            _stop(server2, db2)
+
+
+def test_truncate_survives_restart():
+    with tempfile.TemporaryDirectory() as data_dir:
+        server, db, uri = _start(data_dir)
+        client = MilvusClient(uri=uri)
+        client.create_collection("restart_truncate", schema=_basic_schema())
+        client.insert(
+            "restart_truncate",
+            [
+                {
+                    "id": 1,
+                    "vec": [1.0, 0.0, 0.0, 0.0],
+                    "text": "old",
+                }
+            ],
+        )
+        client.flush("restart_truncate")
+        client.truncate_collection("restart_truncate")
+        assert int(
+            client.get_collection_stats("restart_truncate")["row_count"]
+        ) == 0
+        _stop(server, db)
+
+        server2, db2, uri2 = _start(data_dir)
+        try:
+            client2 = MilvusClient(uri=uri2)
+            assert int(
+                client2.get_collection_stats("restart_truncate")["row_count"]
+            ) == 0
+            assert client2.query(
+                "restart_truncate", filter="id >= 0", output_fields=["id"]
+            ) == []
+        finally:
+            _stop(server2, db2)
