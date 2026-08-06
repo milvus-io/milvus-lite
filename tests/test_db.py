@@ -614,6 +614,10 @@ else:
         capture_output=True,
         text=True,
         timeout=10,
+        # Keep POSIX on the posix_spawn path.  Forking the full pytest
+        # process is unsafe once the session-scoped gRPC server has
+        # started worker threads and can intermittently SIGTRAP on macOS.
+        close_fds=sys.platform == "win32",
     )
     if result.returncode != 0:
         return (

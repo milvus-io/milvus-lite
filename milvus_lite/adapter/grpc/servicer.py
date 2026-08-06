@@ -270,16 +270,29 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             )
 
     def ShowCollections(self, request, context):
-        """Return the list of collection names. Milvus's response also
-        carries timestamps and IDs which we don't track — those slots
-        stay empty."""
+        """Return collection names and their in-memory load status."""
         try:
+            database_name = self._database_name(request, context)
             names = self._db.list_collections(
-                database_name=self._database_name(request, context),
+                database_name=database_name,
             )
+            if request.collection_names:
+                requested = set(request.collection_names)
+                names = [name for name in names if name in requested]
+            percentages = [
+                100
+                if self._db.get_collection(
+                    name, database_name=database_name
+                ).load_state == "loaded"
+                else 0
+                for name in names
+            ]
             return milvus_pb2.ShowCollectionsResponse(
                 status=common_pb2.Status(**success_status_kwargs()),
                 collection_names=names,
+                inMemory_percentages=percentages,
+                query_service_available=[value == 100 for value in percentages],
+                shards_num=[1] * len(names),
             )
         except Exception as e:
             logger.exception("ShowCollections failed: %s", e)
@@ -937,9 +950,14 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         try:
             col = self._get_collection(request, context)
             names = col.list_partitions()
+            if request.partition_names:
+                requested = set(request.partition_names)
+                names = [name for name in names if name in requested]
+            percentage = 100 if col.load_state == "loaded" else 0
             return milvus_pb2.ShowPartitionsResponse(
                 status=common_pb2.Status(**success_status_kwargs()),
                 partition_names=names,
+                inMemory_percentages=[percentage] * len(names),
             )
         except MilvusLiteError as e:
             return milvus_pb2.ShowPartitionsResponse(

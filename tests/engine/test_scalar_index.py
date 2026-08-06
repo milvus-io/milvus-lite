@@ -5,6 +5,7 @@ import pytest
 
 from milvus_lite import Collection, CollectionSchema, DataType, FieldSchema
 from milvus_lite.exceptions import SchemaValidationError
+from milvus_lite.index.scalar import ScalarInvertedIndex
 
 
 def _schema():
@@ -511,14 +512,12 @@ def test_load_rejects_scalar_sidx_dtype_metadata_mismatch(tmp_path):
 
         index_dir = data_dir / "partitions" / "_default" / "indexes"
         sidx_path = next(index_dir.glob("*.age.inverted.sidx"))
-        with pa.OSFile(str(sidx_path), "rb") as source:
-            table = pa.ipc.RecordBatchFileReader(source).read_all()
-        metadata = dict(table.schema.metadata or {})
-        metadata[b"dtype"] = b"VARCHAR"
-        table = table.replace_schema_metadata(metadata)
-        with pa.OSFile(str(sidx_path), "wb") as sink:
-            with pa.ipc.RecordBatchFileWriter(sink, table.schema) as writer:
-                writer.write_table(table)
+        wrong_dtype_index = ScalarInvertedIndex.build(
+            pa.table({"age": ["18", "25", "30", "50", None]}),
+            "age",
+            DataType.VARCHAR,
+        )
+        wrong_dtype_index.save(str(sidx_path))
 
         with pytest.raises(ValueError, match="metadata does not match"):
             col.load()
