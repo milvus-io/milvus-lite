@@ -661,6 +661,7 @@ class Collection:
         offset: int = 0,
         ranker: Optional[dict] = None,
         timezone: Optional[str] = None,
+        search_params: Optional[dict] = None,
     ) -> List[List[dict]]:
         """Vector top-k search.
 
@@ -681,6 +682,8 @@ class Collection:
             range_filter: optional distance upper bound (inclusive).
             offset: number of results to skip before returning (default 0).
             ranker: optional request-level Boost Ranker spec.
+            search_params: optional engine-side ANN tuning params (e.g.
+                ``{"ef": 128}`` for HNSW, ``{"nprobe": 16}`` for IVF).
 
         Returns:
             List of length nq. Each inner list has dicts of shape
@@ -790,6 +793,7 @@ class Collection:
                 project_record_fn=lambda record: project_record(
                     record, self._schema, search_projection_plan
                 ),
+                search_params=search_params,
             )
 
         # Apply range filter (before group_by)

@@ -611,6 +611,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 offset=search_offset,
                 ranker=parsed.get("ranker"),
                 timezone=parsed.get("timezone"),
+                search_params=parsed.get("search_params"),
             )
 
             if public_chain_plan is not None:
@@ -1247,6 +1248,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                     anns_field=parsed.get("anns_field"),
                     ranker=sub_ranker,
                     timezone=route_timezone,
+                    search_params=parsed.get("search_params"),
                 )
                 all_results.append(results)
                 route_metrics.append(parsed["metric_type"])

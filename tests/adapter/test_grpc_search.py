@@ -230,3 +230,55 @@ def test_search_results_sorted_by_cosine_score_descending(loaded_collection):
     )
     distances = [hit["distance"] for hit in res[0]]
     assert distances == sorted(distances, reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Regression: search_params (ef) must reach the HNSW index
+# ---------------------------------------------------------------------------
+# execute_search_with_index used to (1) never forward `search_params` to
+# VectorIndex.search -- hard-wiring HNSW efSearch=64 regardless of what the
+# client sent -- and (2) always route through faiss's IDSelectorBatch even
+# when nothing was excluded, which independently bounds graph traversal.
+# Together they capped recall to ~1% of the collection for an out-of-cluster
+# query, at every `ef`. See docs/milvus-lite-hnsw-recall-bug.md upstream.
+
+def test_hnsw_search_recall_against_brute_force(milvus_client):
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    dim, n = 128, 10_000
+
+    def unit(a):
+        return a / np.linalg.norm(a, axis=-1, keepdims=True)
+
+    centre = unit(rng.normal(size=dim))
+    data = unit(centre + 0.35 * rng.normal(size=(n, dim))).astype("float32")
+    # Off-cluster query -- an in-distribution query is itself near-identical
+    # to a graph node and hides this bug (recall looks perfect either way).
+    query = unit(rng.normal(size=dim)).astype("float32")
+
+    schema = MilvusClient.create_schema(auto_id=False)
+    schema.add_field("id", DataType.INT64, is_primary=True)
+    schema.add_field("vec", DataType.FLOAT_VECTOR, dim=dim)
+    milvus_client.create_collection("hnsw_recall", schema=schema)
+    milvus_client.insert("hnsw_recall", [
+        {"id": i, "vec": data[i].tolist()} for i in range(n)
+    ])
+    idx = milvus_client.prepare_index_params()
+    idx.add_index(field_name="vec", index_type="HNSW", metric_type="COSINE",
+                  params={"M": 16, "efConstruction": 128})
+    milvus_client.create_index("hnsw_recall", idx)
+    milvus_client.load_collection("hnsw_recall")
+
+    truth_ids = set(np.argsort(-(data @ query))[:10].tolist())
+    res = milvus_client.search(
+        "hnsw_recall", data=[query.tolist()], limit=10,
+        search_params={"metric_type": "COSINE", "params": {"ef": 256}},
+    )[0]
+    got_ids = {hit["id"] for hit in res}
+
+    recall = len(truth_ids & got_ids) / 10
+    assert recall >= 0.8, (
+        f"HNSW recall@10 = {recall:.0%} vs brute-force ground truth -- "
+        f"search_params/valid_mask regression in executor_indexed.py"
+    )

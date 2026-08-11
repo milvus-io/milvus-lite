@@ -60,6 +60,7 @@ def execute_search_with_index(
     output_fields: Optional[List[str]] = None,
     indexed_filter_plan: Optional["IndexedFilterPlan"] = None,
     project_record_fn: Optional[Callable[[dict], dict]] = None,
+    search_params: Optional[Dict[str, Any]] = None,
 ) -> List[List[dict]]:
     """Per-source recall + global merge search path.
 
@@ -77,6 +78,9 @@ def execute_search_with_index(
         compiled_filter: optional Phase-8 CompiledExpr
         output_fields: optional Phase-9.1 entity projection list. See
             Collection.search for the three semantics.
+        search_params: optional engine-side ANN tuning params (e.g.
+            ``{"ef": 128}`` for HNSW, ``{"nprobe": 16}`` for IVF), forwarded
+            to each segment's VectorIndex.search. None = index defaults.
 
     Returns:
         nq lists of up to top_k result dicts of shape
@@ -198,8 +202,14 @@ def execute_search_with_index(
             return
         if index is None:
             index = BruteForceIndex.build(vectors, metric_type)
+        # valid_mask=None means "all rows valid" (see VectorIndex.search
+        # docstring) -- equivalent to an all-true mask but skips the
+        # IDSelector path, which otherwise bounds ANN traversal even when
+        # nothing is actually excluded.
         local_ids, dists = index.search(
-            query_vectors, top_k, valid_mask=local_mask
+            query_vectors, top_k,
+            valid_mask=None if local_mask.all() else local_mask,
+            params=search_params,
         )
         for q in range(nq):
             for j in range(top_k):
