@@ -130,7 +130,8 @@ class FaissHnswSqIndex(VectorIndex):
             if valid_indices.size == 0:
                 return result_ids, result_dists
             sel = faiss.IDSelectorBatch(valid_indices)
-            sp = faiss.SearchParametersHNSW(sel=sel)
+            # SearchParametersHNSW overrides the index-level efSearch.
+            sp = faiss.SearchParametersHNSW(sel=sel, efSearch=ef)
             faiss_dists, faiss_ids = self._index.search(queries_c, top_k, params=sp)
         else:
             faiss_dists, faiss_ids = self._index.search(queries_c, top_k)

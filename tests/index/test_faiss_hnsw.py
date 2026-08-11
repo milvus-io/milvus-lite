@@ -22,7 +22,10 @@ pytestmark = pytest.mark.skipif(
 # at top level — we don't want to error at collection time when faiss
 # is missing.
 if is_faiss_available():
+    import faiss
+
     from milvus_lite.index.faiss_hnsw import FaissHnswIndex
+    from milvus_lite.index.faiss_hnsw_sq import FaissHnswSqIndex
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +205,23 @@ def test_search_params_ef_overrides_default(vectors, queries):
     assert ids.shape == (5, 5)
     ids, _ = idx.search(queries, top_k=5, params={"ef": 200})
     assert ids.shape == (5, 5)
+
+
+@pytest.mark.parametrize("index_type", ["HNSW", "HNSW_SQ"])
+def test_search_params_ef_reaches_selector(index_type, vectors, queries, monkeypatch):
+    index_cls = FaissHnswIndex if index_type == "HNSW" else FaissHnswSqIndex
+    original = faiss.SearchParametersHNSW
+    captured = []
+
+    def capture(**kwargs):
+        captured.append(original(**kwargs))
+        return captured[-1]
+
+    monkeypatch.setattr(faiss, "SearchParametersHNSW", capture)
+    idx = index_cls.build(vectors, "L2", HNSW_PARAMS)
+    idx.search(queries, top_k=5, valid_mask=np.ones(100, dtype=bool), params={"ef": 123})
+
+    assert captured[0].efSearch == 123
 
 
 # ---------------------------------------------------------------------------
