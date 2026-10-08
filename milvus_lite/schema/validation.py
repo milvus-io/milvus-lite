@@ -116,6 +116,8 @@ def validate_schema(
                 )
         if f.dtype == DataType.SPARSE_FLOAT_VECTOR:
             all_vector_fields.append(f)
+            if f.default_value is not None:
+                f.default_value = _validate_sparse_vector(f.name, f.default_value)
         if f.dtype == DataType.ARRAY:
             if f.element_type is None:
                 raise SchemaValidationError(
@@ -195,6 +197,13 @@ def validate_schema(
                 )
             func_outputs_seen.add(out_name)
         _validate_function(func, field_by_name)
+
+    for f in schema.fields:
+        if (f.dtype == DataType.SPARSE_FLOAT_VECTOR and f.is_function_output
+                and f.name not in func_outputs_seen):
+            raise SchemaValidationError(
+                f"sparse function output field {f.name!r} has no producing Function"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +412,7 @@ def validate_record(
                 continue
             # User-provided sparse vectors: validate if present.
             if f.name in record and record[f.name] is not None:
-                _validate_sparse_vector(f.name, record[f.name])
+                record[f.name] = _validate_sparse_vector(f.name, record[f.name])
             elif not f.nullable and f.default_value is None:
                 raise SchemaValidationError(
                     f"sparse vector field {f.name!r} missing and not nullable / no default"
@@ -538,28 +547,11 @@ def _find_float_vector(schema: CollectionSchema) -> Optional[FieldSchema]:
     return None
 
 
-def _validate_sparse_vector(field_name: str, value: Any) -> None:
-    """Validate a user-provided sparse vector value.
+def _validate_sparse_vector(field_name: str, value: Any) -> dict[int, float]:
+    """Validate a public record value and canonicalize it before float32 storage."""
+    from milvus_lite.schema.sparse import normalize_sparse_vector
 
-    Expected format: dict[int, float] where keys are non-negative integers
-    (term IDs) and values are float scores.
-    """
-    if not isinstance(value, dict):
-        raise SchemaValidationError(
-            f"sparse vector field {field_name!r} must be a dict, "
-            f"got {type(value).__name__}"
-        )
-    for k, v in value.items():
-        if not isinstance(k, int) or isinstance(k, bool):
-            raise SchemaValidationError(
-                f"sparse vector field {field_name!r} key {k!r} must be int"
-            )
-        if k < 0:
-            raise SchemaValidationError(
-                f"sparse vector field {field_name!r} key {k} must be non-negative"
-            )
-        if not isinstance(v, (int, float)) or isinstance(v, bool):
-            raise SchemaValidationError(
-                f"sparse vector field {field_name!r} value for key {k} "
-                f"must be numeric, got {type(v).__name__}"
-            )
+    try:
+        return normalize_sparse_vector(value, allow_empty=False)
+    except ValueError as exc:
+        raise SchemaValidationError(f"sparse vector field {field_name!r}: {exc}") from exc

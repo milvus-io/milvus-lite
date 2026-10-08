@@ -7,7 +7,7 @@ Adapted from milvus-io/milvus test suite:
 Tests cover:
 1. BM25 function auto-generates sparse vectors from text
 2. BM25 search with text queries via pymilvus
-3. BM25 search with sparse dict queries
+3. BM25 relevance ordering
 4. text_match filter: single token, multi token (OR logic)
 5. text_match combined with dense vector search
 6. text_match combined with scalar filter
@@ -107,9 +107,7 @@ def test_bm25_search_text_query(milvus_client):
     """BM25 search with text string query."""
     name = _setup_loaded(milvus_client)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("python")])
+    query = "python"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
@@ -132,9 +130,7 @@ def test_bm25_search_relevance_ordering(milvus_client):
     """BM25 results should be ordered by relevance (distance ascending = score descending)."""
     name = _setup_loaded(milvus_client)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("python")])
+    query = "python"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
@@ -233,9 +229,7 @@ def test_text_match_and_scalar_filter(milvus_client):
 def test_bm25_search_with_filter(milvus_client):
     name = _setup_loaded(milvus_client)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("python")])
+    query = "python"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
@@ -258,9 +252,7 @@ def test_bm25_search_after_flush(milvus_client):
     name = _setup_loaded(milvus_client)
     milvus_client.flush(name)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("database")])
+    query = "database"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
@@ -289,11 +281,8 @@ def test_upsert_updates_bm25(milvus_client):
          "category": "programming", "dense": [1, 0, 0, 0]},
     ])
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-
     # "python" should no longer match doc 1
-    query = compute_tf([term_to_id("python")])
+    query = "python"
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
         search_params={"metric_type": "BM25"},
@@ -303,7 +292,7 @@ def test_upsert_updates_bm25(milvus_client):
     assert 1 not in hit_ids
 
     # "rust" should match doc 1
-    query = compute_tf([term_to_id("rust")])
+    query = "rust"
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
         search_params={"metric_type": "BM25"},
@@ -324,9 +313,7 @@ def test_delete_excludes_from_bm25(milvus_client):
 
     milvus_client.delete(name, ids=[1])
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("python")])
+    query = "python"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",
@@ -348,10 +335,8 @@ def test_delete_excludes_from_bm25(milvus_client):
 def test_bm25_multiple_queries(milvus_client):
     name = _setup_loaded(milvus_client)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    q1 = compute_tf([term_to_id("python")])
-    q2 = compute_tf([term_to_id("database")])
+    q1 = "python"
+    q2 = "database"
 
     results = milvus_client.search(
         name, data=[q1, q2], anns_field="bm25_emb",
@@ -374,9 +359,7 @@ def test_bm25_multiple_queries(milvus_client):
 def test_bm25_output_fields(milvus_client):
     name = _setup_loaded(milvus_client)
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query = compute_tf([term_to_id("python")])
+    query = "python"
 
     results = milvus_client.search(
         name, data=[query], anns_field="bm25_emb",

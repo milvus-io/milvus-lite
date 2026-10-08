@@ -392,7 +392,8 @@ def records_to_fields_data(
         records: list of dicts (engine output)
         schema: source CollectionSchema — needed for per-field type info
         output_fields: optional whitelist; None → emit every schema field.
-            Pk is always emitted.
+            Pk is always emitted for Query/Get and calls without a projection
+            plan. A Search plan includes it only when selected explicitly or by *.
 
     Returns:
         List of FieldData proto messages, one per emitted field. When
@@ -406,7 +407,7 @@ def records_to_fields_data(
 
     if projection_plan is not None:
         emit = set(projection_plan.response_schema_fields)
-        if pk_name:
+        if pk_name and projection_plan.api_kind != "search":
             emit.add(pk_name)
         emit_names = [f.name for f in schema.fields if f.name in emit]
     elif output_fields is None:

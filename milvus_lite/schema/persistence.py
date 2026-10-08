@@ -182,6 +182,24 @@ def _field_from_dict(d: Any, source: str) -> FieldSchema:
             f"schema file {source!r} unknown dtype {dtype_str!r}"
         ) from e
 
+    default_value = d.get("default_value")
+    if dtype == DataType.SPARSE_FLOAT_VECTOR and isinstance(default_value, dict):
+        # JSON object keys are strings. Restore sparse coordinates here only;
+        # ordinary JSON defaults and caller-supplied keys keep their own types.
+        restored = {}
+        for key, value in default_value.items():
+            try:
+                dimension = int(key)
+                if str(dimension) != key:
+                    raise ValueError("non-canonical integer key")
+            except (TypeError, ValueError) as exc:
+                raise SchemaValidationError(
+                    f"schema file {source!r} field {name!r} has invalid "
+                    f"sparse default dimension {key!r}"
+                ) from exc
+            restored[dimension] = value
+        default_value = restored
+
     return FieldSchema(
         name=str(name),
         dtype=dtype,
@@ -192,7 +210,7 @@ def _field_from_dict(d: Any, source: str) -> FieldSchema:
         element_type=DataType(d["element_type"]) if d.get("element_type") else None,
         max_capacity=d.get("max_capacity"),
         nullable=bool(d.get("nullable", False)),
-        default_value=d.get("default_value"),
+        default_value=default_value,
         enable_analyzer=bool(d.get("enable_analyzer", False)),
         analyzer_params=d.get("analyzer_params"),
         enable_match=bool(d.get("enable_match", False)),

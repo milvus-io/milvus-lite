@@ -1,5 +1,13 @@
 # Deep Design: Full Text Search Subsystem (Phase 11)
 
+For the separation of user-supplied sparse IP retrieval from BM25
+Function-driven text retrieval, see [Sparse Vector IP and BM25 Design](sparse-vector-design.md).
+That design introduces an independent `SparseIpIndex`, reusing posting-list
+operations while retaining the BM25 implementation. It defines field/input
+validation, metric resolution, and the lazy in-memory index lifecycle. This
+document describes the BM25 algorithm; its internal sparse dictionaries are not
+the public query contract for a BM25 Function output field.
+
 ## 1. Overview
 
 MilvusLite Phase 11 introduces Full Text Search (FTS), allowing users to perform semantic relevance search through natural language text. **The core implementation is BM25 scoring + sparse inverted index**, fully compatible with the Milvus Full Text Search API.

@@ -119,19 +119,17 @@ def test_insert_with_bm25_function(milvus_client):
 def test_bm25_search_via_grpc(milvus_client):
     """BM25 search through pymilvus gRPC interface.
 
-    pymilvus MilvusClient.search with sparse vector data sends a
-    PlaceholderGroup with type=SPARSE_FLOAT_VECTOR (104).
+    pymilvus sends raw text for a BM25 Function output field;
+    the Engine prepares the sparse query with the field's analyzer.
     """
     name = _setup_fts_collection(milvus_client)
 
-    # Build sparse query dict: search for "python"
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    query_tf = compute_tf([term_to_id("python")])
+    # Search the BM25 Function output using raw text
+    query_text = "python"
 
     results = milvus_client.search(
         name,
-        data=[query_tf],
+        data=[query_text],
         anns_field="sparse_emb",
         search_params={"metric_type": "BM25"},
         limit=4,

@@ -26,6 +26,7 @@ storage layer free of engine-layer types.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -300,7 +301,7 @@ class Collection:
 
         # Search-time query helpers (not part of the chain — they transform
         # *queries* before vector search, not records or results).
-        self._bm25_analyzers: List[Tuple[str, str, Any]] = []
+        self._bm25_analyzers: Dict[str, Any] = {}
         self._embedding_providers: List[Tuple[str, str, Any]] = []
         if schema.functions:
             from milvus_lite.analyzer.factory import create_analyzer
@@ -310,7 +311,7 @@ class Collection:
                     out_name = func.output_field_names[0]
                     in_field = field_by_name[in_name]
                     analyzer = create_analyzer(in_field.analyzer_params)
-                    self._bm25_analyzers.append((in_name, out_name, analyzer))
+                    self._bm25_analyzers[out_name] = analyzer
                 elif func.function_type == FunctionType.TEXT_EMBEDDING:
                     from milvus_lite.embedding.factory import create_embedding_provider
                     in_name = func.input_field_names[0]
@@ -356,6 +357,13 @@ class Collection:
             raise TypeError(f"records must be a list, got {type(records).__name__}")
         if not records:
             return []
+
+        self._validate_bm25_input_ownership(records)
+        # Ingestion and validation replace top-level fields. Copy each record
+        # to isolate those writes while reusing read-only vectors/JSON/arrays.
+        # Mutable schema defaults are still copied by validate_record().
+        if self._bm25_analyzers:
+            records = [dict(record) for record in records]
 
         # 1. auto-generate primary key IDs if auto_id is enabled
         if self._auto_id:
@@ -457,6 +465,8 @@ class Collection:
         if not records:
             return []
 
+        self._validate_bm25_input_ownership(records)
+
         # Build merged records: for existing pks, fill missing fields
         # from the old record.
         merged: List[dict] = []
@@ -475,9 +485,28 @@ class Collection:
             # Merge: old record is the base, new record overrides
             combined = dict(old)
             combined.update(rec)
+            # Inherited generated values are internal, not caller input.
+            for output_name in self._bm25_analyzers:
+                combined.pop(output_name, None)
+            from milvus_lite.analyzer.sparse import bytes_to_sparse
+            for field in self._schema.fields:
+                if (field.dtype == DataType.SPARSE_FLOAT_VECTOR
+                        and field.name not in rec
+                        and isinstance(combined.get(field.name), bytes)):
+                    combined[field.name] = bytes_to_sparse(combined[field.name])
             merged.append(combined)
 
         return self.insert(merged, partition_name=partition_name)
+
+    def _validate_bm25_input_ownership(self, records: List[dict]) -> None:
+        for record in records:
+            if not isinstance(record, dict):
+                raise SchemaValidationError("each record must be a dict")
+            for output_name in self._bm25_analyzers:
+                if output_name in record:
+                    raise SchemaValidationError(
+                        f"BM25 output field {output_name!r} is generated; provide its source text instead"
+                    )
 
     def _get_raw(self, pk: Any) -> Optional[dict]:
         """Internal point read for a single pk, bypassing load-state check.
@@ -648,7 +677,7 @@ class Collection:
         self,
         query_vectors: List[list],
         top_k: int = 10,
-        metric_type: str = "COSINE",
+        metric_type: Optional[str] = None,
         partition_names: Optional[List[str]] = None,
         expr: Optional[str] = None,
         output_fields: Optional[List[str]] = None,
@@ -666,10 +695,11 @@ class Collection:
         """Vector top-k search.
 
         Args:
-            query_vectors: list of length nq, each item a list of length dim
-                (for FLOAT_VECTOR) or list of dict (for SPARSE_FLOAT_VECTOR).
+            query_vectors: list of dense vectors, ordinary sparse dictionaries,
+                or raw text queries for a BM25 Function output field.
             top_k: requested k (number of groups when group_by_field is set).
-            metric_type: "COSINE" / "L2" / "IP" / "BM25".
+            metric_type: "COSINE" / "L2" / "IP" / "BM25". None resolves the
+                target field's index or its dense/sparse/Function default.
             partition_names: optional partition filter.
             expr: optional Milvus-style scalar filter expression.
             output_fields: optional whitelist of fields to include in entity.
@@ -729,6 +759,7 @@ class Collection:
 
         # Resolve the target vector field
         vector_field = self._resolve_anns_field(anns_field)
+        metric_type = self.resolve_search_metric(vector_field, metric_type)
         field_schema = next(f for f in self._schema.fields if f.name == vector_field)
 
         _boost_field_injected = False
@@ -756,6 +787,7 @@ class Collection:
         )
 
         if field_schema.dtype == DataType.SPARSE_FLOAT_VECTOR:
+            self._validate_sparse_tuning(vector_field, metric_type, search_params or {})
             raw_results = self._search_sparse(
                 query_vectors=query_vectors,
                 vector_field=vector_field,
@@ -862,6 +894,74 @@ class Collection:
             )
         return anns_field
 
+    def resolve_search_metric(
+        self, anns_field: Optional[str] = None, metric_type: Optional[str] = None,
+    ) -> str:
+        """Resolve a request metric using its target field, never another index."""
+        field_name = self._resolve_anns_field(anns_field)
+        field = _schema_field(self._schema, field_name)
+        if metric_type is not None:
+            if not isinstance(metric_type, str):
+                raise SchemaValidationError(f"field {field_name!r}: metric_type must be a string")
+            metric_type = metric_type.upper()
+        spec = self._index_specs.get(field_name)
+        if field.dtype == DataType.SPARSE_FLOAT_VECTOR:
+            expected = "BM25" if field_name in self._bm25_analyzers else "IP"
+            if spec is not None:
+                self._validate_sparse_index_config(
+                    field_name, spec.index_type, spec.metric_type,
+                    spec.build_params, spec.search_params,
+                )
+            if metric_type is not None and metric_type != expected:
+                raise SchemaValidationError(
+                    f"sparse field {field_name!r} requires metric {expected}, got {metric_type!r}"
+                )
+            return expected
+        metric = metric_type or (spec.metric_type if spec is not None else "COSINE")
+        if metric not in ("COSINE", "L2", "IP"):
+            raise SchemaValidationError(f"field {field_name!r}: unsupported dense metric {metric!r}")
+        return metric
+
+    def _validate_sparse_index_config(self, field_name, index_type, metric_type, params, search_params):
+        expected = "BM25" if field_name in self._bm25_analyzers else "IP"
+        if index_type != "SPARSE_INVERTED_INDEX" or metric_type != expected:
+            raise SchemaValidationError(
+                f"sparse field {field_name!r} requires SPARSE_INVERTED_INDEX with metric {expected}; "
+                f"got {index_type!r}/{metric_type!r}. For an existing index, release, drop, "
+                "and recreate it with the allowed metric."
+            )
+        self._validate_sparse_tuning(field_name, metric_type, params)
+        self._validate_sparse_tuning(field_name, metric_type, search_params)
+
+    @staticmethod
+    def _validate_sparse_tuning(field_name, metric_type, params):
+        for name in ("bm25_k1", "bm25_b"):
+            if name not in params:
+                continue
+            if metric_type != "BM25":
+                raise SchemaValidationError(f"IP field {field_name!r} does not accept {name}")
+            try:
+                value = float(params[name])
+                valid = math.isfinite(value) and not isinstance(params[name], bool)
+                valid = valid and (value > 0 if name == "bm25_k1" else 0 <= value <= 1)
+            except (ValueError, TypeError, OverflowError):
+                valid = False
+            if not valid:
+                raise SchemaValidationError(f"field {field_name!r}: invalid {name}")
+        for name in ("drop_ratio_build", "drop_ratio_search"):
+            if name in params:
+                try:
+                    exact = float(params[name]) == 0
+                except (ValueError, TypeError, OverflowError):
+                    exact = False
+                if not exact:
+                    raise SchemaValidationError(f"field {field_name!r}: only {name}=0 is supported")
+        algorithm = params.get("inverted_index_algo", "TAAT_NAIVE")
+        if not isinstance(algorithm, str) or algorithm.upper() != "TAAT_NAIVE":
+            raise SchemaValidationError(
+                f"field {field_name!r}: unsupported sparse algorithm {algorithm!r}; use TAAT_NAIVE"
+            )
+
     def _search_sparse(
         self,
         query_vectors: List,
@@ -873,38 +973,37 @@ class Collection:
         output_fields: Optional[List[str]],
         timezone: Optional[str] = None,
     ) -> List[List[dict]]:
-        """Sparse vector search using per-segment cached BM25 indexes.
+        """Sparse search using independent IP or BM25 per-segment indexes.
 
         Architecture (Perf-3):
-        - Each immutable segment gets a cached SparseInvertedIndex
+        - Each immutable segment gets a cached sparse scorer
           (built once, reused across searches).
         - The mutable memtable's index is rebuilt each search (small).
         - Per-source top-k results are merged globally.
 
-        TODO: IDF accuracy — each segment currently uses its own IDF
+        TODO: BM25 IDF accuracy — each segment currently uses its own IDF
         statistics, so BM25 scores from different segments have different
         baselines. Fix: aggregate global statistics (doc_count/avgdl/df
         summed across segments) at search time and use global IDF for
         scoring. Similar to Elasticsearch's DFS_QUERY_THEN_FETCH strategy.
         """
         from milvus_lite.analyzer.sparse import bytes_to_sparse
-        from milvus_lite.index.sparse_inverted import SparseInvertedIndex
+        from milvus_lite.index.sparse_factory import (
+            _search_prepared_sparse_index,
+            create_sparse_index,
+            sparse_index_matches,
+        )
 
         partition_filter = set(partition_names) if partition_names else None
         projection_plan = build_projection_plan(
             output_fields, self._schema, api_kind="search"
         )
 
-        # BM25 params
-        bm25_k1 = 1.5
-        bm25_b = 0.75
         sparse_spec = self._index_specs.get(vector_field)
-        if sparse_spec and sparse_spec.index_type == "SPARSE_INVERTED_INDEX":
-            bm25_k1 = sparse_spec.build_params.get("bm25_k1", 1.5)
-            bm25_b = sparse_spec.build_params.get("bm25_b", 0.75)
+        index_params = sparse_spec.build_params if sparse_spec else {}
 
         # Convert query vectors upfront
-        query_sparse = self._prepare_sparse_queries(query_vectors)
+        query_sparse = self._prepare_sparse_queries(query_vectors, vector_field)
         nq = len(query_sparse)
         compiled_filter = self._compile_filter(expr, timezone=timezone) if expr else None
         indexed_filter_plan = self._indexed_filter_plan(compiled_filter)
@@ -916,18 +1015,19 @@ class Collection:
         # Read snapshot — keeps segment cache and tombstones from crossing
         # compaction / tombstone-GC generations.
         seg_snapshot, delta_snap = self._read_snapshot()
+        mt_deletes = self._memtable.delete_index_snapshot()
 
         # ── Build global pk→best_seq map for cross-segment dedup ──
         global_pk_seq: Dict[Any, int] = {}
         for seg in seg_snapshot:
-            if partition_filter is not None:
-                if seg.partition not in partition_filter:
-                    continue
+            # Resolve collection-wide versions before partition pruning, just
+            # as for MemTable rows. Moving a pk must not reveal its old version
+            # in the source partition after the new version is flushed.
             for i, pk in enumerate(seg.pks):
                 seq = int(seg.seqs[i])
                 if pk not in global_pk_seq or seq > global_pk_seq[pk]:
                     global_pk_seq[pk] = seq
-        # Memtable pks always win (highest seq)
+        # Resolve versions by sequence, not by physical source order.
         for pk, (_, _, seq) in self._memtable.pk_index_snapshot():
             global_pk_seq[pk] = max(seq, global_pk_seq.get(pk, -1))
 
@@ -941,17 +1041,16 @@ class Collection:
                 continue
 
             # Build or reuse cached sparse index for this segment
-            cache_key = f"_sparse_{vector_field}"
-            cached_idx = seg.indexes.get(cache_key)
-            if cached_idx is None:
+            cached_idx = seg.sparse_indexes.get(vector_field)
+            if not sparse_index_matches(cached_idx, metric_type, index_params):
                 sparse_batch = table.column(vector_field).to_pylist()
                 sparse_vecs = [
                     bytes_to_sparse(r) if isinstance(r, bytes) else (r or {})
                     for r in sparse_batch
                 ]
-                cached_idx = SparseInvertedIndex(k1=bm25_k1, b=bm25_b)
+                cached_idx = create_sparse_index(metric_type, index_params)
                 cached_idx.build(sparse_vecs)  # no valid_mask — full segment
-                seg.attach_index(cached_idx, field_name=cache_key)
+                seg.sparse_indexes[vector_field] = cached_idx
 
             # Build valid_mask for this segment (dedup + tombstone + filter)
             pks = seg.pks
@@ -960,7 +1059,10 @@ class Collection:
             valid_mask = np.ones(n, dtype=bool)
             for i in range(n):
                 pk, seq = pks[i], int(seqs[i])
-                if delta_snap.is_deleted(pk, seq):
+                pending_delete = mt_deletes.get(pk)
+                if (delta_snap.is_deleted(pk, seq)
+                        or (pending_delete is not None and pending_delete[0] > seq
+                            and pending_delete[1] in (ALL_PARTITIONS, seg.partition))):
                     valid_mask[i] = False
                 elif global_pk_seq.get(pk, -1) > seq:
                     # Stale version — a newer version exists in another segment or memtable
@@ -977,7 +1079,9 @@ class Collection:
                 continue
 
             # Search this segment's cached index
-            local_ids, dists = cached_idx.search(query_sparse, top_k, valid_mask=valid_mask)
+            local_ids, dists = _search_prepared_sparse_index(
+                cached_idx, query_sparse, top_k, valid_mask=valid_mask,
+            )
             for qi in range(nq):
                 for j in range(top_k):
                     lid = int(local_ids[qi, j])
@@ -995,6 +1099,8 @@ class Collection:
         for pk, seq, record in mt.active_record_snapshots(
             partition_names=partition_names
         ):
+            if delta_snap.is_deleted(pk, seq) or global_pk_seq.get(pk, -1) > seq:
+                continue
             raw = record.get(vector_field)
             mt_pks.append(pk)
             mt_sparse.append(
@@ -1013,9 +1119,9 @@ class Collection:
                         if not _eval_row(compiled_filter.ast, record):
                             mt_valid[i] = False
 
-            mt_idx = SparseInvertedIndex(k1=bm25_k1, b=bm25_b)
+            mt_idx = create_sparse_index(metric_type, index_params)
             mt_idx.build(mt_sparse, valid_mask=mt_valid)
-            local_ids, dists = mt_idx.search(query_sparse, top_k)
+            local_ids, dists = _search_prepared_sparse_index(mt_idx, query_sparse, top_k)
             for qi in range(nq):
                 for j in range(top_k):
                     lid = int(local_ids[qi, j])
@@ -1102,25 +1208,25 @@ class Collection:
                 embedded.append(qv)
         return embedded
 
-    def _prepare_sparse_queries(self, query_vectors: List) -> List[Dict[int, float]]:
-        """Convert query vectors to sparse dicts (text → tokenize → TF)."""
+    def _prepare_sparse_queries(self, query_vectors: List, vector_field: str) -> List[Dict[int, float]]:
+        """Validate the entire batch against the target field's producer."""
+        from milvus_lite.schema.sparse import normalize_sparse_vector
+        from milvus_lite.analyzer.sparse import compute_tf
+
+        analyzer = self._bm25_analyzers.get(vector_field)
         query_sparse: List[Dict[int, float]] = []
         for qv in query_vectors:
-            if isinstance(qv, dict):
-                query_sparse.append(qv)
-            elif isinstance(qv, str):
-                analyzer = self._bm25_analyzers[0][2] if self._bm25_analyzers else None
-                if analyzer is None:
+            if analyzer is not None:
+                if not isinstance(qv, str):
                     raise SchemaValidationError(
-                        "Text query requires a BM25 function with an analyzer"
+                        f"BM25 field {vector_field!r} requires a text query, not a sparse vector"
                     )
-                from milvus_lite.analyzer.sparse import compute_tf
                 query_sparse.append(compute_tf(analyzer.analyze(qv)))
             else:
-                raise SchemaValidationError(
-                    f"Sparse search query must be a dict or string, "
-                    f"got {type(qv).__name__}"
-                )
+                try:
+                    query_sparse.append(normalize_sparse_vector(qv))
+                except ValueError as exc:
+                    raise SchemaValidationError(f"sparse query field {vector_field!r}: {exc}") from exc
         return query_sparse
 
     def query(
@@ -1269,6 +1375,11 @@ class Collection:
         return plan_indexed_filter(compiled_filter, indexed_fields)
 
     def _build_or_load_segment_index(self, seg: Segment, spec: IndexSpec) -> None:
+        if _field_dtype(self._schema, spec.field_name) == DataType.SPARSE_FLOAT_VECTOR:
+            self._validate_sparse_index_config(
+                spec.field_name, spec.index_type, spec.metric_type, spec.build_params, spec.search_params,
+            )
+            return  # Sparse indexes are built lazily by search, not as sidecars.
         index_dir = self._index_dir(seg.partition)
         if _is_scalar_index_spec(spec):
             seg.build_or_load_scalar_index(
@@ -1454,6 +1565,8 @@ class Collection:
             index_type = str(index_params["index_type"]).upper()
             build_params = dict(index_params.get("params") or {})
             metric_type = index_params.get("metric_type")
+            if isinstance(metric_type, str):
+                metric_type = metric_type.upper()
             if target.dtype in (DataType.FLOAT_VECTOR, DataType.SPARSE_FLOAT_VECTOR):
                 if metric_type is None:
                     raise SchemaValidationError(
@@ -1468,6 +1581,12 @@ class Collection:
                 _validate_scalar_index_request(target.dtype, index_type)
                 metric_type = metric_type or "NONE"
 
+            if target.dtype == DataType.SPARSE_FLOAT_VECTOR:
+                self._validate_sparse_index_config(
+                    field_name, index_type, metric_type, build_params,
+                    index_params.get("search_params") or {},
+                )
+
             spec = IndexSpec(
                 field_name=field_name,
                 index_type=index_type,
@@ -1479,6 +1598,9 @@ class Collection:
             self._index_specs[field_name] = spec
             self._manifest.set_index_spec(spec)
             self._manifest.save()
+
+            for seg in self._segment_cache.values():
+                seg.sparse_indexes.pop(field_name, None)
 
             # Milvus semantics: create_index preserves load state. If
             # loaded, build indexes inline for existing segments so search
@@ -1624,6 +1746,11 @@ class Collection:
             self._load_state = "loading"
             try:
                 for spec in self._index_specs.values():
+                    if _field_dtype(self._schema, spec.field_name) == DataType.SPARSE_FLOAT_VECTOR:
+                        self._validate_sparse_index_config(
+                            spec.field_name, spec.index_type, spec.metric_type,
+                            spec.build_params, spec.search_params,
+                        )
                     for seg in self._segment_cache.values():
                         if seg.num_rows == 0:
                             continue
@@ -1641,10 +1768,10 @@ class Collection:
         the released state — see Collection.__init__ for the rationale).
         """
         with self._maintenance_lock:
-            if not self._index_specs:
-                return
             for seg in self._segment_cache.values():
                 seg.release_index()
+            if not self._index_specs:
+                return
             self._load_state = "released"
 
     @property
@@ -2094,7 +2221,7 @@ class Collection:
             if f.dtype == DataType.SPARSE_FLOAT_VECTOR:
                 from milvus_lite.analyzer.sparse import sparse_to_bytes
                 cols[f.name] = [
-                    sparse_to_bytes(v) if isinstance(v, dict) else (v or b"")
+                    sparse_to_bytes(v) if isinstance(v, dict) else v
                     for v in cols[f.name]
                 ]
 

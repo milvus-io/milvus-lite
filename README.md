@@ -28,7 +28,7 @@ Milvus Lite is intended for prototyping and local workloads. For large-scale pro
 
 - Drop-in local usage with `MilvusClient("./demo.db")`.
 - Pure Python implementation with inspectable code and Python stack traces.
-- Dense vector search, sparse BM25 search, and hybrid search.
+- Dense vector search, exact sparse inner-product search, BM25 text search, and hybrid search.
 - FAISS-backed vector indexes and `INVERTED` scalar indexes.
 - Milvus-style scalar and geometry filters, dynamic fields, JSON fields, array fields, partitions, aliases, iterators, and group-by search.
 - Named databases and embedded-engine collection snapshots.
@@ -162,9 +162,53 @@ with MilvusLite("./data") as db:
     print(results)
 ```
 
+## Sparse Vector Search
+
+Use `SPARSE_FLOAT_VECTOR` with `SPARSE_INVERTED_INDEX` and `metric_type="IP"`
+for user-generated sparse embeddings. Scores are the dot product of the supplied
+weights; vectors are not normalized or reweighted with BM25 statistics.
+
+```python
+from pymilvus import DataType, MilvusClient
+
+client = MilvusClient("./sparse.db")
+schema = MilvusClient.create_schema(auto_id=False)
+schema.add_field("id", DataType.INT64, is_primary=True)
+schema.add_field("embedding", DataType.SPARSE_FLOAT_VECTOR)
+client.create_collection("sparse_docs", schema=schema)
+client.insert("sparse_docs", [
+    {"id": 1, "embedding": {0: 1.0, 1: 100.0}},
+    {"id": 2, "embedding": {0: 0.5}},
+])
+
+indexes = client.prepare_index_params()
+indexes.add_index(
+    field_name="embedding", index_type="SPARSE_INVERTED_INDEX", metric_type="IP",
+)
+client.create_index("sparse_docs", indexes)
+client.load_collection("sparse_docs")
+results = client.search(
+    "sparse_docs", data=[{0: 1.0}], anns_field="embedding", limit=2,
+)
+# IDs: [1, 2]; scores: [1.0, 0.5]. Omitted metric uses the target field's index.
+print(results)
+client.close()
+```
+
+Dimensions must be integer IDs from `0` through `2**32 - 2`; weights must be
+finite non-negative float32 values. Only positive-score matches are returned,
+so a query with no overlapping dimensions can return fewer than `limit` hits.
+Empty queries return no hits; new non-null stored embeddings require a nonzero
+weight. Sparse search uses exact accumulation (`TAAT_NAIVE`); nonzero drop ratios
+and other sparse acceleration algorithms are not supported.
+
 ## Full Text and Hybrid Search
 
 Milvus Lite supports BM25 through Milvus schema functions. Text fields are analyzed on insert and written to a sparse vector field.
+
+BM25 Function output fields use the source text on both insert and search. Do not
+write the generated sparse field or submit precomputed vectors to that field.
+Use an ordinary sparse field with IP for externally generated embeddings.
 
 ```python
 from pymilvus import DataType, Function, FunctionType, MilvusClient
@@ -216,6 +260,19 @@ print(results)
 ```
 
 Hybrid search combines multiple ANN routes, such as dense vector search plus BM25, with `WeightedRanker` or `RRFRanker`. Request-level `FunctionType.RERANK` is also supported for model rerank and numeric decay rerank.
+
+### Sparse Search Upgrade Notes
+
+Earlier 3.2.1 code accepted IP sparse queries but computed BM25 scores. Existing
+ordinary sparse fields now return true inner-product scores and rankings, without
+rewriting stored vectors. Fields without an index default to IP for user vectors
+and BM25 for Function-generated text vectors.
+
+A persisted BM25 index on an ordinary sparse field, or an IP index on a BM25
+output field, must be released, dropped, and recreated with the correct metric.
+Invalid configurations are reported rather than silently rewritten. Old standalone
+BM25 index JSON files remain readable by the BM25 implementation. See the
+[sparse vector design](docs/sparse-vector-design.md) for details.
 
 ## Filtering
 

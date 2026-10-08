@@ -175,9 +175,7 @@ def test_grpc_multi_index_search_both(milvus_client):
     assert len(r1[0]) == 3
 
     # BM25 search (no index needed — on-the-fly)
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-    q = compute_tf([term_to_id("python")])
+    q = "python"
     r2 = milvus_client.search("mi_search", data=[q], anns_field="sparse",
                               search_params={"metric_type": "BM25"}, limit=3)
     assert len(r2[0]) >= 1
