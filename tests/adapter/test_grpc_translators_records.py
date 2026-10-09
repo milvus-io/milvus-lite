@@ -211,6 +211,20 @@ def test_decode_vector_total_length_mismatch_raises():
 # records_to_fields_data — happy path
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize("api_kind,expected", [
+    ("search", ["label"]), ("query", ["pk", "label"]), ("get", ["pk", "label"]),
+])
+def test_primary_field_encoding_respects_read_api(api_kind, expected):
+    schema = CollectionSchema(fields=[
+        FieldSchema("pk", DataType.INT64, is_primary=True),
+        FieldSchema("label", DataType.VARCHAR),
+    ])
+    fields = records_to_fields_data(
+        [{"pk": 1, "label": "a"}], schema,
+        projection_plan=build_projection_plan(["label"], schema, api_kind=api_kind),
+    )
+    assert [field.field_name for field in fields] == expected
+
 def _schema_basic():
     return CollectionSchema(fields=[
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),

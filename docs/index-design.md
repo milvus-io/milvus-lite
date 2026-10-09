@@ -1,5 +1,12 @@
 # Deep Design: Vector Index Subsystem (Phase 9)
 
+Sparse IP/BM25 indexing is specified separately in
+[Sparse Vector IP and BM25 Design](sparse-vector-design.md). The new
+`SparseIpIndex` and existing BM25 implementation reuse raw-weight posting
+operations but have distinct scoring and input contracts. Unlike the
+dense sidecar lifecycle below, the current Engine builds sparse indexes lazily
+in memory; the IP implementation retains that lifecycle.
+
 ## 1. Overview
 
 MilvusLite Phase 9 introduces vector indexing, upgrading the retrieval path of `Collection.search` from NumPy brute-force scanning to ANN (Approximate Nearest Neighbor) retrieval. **The default implementation is FAISS HNSW**, while BruteForceIndex is retained as a differential baseline + dependency-free fallback.

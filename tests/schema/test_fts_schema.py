@@ -334,7 +334,8 @@ def test_validate_record_sparse_vector_user_provided():
     validate_record(record, schema)  # should not raise
 
 
-def test_validate_record_sparse_vector_bad_key():
+@pytest.mark.parametrize("key", ["bad", "0"])
+def test_validate_record_sparse_vector_bad_key(key):
     schema = CollectionSchema(
         fields=[
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True),
@@ -342,7 +343,16 @@ def test_validate_record_sparse_vector_bad_key():
         ],
     )
     with pytest.raises(SchemaValidationError, match="must be int"):
-        validate_record({"id": 1, "sv": {"bad": 1.0}}, schema)
+        validate_record({"id": 1, "sv": {key: 1.0}}, schema)
+
+
+def test_user_sparse_default_requires_integer_dimensions():
+    schema = CollectionSchema(fields=[
+        FieldSchema("id", DataType.INT64, is_primary=True),
+        FieldSchema("sv", DataType.SPARSE_FLOAT_VECTOR, default_value={"0": 0.5}),
+    ])
+    with pytest.raises(SchemaValidationError, match="must be int"):
+        validate_schema(schema)
 
 
 def test_validate_record_sparse_vector_negative_key():

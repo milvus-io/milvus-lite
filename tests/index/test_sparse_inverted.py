@@ -9,6 +9,7 @@ Covers:
 - Search after flush
 """
 
+import json
 import math
 import os
 from contextlib import closing
@@ -17,8 +18,6 @@ import tempfile
 import numpy as np
 import pytest
 
-from milvus_lite.analyzer.hash import term_to_id
-from milvus_lite.analyzer.sparse import compute_tf
 from milvus_lite.index.sparse_inverted import SparseInvertedIndex
 
 
@@ -171,6 +170,55 @@ class TestSparseInvertedIndex:
 
 
 # ---------------------------------------------------------------------------
+# BM25 constructor and standalone file compatibility
+# ---------------------------------------------------------------------------
+
+def _assert_weighted_bm25(index):
+    # N=2, df(1)=1, dl=4, avgdl=3, tf=2, query weight=3.
+    score = math.log(2.0) * (2.0 * 2.2) / (2.0 + 1.2 * (0.6 + 0.4 * 4.0 / 3.0)) * 3.0
+    ids, distances = index.search([{1: 3.0}], top_k=2)
+    np.testing.assert_array_equal(ids, [[0, -1]])
+    np.testing.assert_allclose(distances[:, :1], [[-score]], rtol=1e-6)
+    assert np.isposinf(distances[0, 1])
+
+
+def test_bm25_formula_and_parameters_survive_save_load(tmp_path):
+    index = SparseInvertedIndex(k1=1.2, b=0.4)
+    index.build([{1: 2.0, 9: 2.0}, {9: 2.0}])
+    _assert_weighted_bm25(index)
+    path = str(tmp_path / "bm25.json")
+    index.save(path)
+
+    loaded = SparseInvertedIndex.load(path)
+
+    assert isinstance(loaded, SparseInvertedIndex)
+    assert loaded.k1 == 1.2
+    assert loaded.b == 0.4
+    _assert_weighted_bm25(loaded)
+
+
+def test_bm25_positional_constructor_remains_compatible():
+    index = SparseInvertedIndex(1.2, 0.4)
+    index.build([{1: 2.0, 9: 2.0}, {9: 2.0}])
+
+    _assert_weighted_bm25(index)
+
+
+def test_bm25_loads_legacy_file_without_metric(tmp_path):
+    """An actual old-format payload stays owned by the BM25 implementation."""
+    path = tmp_path / "legacy_bm25.json"
+    path.write_text(json.dumps({
+        "k1": 1.2, "b": 0.4, "doc_count": 2, "avgdl": 3.0,
+        "doc_lengths": [4.0, 2.0],
+        "posting_lists": {"1": [[0, 2.0]], "9": [[0, 2.0], [1, 2.0]]},
+        "df": {"1": 1, "9": 2},
+    }))
+    loaded = SparseInvertedIndex.load(str(path))
+
+    _assert_weighted_bm25(loaded)
+
+
+# ---------------------------------------------------------------------------
 # Engine end-to-end BM25 search
 # ---------------------------------------------------------------------------
 
@@ -226,9 +274,9 @@ class TestBM25EndToEnd:
             ])
 
             # Search for "machine learning" — should rank docs 1,4 above 2,3
-            query_tf = compute_tf([term_to_id("machine"), term_to_id("learning")])
+            query_text = "machine learning"
             results = col.search(
-                query_vectors=[query_tf],
+                query_vectors=[query_text],
                 top_k=4,
                 metric_type="BM25",
                 anns_field="sparse_emb",
@@ -271,9 +319,9 @@ class TestBM25EndToEnd:
         ) as col:
             col.insert([self._record(1, "hello world")])
 
-            query_tf = compute_tf([term_to_id("nonexistent")])
+            query_text = "nonexistent"
             results = col.search(
-                query_vectors=[query_tf],
+                query_vectors=[query_text],
                 top_k=5,
                 metric_type="BM25",
                 anns_field="sparse_emb",

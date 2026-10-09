@@ -93,6 +93,23 @@ def _create_hybrid_l2_projection_collection(client, name):
     return name
 
 
+@pytest.mark.parametrize("output_fields", [["category"], ["id", "category"]])
+def test_hybrid_search_honors_primary_key_projection(milvus_client, output_fields):
+    name = _create_hybrid_collection(milvus_client, "hybrid_pk_projection")
+    requests = [
+        AnnSearchRequest(data=[[1.0, 0.0, 0.0, 0.0]], anns_field="dense", param={}, limit=5),
+        AnnSearchRequest(data=["python"], anns_field="bm25_emb", param={"metric_type": "BM25"}, limit=5),
+    ]
+    [hits] = milvus_client.hybrid_search(
+        name, reqs=requests, ranker=RRFRanker(), limit=3, output_fields=output_fields,
+    )
+    assert len(hits) == 3
+    for hit in hits:
+        assert set(hit["entity"]) == set(output_fields)
+        if "id" in output_fields:
+            assert hit["entity"]["id"] == hit["id"]
+
+
 # ---------------------------------------------------------------------------
 # Reranker unit tests (no gRPC)
 # ---------------------------------------------------------------------------
@@ -173,9 +190,6 @@ def test_hybrid_weighted_dense_bm25(milvus_client):
     """Hybrid search: dense + BM25 with WeightedRanker."""
     name = _create_hybrid_collection(milvus_client, "hybrid_w1")
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-
     # Dense query: closest to doc 1 [1,0,0,0]
     dense_req = AnnSearchRequest(
         data=[[1.0, 0.0, 0.0, 0.0]],
@@ -184,7 +198,7 @@ def test_hybrid_weighted_dense_bm25(milvus_client):
         limit=5,
     )
     # BM25 query: "machine learning" → docs 3, 4, 5
-    bm25_query = compute_tf([term_to_id("machine"), term_to_id("learning")])
+    bm25_query = "machine learning"
     bm25_req = AnnSearchRequest(
         data=[bm25_query],
         anns_field="bm25_emb",
@@ -213,16 +227,13 @@ def test_hybrid_top_level_function_score_weighted(milvus_client):
     """Hybrid FunctionScore weighted reranker runs at the L2 merge level."""
     name = _create_hybrid_collection(milvus_client, "hybrid_fn_weighted")
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-
     dense_req = AnnSearchRequest(
         data=[[1.0, 0.0, 0.0, 0.0]],
         anns_field="dense",
         param={},
         limit=5,
     )
-    bm25_query = compute_tf([term_to_id("machine"), term_to_id("learning")])
+    bm25_query = "machine learning"
     bm25_req = AnnSearchRequest(
         data=[bm25_query],
         anns_field="bm25_emb",
@@ -459,16 +470,13 @@ def test_hybrid_rrf_dense_bm25(milvus_client):
     """Hybrid search: dense + BM25 with RRFRanker."""
     name = _create_hybrid_collection(milvus_client, "hybrid_rrf1")
 
-    from milvus_lite.analyzer.hash import term_to_id
-    from milvus_lite.analyzer.sparse import compute_tf
-
     dense_req = AnnSearchRequest(
         data=[[1.0, 0.0, 0.0, 0.0]],
         anns_field="dense",
         param={},
         limit=5,
     )
-    bm25_query = compute_tf([term_to_id("python")])
+    bm25_query = "python"
     bm25_req = AnnSearchRequest(
         data=[bm25_query],
         anns_field="bm25_emb",

@@ -68,19 +68,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _extract_anns_field(sub_req) -> str | None:
-    """Extract anns_field from a sub-SearchRequest's search_params."""
-    import json as _json
-    for kv in sub_req.search_params:
-        if kv.key == "anns_field":
-            try:
-                v = _json.loads(kv.value)
-            except (ValueError, _json.JSONDecodeError):
-                v = kv.value
-            return v if isinstance(v, str) and v else None
-    return None
-
-
 def _kv_pairs_to_dict(pairs) -> dict[str, str]:
     return {
         str(p.key): str(p.value)
@@ -533,9 +520,8 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         unpack), centralized in translators/search.py.
 
         Metric resolution: pymilvus's MilvusClient.search doesn't
-        include metric_type in search_params by default. We fall back
-        to the collection's IndexSpec.metric_type so the engine uses
-        the same metric the index was built with.
+        include metric_type in search_params by default. The Engine resolves
+        it using the requested field's index and Function binding.
         """
         try:
             from milvus_lite.adapter.grpc.function_chain import (
@@ -548,18 +534,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             from milvus_lite.function.types import ID_FIELD, SCORE_FIELD
 
             col = self._get_collection(request, context)
-            # Pull the canonical metric from a vector index if any.
-            first_spec = (
-                col._index_specs.get(col._vector_name)  # noqa: SLF001
-                if col._index_specs and col._vector_name is not None  # noqa: SLF001
-                else None
+            parsed = parse_search_request(request)
+            parsed["metric_type"] = col.resolve_search_metric(
+                parsed.get("anns_field"), parsed["metric_type"],
             )
-            default_metric = (
-                first_spec.metric_type
-                if first_spec is not None and first_spec.metric_type != "NONE"
-                else "COSINE"
-            )
-            parsed = parse_search_request(request, default_metric_type=default_metric)
 
             group_by_field = parsed.get("group_by_field")
             group_size = parsed.get("group_size") or 1
@@ -1193,7 +1171,6 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             )
 
             col = self._get_collection(request, context)
-            all_specs = col._index_specs or {}  # noqa: SLF001
 
             # Parse rank_params
             rp = parse_rank_params(request.rank_params)
@@ -1228,13 +1205,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             all_results = []
             route_metrics = []
             for sub_req in request.requests:
-                sub_anns = _extract_anns_field(sub_req)
-                if sub_anns and sub_anns in all_specs:
-                    sub_default_metric = all_specs[sub_anns].metric_type
-                else:
-                    first_spec = next(iter(all_specs.values()), None)
-                    sub_default_metric = first_spec.metric_type if first_spec else "COSINE"
-                parsed = parse_search_request(sub_req, default_metric_type=sub_default_metric)
+                parsed = parse_search_request(sub_req)
+                parsed["metric_type"] = col.resolve_search_metric(
+                    parsed.get("anns_field"), parsed["metric_type"],
+                )
                 route_timezone = parsed.get("timezone") or hybrid_timezone
                 if output_timezone is None and parsed.get("timezone") is not None:
                     output_timezone = parsed.get("timezone")

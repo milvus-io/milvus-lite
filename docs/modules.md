@@ -40,6 +40,7 @@ lite-v2/
 │   │   ├── __init__.py             #   Exports: DataType, FieldSchema, CollectionSchema
 │   │   ├── types.py                #   DataType enum, FieldSchema, CollectionSchema class definitions
 │   │   ├── validation.py           #   validate_schema(), validate_record(), separate_dynamic_fields()
+│   │   ├── sparse.py               #   Sparse weight validation and float32 canonicalization
 │   │   ├── arrow_builder.py        #   4 Arrow Schema builders (data/delta/wal_data/wal_delta)
 │   │   └── persistence.py          #   schema.json read/write (save_schema / load_schema)
 │   │
@@ -89,7 +90,10 @@ lite-v2/
 │   │   ├── faiss_ivf_flat.py       #   FaissIvfFlatIndex (FAISS IVF_FLAT)
 │   │   ├── faiss_ivf_sq8.py        #   FaissIvfSq8Index (FAISS IVF_SQ8)
 │   │   ├── faiss_hnsw_sq.py        #   FaissHnswSqIndex (FAISS HNSW_SQ — HNSW + scalar quantization)
-│   │   ├── sparse_inverted.py      #   SparseInvertedIndex (sparse vector inverted index)
+│   │   ├── sparse_inverted.py      #   SparseInvertedIndex (BM25 scoring and statistics)
+│   │   ├── sparse_ip.py            #   SparseIpIndex (exact sparse inner product)
+│   │   ├── sparse_common.py        #   Shared sparse mask/result helpers
+│   │   ├── sparse_factory.py       #   Sparse scorer selection and cache matching
 │   │   └── factory.py              #   build_index_from_spec / load_index + try-import faiss degradation
 │   │
 │   ├── analyzer/                   # == Analyzer layer (Phase 11) ==
@@ -239,6 +243,35 @@ lite-v2/
 ├── pyproject.toml
 └── requirements.txt
 ```
+
+## Sparse IP Extension
+
+[Sparse Vector IP and BM25 Design](sparse-vector-design.md) specifies the implemented
+extension and its module boundaries:
+
+- New `index/sparse_ip.py`: `SparseIpIndex()` provides independent sparse IP
+  build/search/save/load, with no BM25 constructor parameters. Reuse sparse
+  postings, mask handling, and top-k helpers where appropriate.
+- `index/sparse_inverted.py`: retain `SparseInvertedIndex(k1=1.5, b=0.75)` as the
+  BM25 implementation, including its statistics, constructor, and old file format.
+- `schema/validation.py`: validate user sparse values and distinguish BM25
+  Function outputs from caller-supplied sparse fields.
+- `engine/collection.py`: add
+  `resolve_search_metric(anns_field=None, metric_type=None) -> str`, preserve
+  omission with `search(..., metric_type=None, ...)`, and make
+  `_prepare_sparse_queries(query_vectors, vector_field)` field-aware. Enforce the
+  text/vector boundary and validate caller-owned writes before Function execution.
+  Select `SparseIpIndex` or the existing BM25 implementation from the validated
+  target field and effective metric for both Segment and MemTable search.
+- `storage/segment.py`: own sparse caches in `sparse_indexes`, keyed by the actual
+  field name, and invalidate them through the existing release lifecycle.
+- `adapter/grpc`: preserve omitted metrics and reuse Engine resolution for Search
+  and each HybridSearch route. Protocol translation adds no scoring capability.
+
+Sparse indexing uses lazy memory caches rather than the dense index sidecar
+pipeline. `index/sparse_factory.py` selects and checks the concrete scorer;
+`index/sparse_common.py` shares masks/results, and `schema/sparse.py` validates
+and canonicalizes user weights to float32.
 
 ## Architecture Invariants (Core Constraints)
 

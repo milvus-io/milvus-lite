@@ -28,6 +28,7 @@ from pymilvus.grpc_gen import schema_pb2
 from milvus_lite.adapter.grpc.translators.records import records_to_fields_data
 from milvus_lite.engine.projection import (
     ProjectionPlan,
+    build_projection_plan,
     projection_output_fields,
 )
 from milvus_lite.schema.types import CollectionSchema, DataType
@@ -56,9 +57,12 @@ def build_search_result_data(
         pk_name: primary key field name. Stored in
             ``primary_field_name`` and used to pick the int_id vs
             str_id slot for the IDs proto.
-        output_fields: optional whitelist; passed through to
-            records_to_fields_data.
+        output_fields: optional whitelist, normalized into a Search projection
+            when no plan is supplied. Primary keys always appear in IDs; they
+            also appear in fields_data only when requested explicitly or by *.
     """
+    if projection_plan is None:
+        projection_plan = build_projection_plan(output_fields, schema, api_kind="search")
     nq = len(results)
 
     # Flatten per-query → flat lists of (id, score, entity_dict).
@@ -101,18 +105,11 @@ def build_search_result_data(
         timezone=timezone,
     )
 
-    # Determine emitted output_fields list. pymilvus's parser uses
-    # this to know which non-pk fields to attach to each hit.
-    if projection_plan is not None:
-        emitted = list(projection_output_fields(
-            projection_plan, schema, include_primary=False
-        ))
-    elif output_fields is None:
-        emitted = [f.name for f in schema.fields if f.name != pk_name]
-    else:
-        # Preserve user order; drop pk if user listed it (it's
-        # surfaced via "id" anyway)
-        emitted = [f for f in output_fields if f != pk_name]
+    # Advertise the same projection encoded in fields_data. The Search plan
+    # already omits an unrequested primary key; explicit requests retain it.
+    emitted = list(projection_output_fields(
+        projection_plan, schema, include_primary=True
+    ))
 
     result = schema_pb2.SearchResultData(
         num_queries=nq,

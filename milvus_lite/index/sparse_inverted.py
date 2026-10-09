@@ -24,6 +24,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from milvus_lite.index.sparse_common import empty_results, validate_mask
+
 
 class SparseInvertedIndex:
     """Per-segment inverted index for BM25 scoring.
@@ -60,6 +62,7 @@ class SparseInvertedIndex:
                 skipped (deleted or deduped).
         """
         n = len(sparse_vectors)
+        valid_mask = validate_mask(valid_mask, n)
         self._posting_lists = {}
         self._df = {}
         doc_lengths = np.zeros(n, dtype=np.float32)
@@ -115,15 +118,10 @@ class SparseInvertedIndex:
             distances = -bm25_score (smaller = more relevant).
             Padded with -1 / +inf for missing slots.
         """
-        if valid_mask is not None and len(valid_mask) != len(self._doc_lengths):
-            raise ValueError(
-                f"valid_mask length ({len(valid_mask)}) != num_docs "
-                f"({len(self._doc_lengths)})"
-            )
+        valid_mask = validate_mask(valid_mask, len(self._doc_lengths))
 
         nq = len(query_sparse_vectors)
-        all_ids = np.full((nq, top_k), -1, dtype=np.int64)
-        all_dists = np.full((nq, top_k), float("inf"), dtype=np.float32)
+        all_ids, all_dists = empty_results(nq, top_k)
 
         if self.doc_count == 0:
             return all_ids, all_dists

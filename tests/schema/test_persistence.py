@@ -61,6 +61,48 @@ def test_save_load_roundtrip(tmp_path):
         assert src.default_value == dst.default_value
 
 
+def test_sparse_default_roundtrip_restores_integer_dimensions(tmp_path):
+    """Sparse coordinate keys must recover their type without changing JSON fields."""
+    sparse_default = {0: 0.5, 2**32 - 2: 0.25}
+    json_default = {"0": 0.5, "nested": {"17": "text key"}}
+    schema = CollectionSchema(fields=[
+        FieldSchema("id", DataType.INT64, is_primary=True),
+        FieldSchema("sparse", DataType.SPARSE_FLOAT_VECTOR, default_value=sparse_default),
+        FieldSchema("metadata", DataType.JSON, default_value=json_default),
+    ])
+    path = str(tmp_path / "schema.json")
+    save_schema(schema, "sparse_defaults", path)
+
+    name, loaded = load_schema(path)
+
+    assert name == "sparse_defaults"
+    defaults = {field.name: field.default_value for field in loaded.fields}
+    assert defaults["sparse"] == sparse_default
+    assert all(type(dimension) is int for dimension in defaults["sparse"])
+    assert defaults["metadata"] == json_default
+
+
+@pytest.mark.parametrize("default", [
+    {"not-a-dimension": 0.5},
+    {"1.5": 0.5},
+    {"0": 0.5, "00": 0.25},
+])
+def test_load_rejects_invalid_sparse_default_dimension_encoding(tmp_path, default):
+    """Malformed keys must not leak conversion errors or silently merge coordinates."""
+    schema = CollectionSchema(fields=[
+        FieldSchema("id", DataType.INT64, is_primary=True),
+        FieldSchema("sparse", DataType.SPARSE_FLOAT_VECTOR, default_value={0: 0.5}),
+    ])
+    path = tmp_path / "schema.json"
+    save_schema(schema, "sparse_defaults", str(path))
+    payload = json.loads(path.read_text())
+    payload["fields"][1]["default_value"] = default
+    path.write_text(json.dumps(payload))
+
+    with pytest.raises(SchemaValidationError, match="field 'sparse'.*default dimension"):
+        load_schema(str(path))
+
+
 def test_save_creates_parent_dir(tmp_path):
     nested = tmp_path / "a" / "b" / "c"
     path = str(nested / "schema.json")

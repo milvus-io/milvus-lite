@@ -66,6 +66,7 @@ class Segment:
         "index",
         "indexes",
         "scalar_indexes",
+        "sparse_indexes",
         "_pk_field",
         "_vector_field",
         "_vector_data_by_field",
@@ -108,6 +109,8 @@ class Segment:
         self.index: Optional["VectorIndex"] = None
         self.indexes: Dict[str, "VectorIndex"] = {}
         self.scalar_indexes: Dict[str, "ScalarInvertedIndex"] = {}
+        # Sparse indexes are lazy memory caches, separate from dense sidecars.
+        self.sparse_indexes: Dict[str, Any] = {}
 
     # ── factory ─────────────────────────────────────────────────
 
@@ -210,9 +213,11 @@ class Segment:
             self.index = None
             self.indexes.clear()
             self.scalar_indexes.clear()
+            self.sparse_indexes.clear()
         else:
             self.indexes.pop(field_name, None)
             self.scalar_indexes.pop(field_name, None)
+            self.sparse_indexes.pop(field_name, None)
             if field_name == self._vector_field:
                 self.index = None
 

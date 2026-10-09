@@ -470,6 +470,41 @@ def test_non_string_name_rejected(db, schema):
 # Persistence across reopens
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize("indexed", [False, True], ids=["without_index", "with_ip_index"])
+def test_sparse_default_survives_database_reopen(tmp_path, indexed):
+    """Reopen via schema.json, never by passing the original in-memory schema."""
+    data_dir = str(tmp_path / "data")
+    schema = CollectionSchema(fields=[
+        FieldSchema("id", DataType.INT64, is_primary=True),
+        FieldSchema("sparse", DataType.SPARSE_FLOAT_VECTOR, default_value={0: 0.5}),
+    ])
+    with MilvusLite(data_dir) as db:
+        col = db.create_collection("sparse_defaults", schema)
+        col.insert([{"id": 1}, {"id": 2, "sparse": {0: 0.25}}])
+        if indexed:
+            col.create_index("sparse", {
+                "index_type": "SPARSE_INVERTED_INDEX", "metric_type": "IP",
+            })
+        col.load()
+        hits = col.search([{0: 2.0}], anns_field="sparse", top_k=3)[0]
+        assert {hit["id"]: hit["distance"] for hit in hits} == pytest.approx({1: 1.0, 2: 0.5})
+        col.flush()
+
+    # Only the data directory and collection name reach the second DB instance.
+    with MilvusLite(data_dir) as reopened:
+        col = reopened.get_collection("sparse_defaults")
+        assert col.schema is not schema
+        sparse_field = next(field for field in col.schema.fields if field.name == "sparse")
+        assert sparse_field.default_value == {0: 0.5}
+        col.load()
+        assert {row["id"] for row in col.get([1, 2])} == {1, 2}
+
+        # A restored default must also work for new writes, not just old data.
+        col.insert([{"id": 3}])
+        hits = col.search([{0: 2.0}], anns_field="sparse", top_k=3)[0]
+        assert {hit["id"]: hit["distance"] for hit in hits} == pytest.approx({1: 1.0, 2: 0.5, 3: 1.0})
+
+
 def test_collection_persists_across_reopen(tmp_path, schema):
     data_dir = str(tmp_path / "data")
     db1 = MilvusLite(data_dir)

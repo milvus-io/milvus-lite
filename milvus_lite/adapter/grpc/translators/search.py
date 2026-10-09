@@ -14,8 +14,8 @@ We deserialize it, walk PlaceholderValues, and unpack each
 ``vector_float_to_bytes`` blob via ``struct.unpack``.
 
 Notes:
-    - We accept FloatVector PlaceholderValues only (type 101). Other
-      types (binary, sparse, int8, etc.) raise UnsupportedFieldTypeError.
+    - Supported placeholders are FloatVector (101), SparseFloatVector (104),
+      and VarChar text (21). Field-specific validation belongs to the Engine.
     - Each PlaceholderValue's ``values`` is a repeated bytes; each
       element is one query vector packed as ``"<dim>f"`` little-endian.
     - dim is inferred from len(bytes) // 4 since we don't get it
@@ -41,21 +41,20 @@ _PH_SPARSE_FLOAT_VECTOR = 104
 _PH_VARCHAR = 21
 
 
-def parse_search_request(request, default_metric_type: str = "COSINE") -> dict:
+def parse_search_request(request, default_metric_type: Optional[str] = None) -> dict:
     """Decode the engine-relevant fields from a SearchRequest.
 
     Args:
         request: SearchRequest proto
         default_metric_type: fallback metric when search_params doesn't
-            contain one. The servicer passes the collection's
-            IndexSpec.metric_type so the engine uses the same metric
-            the index was built with.
+            contain one. Omission is preserved as None by default so the
+            Engine can resolve the requested field's configuration.
 
     Returns:
         dict with keys::
             query_vectors:    List[List[float]]   (nq × dim)
             top_k:            int
-            metric_type:      str  ("COSINE" / "L2" / "IP")
+            metric_type:      Optional[str] ("COSINE" / "L2" / "IP" / "BM25")
             expr:             Optional[str]  (None if no filter)
             partition_names:  Optional[List[str]]
             output_fields:    Optional[List[str]]
@@ -223,18 +222,15 @@ def _decode_placeholder_group(placeholder_group_bytes: bytes) -> List[List[float
 
 def _decode_search_params(
     kv_pairs,
-    default_metric_type: str = "COSINE",
-) -> Tuple[int, str, dict]:
+    default_metric_type: Optional[str] = None,
+) -> Tuple[int, Optional[str], dict]:
     """Decode the search_params KeyValuePair list.
 
     Each value is a JSON-encoded string (pymilvus's utils.dumps).
     We pull out:
         - topk        → int (required)
-        - metric_type → str (optional; default_metric_type used if missing.
-                              pymilvus's MilvusClient.search doesn't put
-                              metric_type in the request, so the caller
-                              must supply the collection's IndexSpec
-                              metric as the default)
+        - metric_type → optional str; omission preserves default_metric_type
+                        (None by default) for target-field resolution by Engine.
         - params      → dict (engine-side, e.g. {"ef": 64})
     Other keys (round_decimal, anns_field, ignore_growing, etc.) are
     ignored — they have no MilvusLite equivalent.
@@ -260,8 +256,8 @@ def _decode_search_params(
             )
 
     metric_type = raw.get("metric_type", default_metric_type)
-    if not isinstance(metric_type, str):
-        metric_type = str(metric_type)
+    if metric_type is not None and not isinstance(metric_type, str):
+        raise SchemaValidationError("metric_type must be a string")
 
     engine_params = raw.get("params") or {}
     if not isinstance(engine_params, dict):

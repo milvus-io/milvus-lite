@@ -114,6 +114,25 @@ def test_search_with_output_fields(loaded_collection):
         assert "score" in hit["entity"]
 
 
+@pytest.mark.parametrize("output_fields,expected", [
+    (None, {"vec", "title", "score", "active"}),
+    (["title", "score"], {"title", "score"}),
+    (["id", "title"], {"id", "title"}),
+    (["id"], {"id"}),
+    (["*"], {"id", "vec", "title", "score", "active"}),
+])
+def test_search_primary_key_is_projected_only_when_requested(loaded_collection, output_fields, expected):
+    [hits] = loaded_collection.search(
+        "demo", data=[[5.0, 6.0, 0.0, 0.0]], limit=3, output_fields=output_fields,
+    )
+    assert len(hits) == 3
+    for hit in hits:
+        assert isinstance(hit["id"], int)
+        assert set(hit["entity"]) == expected
+        if "id" in expected:
+            assert hit["entity"]["id"] == hit["id"]
+
+
 def test_search_default_output_fields_is_empty(loaded_collection):
     """When no output_fields are requested, pymilvus shows just id +
     distance, no entity fields."""
