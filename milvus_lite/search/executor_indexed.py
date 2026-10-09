@@ -198,9 +198,14 @@ def execute_search_with_index(
         if n == 0:
             return
         local_mask = _build_local_mask(pks, seqs, filter_mask)
-        if not local_mask.any():
+        n_valid = int(local_mask.sum())
+        if n_valid == 0:
             return
-        if index is None:
+        # When top_k covers every valid row, the exact answer is "all of
+        # them", so use brute force. An ANN graph (e.g. HNSW) can leave a
+        # node unreachable, which would silently drop it even from
+        # pk-restricted or "return everything" searches.
+        if index is None or n_valid <= top_k:
             index = BruteForceIndex.build(vectors, metric_type)
         # valid_mask=None means "all rows valid" (see VectorIndex.search
         # docstring) -- equivalent to an all-true mask but skips the
