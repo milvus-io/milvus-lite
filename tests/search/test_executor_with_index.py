@@ -401,3 +401,50 @@ def test_new_path_uses_attached_segment_index(tmp_path, schema):
         _assert_results_equal(old, new)
     finally:
         c.close()
+
+
+class _UnreachableRowIndex:
+    """Fake ANN index that can never return one local row, like an HNSW
+    node with no incoming edges."""
+
+    def __init__(self, vectors, metric, unreachable):
+        from milvus_lite.index.brute_force import BruteForceIndex
+
+        self._inner = BruteForceIndex.build(vectors, metric)
+        self._unreachable = unreachable
+
+    def search(self, queries, top_k, valid_mask=None, params=None):
+        mask = np.ones(self._inner.num_vectors, dtype=bool)
+        if valid_mask is not None:
+            mask &= valid_mask
+        mask[self._unreachable] = False
+        return self._inner.search(queries, top_k, valid_mask=mask)
+
+
+def test_exact_when_top_k_covers_all_valid_rows(tmp_path, schema):
+    """Issue #369: an ANN index that misses a row must not hide it from
+    pk-restricted searches or searches asking for every row."""
+    c = Collection("unreachable", str(tmp_path / "data"), schema)
+    try:
+        c.insert([
+            {"id": i, "vec": _vec(i), "title": "x", "score": 0.5, "active": True}
+            for i in range(10)
+        ])
+        c.flush()
+        c._wait_for_bg()  # noqa: SLF001
+        (seg,) = c._segment_cache.values()  # noqa: SLF001
+        missing_pk = 3
+        local_id = list(seg.pks).index(missing_pk)
+        seg.attach_index(_UnreachableRowIndex(seg.vectors, "L2", local_id))
+
+        queries = [_vec(missing_pk)]
+        by_pk = _run_new_path(
+            c, queries, top_k=1, metric_type="L2", expr=f"id == {missing_pk}",
+        )
+        assert [r["id"] for r in by_pk[0]] == [missing_pk]
+
+        everything = _run_new_path(c, queries, top_k=10, metric_type="L2")
+        assert len(everything[0]) == 10
+        assert everything[0][0]["id"] == missing_pk
+    finally:
+        c.close()
