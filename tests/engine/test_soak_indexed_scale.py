@@ -244,8 +244,9 @@ def _run_scale_soak(
 ) -> None:
     import milvus_lite.engine.collection as collection_mod
 
-    old_limit = collection_mod.MEMTABLE_SIZE_LIMIT
-    collection_mod.MEMTABLE_SIZE_LIMIT = memtable_limit
+    old_limit = collection_mod.MEMTABLE_MEMORY_LIMIT
+    # Convert the workload's target rows per flush to an approximate byte budget.
+    collection_mod.MEMTABLE_MEMORY_LIMIT = memtable_limit * (4 * dim + 100)
     data_dir = str(tmp_path / name)
     col = Collection(name, data_dir, _schema(dim))
     deleted = set(range(0, n_rows, delete_every))
@@ -359,7 +360,7 @@ def _run_scale_soak(
         _assert_sample_deleted(col, sorted(final_deleted)[:10])
     finally:
         col.close()
-        collection_mod.MEMTABLE_SIZE_LIMIT = old_limit
+        collection_mod.MEMTABLE_MEMORY_LIMIT = old_limit
 
 
 def test_soak_ivf_sq8_32d_500k_many_segments(tmp_path):

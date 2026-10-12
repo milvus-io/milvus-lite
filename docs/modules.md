@@ -564,7 +564,8 @@ Users only need `from milvus_lite import MilvusLite, CollectionSchema, FieldSche
 
 ```python
 # -- MemTable --
-MEMTABLE_SIZE_LIMIT = 10_000
+MEMTABLE_MEMORY_LIMIT = 128 * 1024 * 1024  # estimated retained bytes
+WAL_SIZE_LIMIT = 256 * 1024 * 1024         # uncheckpointed bytes
 
 # -- Compaction --
 MAX_DATA_FILES = 32
@@ -582,6 +583,10 @@ WAL_DELTA_TEMPLATE = "wal_delta_{n:0{w}d}.arrow"
 DEFAULT_PARTITION = "_default"
 ALL_PARTITIONS = "_all"
 ```
+
+The flush budgets above are defaults. Set `MILVUS_LITE_MEMTABLE_MEMORY_LIMIT_BYTES`
+and `MILVUS_LITE_WAL_SIZE_LIMIT_BYTES` to positive integer byte counts before
+importing Milvus Lite to override them for each collection in the process.
 
 ## 7. exceptions.py Contents
 
@@ -624,7 +629,8 @@ Designed bottom-up by dependency level; each module only lists external interfac
 
 ```python
 # -- MemTable --
-MEMTABLE_SIZE_LIMIT: int = 10_000          # Combined threshold for insert_buf + delete_buf
+MEMTABLE_MEMORY_LIMIT: int = 128 * 1024 * 1024
+WAL_SIZE_LIMIT: int = 256 * 1024 * 1024
 
 # -- Compaction --
 MAX_DATA_FILES: int = 32                    # Max data files per Partition
@@ -887,6 +893,14 @@ class WAL:
         """Current WAL number."""
 
     @property
+    def size_bytes(self) -> int:
+        """Bytes appended to this data/delta WAL pair, including IPC overhead."""
+
+    @staticmethod
+    def existing_size_bytes(wal_dir: str) -> int:
+        """Total size of existing WAL pairs, used once at collection startup."""
+
+    @property
     def data_path(self) -> Optional[str]:
         """wal_data file path (None when not yet created)."""
 
@@ -970,8 +984,14 @@ class MemTable:
 
     def size(self) -> int:
         """Returns len(_pk_index) + len(_delete_index).
-        Note this is the "active pk count", not the total row count of _insert_batches --
-        the flush trigger threshold uses this to avoid memory blowup from repeated upserts of the same pk."""
+        This is a logical count, not a physical resource or flush threshold."""
+
+    @property
+    def estimated_memory_bytes(self) -> int:
+        """Estimated retained Arrow buffers and tombstone payloads.
+        Includes superseded rows; maintained incrementally for writes and recovery.
+        Shared buffers may be counted more than once. Python container and PK-index
+        overhead is excluded; this is a flush budget, not a process RSS limit."""
 
     def get_active_records(
         self, partition_names: Optional[List[str]] = None
@@ -1627,7 +1647,7 @@ def _apply(self, op: Operation) -> None:
     else:  # DeleteOp
         self.wal.write_delete(op.batch)
         self.memtable.apply_delete(op.batch)
-    if self.memtable.size() >= MEMTABLE_SIZE_LIMIT:
+    if self._should_flush():
         self._trigger_flush()
 ```
 

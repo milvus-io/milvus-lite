@@ -1,5 +1,25 @@
+import os
+
+
+def _byte_budget(env_name: str, default: int) -> int:
+    """Read a positive byte budget once at import time."""
+    raw = os.environ.get(env_name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(f"{env_name} must be a positive integer in bytes, got {raw!r}") from None
+    if value <= 0:
+        raise ValueError(f"{env_name} must be a positive integer in bytes, got {raw!r}")
+    return value
+
+
 # ── MemTable ──
-MEMTABLE_SIZE_LIMIT = 10_000
+# Byte budgets, checked after each write (one batch may exceed the limit).
+# Environment overrides apply per collection; set before importing milvus_lite.
+MEMTABLE_MEMORY_LIMIT = _byte_budget("MILVUS_LITE_MEMTABLE_MEMORY_LIMIT_BYTES", 128 * 1024 * 1024)
+WAL_SIZE_LIMIT = _byte_budget("MILVUS_LITE_WAL_SIZE_LIMIT_BYTES", 256 * 1024 * 1024)
 
 # ── Compaction ──
 MAX_DATA_FILES = 32

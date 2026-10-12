@@ -455,8 +455,9 @@ class MemTable:
         return len(self.insert_buf) + len(self.delete_buf)
 ```
 
-- **Size limit**: Default `MEMTABLE_SIZE_LIMIT = 10000` records (insert + delete combined, across Partitions)
-- **Flush trigger**: When the threshold is reached, the current MemTable is frozen and a new MemTable is created to accept writes
+- **Byte budgets**: Default `MEMTABLE_MEMORY_LIMIT = 128 MiB` of estimated retained MemTable memory, or `WAL_SIZE_LIMIT = 256 MiB` of uncheckpointed WAL data and delta bytes, across Partitions. Superseded insert batches count toward memory usage; repeated deletes remain bounded by the WAL budget.
+- **Configuration**: Set `MILVUS_LITE_MEMTABLE_MEMORY_LIMIT_BYTES` and/or `MILVUS_LITE_WAL_SIZE_LIMIT_BYTES` to positive integer byte counts before importing Milvus Lite. These process-wide settings apply separately to each collection.
+- **Flush trigger**: After a write or recovery reaches either byte budget, the current MemTable is frozen and a new MemTable is created to accept writes. A write may exceed the budget by one batch.
 - **Flush output**: Split by Partition, each Partition gets independent data Parquet + delta Parquet
 - **Dynamic field handling**: During `put()`, fields outside the Schema are serialized as JSON into `$meta`
 - **`_partition` is not written to Parquet**: `_partition` is only used for routing during flush; the Parquet file itself does not contain this column (Partition is indicated by directory isolation)

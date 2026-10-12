@@ -34,7 +34,7 @@ def test_insert_returns_before_bg_index_build(tmp_path, schema, monkeypatch):
     large segments takes many seconds. That work must run off the
     user thread.
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     col = Collection("c", str(tmp_path / "d"), schema)
     # Attach an index spec so the bg worker has index work to do.
@@ -72,7 +72,7 @@ def test_insert_returns_before_bg_index_build(tmp_path, schema, monkeypatch):
 
 def test_search_concurrent_with_bg_compaction(tmp_path, schema, monkeypatch):
     """Searches from a different thread work while bg compaction runs."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     col = Collection("c", str(tmp_path / "d"), schema)
 
@@ -112,7 +112,7 @@ def test_search_concurrent_with_bg_compaction(tmp_path, schema, monkeypatch):
 
 def test_close_drains_bg_tasks(tmp_path, schema, monkeypatch):
     """close() waits for pending bg tasks before returning."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     col = Collection("c", str(tmp_path / "d"), schema)
 
@@ -133,7 +133,7 @@ def test_bg_index_build_survives_concurrent_flush(tmp_path, schema, monkeypatch)
     """Regression: `_ensure_loaded_segments_indexed` used to iterate
     `_segment_cache.values()` directly, which raises RuntimeError if
     the main thread adds a new segment mid-iteration. Must snapshot."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 3)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 150)
 
     col = Collection("c", str(tmp_path / "d"), schema)
     col.create_index("vec", {
@@ -188,7 +188,7 @@ def test_bg_index_build_survives_concurrent_flush(tmp_path, schema, monkeypatch)
 
 def test_wait_for_bg_drains_pending(tmp_path, schema, monkeypatch):
     """_wait_for_bg blocks until all queued tasks finish."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     col = Collection("c", str(tmp_path / "d"), schema)
 

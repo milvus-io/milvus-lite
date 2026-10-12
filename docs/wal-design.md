@@ -647,7 +647,7 @@ At T4:
 
 `sync_mode="close"` calls `os.fsync(sink.fileno())` once before `close_and_delete` to plug this window:
 - WAL is closed when flush is triggered, fsync before close persists the entire file
-- Frequency = flush frequency = once per `MEMTABLE_SIZE_LIMIT` rows, very sparse, negligible performance impact
+- Frequency follows the MemTable memory / uncheckpointed WAL byte budgets (128 MiB memory / 256 MiB WAL by default), not the number of distinct keys.
 - Critical path: durability on the "WAL switch → Manifest update" commit path is now ensured
 
 **Cost of `sync_mode="batch"`**:
@@ -2277,3 +2277,36 @@ Cost: Global scan O(N) for dedup during search
      → Acceptable for MVP (brute-force search is already O(N), dedup scan is negligible in comparison)
      → After Phase 2 introduces Bloom Filter + bitset, dedup can be moved from search hot path to write side
 ```
+
+
+### Byte-budget flush triggering
+
+Automatic flush checks `MemTable.estimated_memory_bytes` and the total size of
+uncheckpointed WAL pairs after every write. The defaults are 128 MiB for memory and 256 MiB for WAL.
+The memory estimate includes all retained Arrow buffers (including superseded
+rows and full buffers retained by slices) and current tombstone payloads. Shared
+Arrow buffers may be counted more than once; Python container and PK-index
+overhead is excluded, so this is a flush budget rather than a process RSS limit.
+
+WAL accounting includes both data and delta streams, including IPC overhead.
+Repeated deletes may leave only one tombstone in memory but still grow the WAL.
+On open, existing WAL sizes are carried into the budget alongside the new WAL.
+After recovery and collection initialization, an over-budget collection flushes
+before serving requests. Recovery still reads existing WAL batches into memory;
+this check does not bound the peak memory of replaying a pre-existing large WAL.
+
+The check happens after applying a write, so one batch may overshoot the budget.
+A successful flush commits the Manifest before deleting the checkpointed WALs
+and resetting their byte accounting. Logical `MemTable.size()` is unchanged.
+
+Set these environment variables before importing Milvus Lite or starting the
+server to override the budgets (positive integer byte counts):
+
+```bash
+export MILVUS_LITE_MEMTABLE_MEMORY_LIMIT_BYTES=134217728  # 128 MiB
+export MILVUS_LITE_WAL_SIZE_LIMIT_BYTES=268435456         # 256 MiB
+```
+
+The settings are read once at import time and apply separately to every
+collection in the process. Invalid values fail with an error naming the setting.
+They do not impose a database-wide or process-wide memory cap.

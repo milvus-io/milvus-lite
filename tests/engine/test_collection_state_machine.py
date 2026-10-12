@@ -94,7 +94,7 @@ def _assert_collection_matches_model(col: Collection, model: Dict[str, dict]) ->
 
 @pytest.mark.parametrize("seed", range(8))
 def test_collection_randomized_state_machine(tmp_path, monkeypatch, seed):
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     rng = random.Random(seed)
     data_dir = str(tmp_path / f"db_{seed}")

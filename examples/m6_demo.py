@@ -1,7 +1,7 @@
 """M6 demo — long-run with compaction + tombstone GC.
 
 Inserts a moderate number of records with frequent flushes triggered
-by a small MEMTABLE_SIZE_LIMIT, periodically deletes some, and prints
+by a small memory byte budget, periodically deletes some, and prints
 the data file count and delta_index size as the run progresses.
 
 Verifies:
@@ -48,12 +48,12 @@ def main() -> None:
     ]
 
     # Force frequent flushes so compaction is exercised hard.
-    original_limit = collection_mod.MEMTABLE_SIZE_LIMIT
-    collection_mod.MEMTABLE_SIZE_LIMIT = 8
+    original_limit = collection_mod.MEMTABLE_MEMORY_LIMIT
+    collection_mod.MEMTABLE_MEMORY_LIMIT = 640
 
     data_dir = tempfile.mkdtemp(prefix="milvus_lite_m6_")
     print(f"data_dir = {data_dir}")
-    print(f"MEMTABLE_SIZE_LIMIT = {collection_mod.MEMTABLE_SIZE_LIMIT}, "
+    print(f"MEMTABLE_MEMORY_LIMIT = {collection_mod.MEMTABLE_MEMORY_LIMIT}, "
           f"MAX_DATA_FILES = {MAX_DATA_FILES}")
 
     try:
@@ -120,7 +120,7 @@ def main() -> None:
         col.close()
         print("\nOK — M6 demo: file count bounded, deletes effective, search consistent")
     finally:
-        collection_mod.MEMTABLE_SIZE_LIMIT = original_limit
+        collection_mod.MEMTABLE_MEMORY_LIMIT = original_limit
         shutil.rmtree(data_dir, ignore_errors=True)
 
 

@@ -128,6 +128,8 @@ class WAL:
         self._data_sink: Optional[BinaryIO] = None
         self._delta_sink: Optional[BinaryIO] = None
         self._closed = False
+        self._data_size_bytes = 0
+        self._delta_size_bytes = 0
 
         os.makedirs(wal_dir, exist_ok=True)
 
@@ -136,6 +138,22 @@ class WAL:
     @property
     def number(self) -> int:
         return self._number
+
+    @property
+    def size_bytes(self) -> int:
+        """Bytes appended to this WAL pair, including Arrow IPC overhead."""
+        return self._data_size_bytes + self._delta_size_bytes
+
+    @staticmethod
+    def existing_size_bytes(wal_dir: str) -> int:
+        """Size of all existing WAL pairs; called once when opening a collection."""
+        total = 0
+        for number in WAL.find_wal_files(wal_dir):
+            for template in (WAL_DATA_TEMPLATE, WAL_DELTA_TEMPLATE):
+                path = os.path.join(wal_dir, template.format(n=number, w=SEQ_FORMAT_WIDTH))
+                if os.path.exists(path):
+                    total += os.path.getsize(path)
+        return total
 
     @property
     def data_path(self) -> Optional[str]:
@@ -182,6 +200,7 @@ class WAL:
         # Always flush Python buffer → OS. Cheap (one syscall) and
         # required for the recovery contract under any crash semantics.
         self._data_sink.flush()
+        self._data_size_bytes = self._data_sink.tell()
         if self._sync_mode == "batch":
             os.fsync(self._data_sink.fileno())
 
@@ -199,6 +218,7 @@ class WAL:
 
         self._delta_writer.write_batch(record_batch)
         self._delta_sink.flush()
+        self._delta_size_bytes = self._delta_sink.tell()
         if self._sync_mode == "batch":
             os.fsync(self._delta_sink.fileno())
 

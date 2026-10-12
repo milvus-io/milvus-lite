@@ -22,6 +22,7 @@ replays operations out of physical order.
 
 from __future__ import annotations
 
+import sys
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,7 +49,7 @@ class MemTable:
     Phase 2 supports:
         - apply_insert / apply_delete (seq-aware, order-independent)
         - get(pk) for point reads
-        - size() for flush triggering
+        - size() for logical counts, estimated_memory_bytes for flush triggering
         - get_active_records() for search/get during the read path
 
     Phase 3 will add flush() which dedups via _pk_index and emits Arrow
@@ -64,6 +65,8 @@ class MemTable:
         self._insert_batches: List[pa.RecordBatch] = []
         self._pk_index: Dict[Any, _PkPos] = {}
         self._delete_index: Dict[Any, _DeleteEntry] = {}
+        self._insert_bytes = 0
+        self._delete_bytes = 0
         self._lock = threading.RLock()
 
     # ── write path ──────────────────────────────────────────────
@@ -103,11 +106,16 @@ class MemTable:
                 # take effect
                 self._pk_index[pk] = (batch_idx, row_idx, seq)
                 # our seq > existing_delete (we passed the check above)
-                self._delete_index.pop(pk, None)
+                removed_delete = self._delete_index.pop(pk, None)
+                if removed_delete is not None:
+                    self._delete_bytes -= self._delete_entry_bytes(pk, removed_delete)
                 any_kept = True
 
             if any_kept:
                 self._insert_batches.append(batch)
+                # Include superseded rows and buffers retained by sliced batches.
+                # Shared buffers across batches may be counted more than once.
+                self._insert_bytes += batch.get_total_buffer_size()
 
     def apply_delete(self, batch: pa.RecordBatch) -> None:
         """Apply a wal_delta RecordBatch.
@@ -140,7 +148,11 @@ class MemTable:
                 # update delete watermark to the larger seq
                 existing_delete = self._delete_index.get(pk)
                 if existing_delete is None or seq > existing_delete[0]:
-                    self._delete_index[pk] = (seq, partition)
+                    entry = (seq, partition)
+                    if existing_delete is not None:
+                        self._delete_bytes -= self._delete_entry_bytes(pk, existing_delete)
+                    self._delete_index[pk] = entry
+                    self._delete_bytes += self._delete_entry_bytes(pk, entry)
 
                 # if pk_index entry exists with smaller seq, evict it
                 if existing_pos is not None and existing_pos[2] < seq:
@@ -404,12 +416,29 @@ class MemTable:
     def size(self) -> int:
         """Active pk count + tombstone count.
 
-        Used by flush triggering. NOT the physical row count of
-        _insert_batches — that includes shadowed rows that no longer
-        contribute to the visible state.
+        NOT the physical row count of _insert_batches — that includes
+        shadowed rows that no longer contribute to the visible state.
         """
         with self._lock:
             return len(self._pk_index) + len(self._delete_index)
+
+    @staticmethod
+    def _delete_entry_bytes(pk: Any, entry: _DeleteEntry) -> int:
+        return sys.getsizeof(pk) + sys.getsizeof(entry) + sum(
+            sys.getsizeof(value) for value in entry
+        )
+
+    @property
+    def estimated_memory_bytes(self) -> int:
+        """Retained Arrow buffers plus tombstone payloads, including stale rows.
+
+        Maintained incrementally, including during WAL replay. This is a flush
+        budget, not process RSS: Python container/PK-index overhead is excluded
+        and shared Arrow buffers can be counted more than once. Delete batches
+        are not retained; only their current tombstone payloads are counted.
+        """
+        with self._lock:
+            return self._insert_bytes + self._delete_bytes
 
     # ── flush ───────────────────────────────────────────────────
 
