@@ -303,16 +303,16 @@ def _make_record(i):
     }
 
 
-def test_flush_triggers_at_size_limit(tmp_path, schema, monkeypatch):
-    """When MemTable hits MEMTABLE_SIZE_LIMIT, insert should trigger a flush."""
-    # Lower the limit so we don't have to insert 10K rows.
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+def test_flush_triggers_at_memory_limit(tmp_path, schema, monkeypatch):
+    """When MemTable hits MEMTABLE_MEMORY_LIMIT, insert should trigger a flush."""
+    # A small byte budget forces flushes with these short records.
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
 
     data_dir = str(tmp_path / "data")
     col = Collection("c", data_dir, schema)
     for i in range(10):
         col.insert([_make_record(i)])
-    # After 10 inserts with limit=5, we should have flushed at least once.
+    # Ten inserts exceed the 250-byte budget, triggering at least one flush.
     # The post-flush MemTable holds the records that came AFTER the flush.
     assert col.count() < 10
 

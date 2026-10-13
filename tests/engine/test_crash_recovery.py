@@ -146,12 +146,12 @@ def test_crash_during_step3_parquet_write(tmp_path, schema, monkeypatch):
 
     Recovery: WAL replay restores the records; orphan Parquet is cleaned.
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 3)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 150)
 
     data_dir = str(tmp_path / "d")
     col = Collection("c", data_dir, schema)
 
-    # Insert 2 records — no flush yet (limit=3)
+    # Two single-row batches fit below the 150-byte budget; three exceed it.
     col.insert([_record(0)])
     col.insert([_record(1)])
 
@@ -200,7 +200,7 @@ def test_crash_during_step3_parquet_write(tmp_path, schema, monkeypatch):
 def test_crash_during_step5_manifest_save(tmp_path, schema, monkeypatch):
     """Crash inside Manifest.save(). Either the rename completed (new
     manifest) or it didn't (old manifest); both cases must recover."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 3)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 150)
 
     data_dir = str(tmp_path / "d")
     col = Collection("c", data_dir, schema)
@@ -250,7 +250,7 @@ def test_crash_after_manifest_before_wal_delete(tmp_path, schema, monkeypatch):
     rows that overlap with what's already in the Parquet. _seq dedup
     handles this — the rows simply re-enter MemTable with the same _seq.
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 3)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 150)
 
     data_dir = str(tmp_path / "d")
     col = Collection("c", data_dir, schema)
@@ -294,7 +294,7 @@ def test_repeated_crash_recovery_cycles(tmp_path, schema, monkeypatch):
     rather than close (which would flush to Parquet, where get() can't
     see them yet).
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 100)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 5000)
 
     data_dir = str(tmp_path / "d")
 
@@ -334,7 +334,7 @@ def test_random_insert_crash_recover(tmp_path, schema, monkeypatch, seed):
     import random
     rng = random.Random(seed)
     # Small limit so flushes happen mid-test.
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 7)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 350)
 
     data_dir = str(tmp_path / f"d{seed}")
     committed_pks: set = set()
@@ -443,7 +443,7 @@ def test_random_insert_delete_crash_recover(tmp_path, schema, monkeypatch):
     compared against the final Collection state."""
     import random
     rng = random.Random(13)
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 7)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 350)
 
     data_dir = str(tmp_path / "d")
     expected: dict = {}  # pk → label or None for deleted

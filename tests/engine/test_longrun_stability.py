@@ -82,8 +82,9 @@ def _run_indexed_churn(
     seed: int,
     file_count_limit: int,
 ) -> None:
+    # Preserve approximately the intended rows per flush using a byte budget.
     monkeypatch.setattr(
-        "milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", memtable_limit,
+        "milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", memtable_limit * (4 * dim + 100),
     )
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 3,

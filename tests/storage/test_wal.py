@@ -88,6 +88,21 @@ def test_delta_path_none_before_write(wal):
     assert wal.delta_path is None
 
 
+def test_size_bytes_tracks_both_streams(wal, wal_dir, wal_data_schema, wal_delta_schema):
+    assert wal.size_bytes == 0
+    assert WAL.existing_size_bytes(wal_dir) == 0
+    try:
+        for _ in range(3):
+            wal.write_insert(_make_data_batch(wal_data_schema))
+            wal.write_delete(_make_delta_batch(wal_delta_schema))
+            disk_bytes = os.path.getsize(wal.data_path) + os.path.getsize(wal.delta_path)
+            assert wal.size_bytes == disk_bytes
+            assert WAL.existing_size_bytes(wal_dir) == disk_bytes
+    finally:
+        wal.close_and_delete()
+    assert WAL.existing_size_bytes(wal_dir) == 0
+
+
 # ---------------------------------------------------------------------------
 # Write + file creation
 # ---------------------------------------------------------------------------

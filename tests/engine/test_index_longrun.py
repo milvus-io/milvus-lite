@@ -86,7 +86,7 @@ def test_index_lifecycle_long_run_brute_force(tmp_path, schema, monkeypatch):
     flush/compaction's _ensure_loaded_segments_indexed +
     _cleanup_orphan_index_files coordination.
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 3
     )
@@ -104,7 +104,7 @@ def test_index_lifecycle_long_run_brute_force(tmp_path, schema, monkeypatch):
         n_records = 500
         for i in range(n_records):
             c.insert([{"id": i, "vec": _vec(i), "title": f"t{i}"}])
-            # Insert triggers a flush at MEMTABLE_SIZE_LIMIT, which
+            # Insert triggers a flush at MEMTABLE_MEMORY_LIMIT, which
             # in turn may trigger compaction. After each insert
             # the invariant must hold.
             _assert_one_to_one(data_dir, "_default", ".vec.brute_force.idx", c)
@@ -121,7 +121,7 @@ def test_index_lifecycle_long_run_brute_force(tmp_path, schema, monkeypatch):
 def test_index_lifecycle_with_deletes_brute_force(tmp_path, schema, monkeypatch):
     """Insert + delete + flush + compaction interleaved. The .idx ↔ data
     invariant must hold throughout, AND deletes must remain effective."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 3
     )
@@ -167,7 +167,7 @@ def test_index_lifecycle_with_deletes_brute_force(tmp_path, schema, monkeypatch)
 def test_restart_after_long_run_brute_force(tmp_path, schema, monkeypatch):
     """Long run → close → reopen → load (should read all .idx from disk)
     → search results match what we had before close."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 3
     )
@@ -213,7 +213,7 @@ def test_index_lifecycle_long_run_hnsw(tmp_path, schema, monkeypatch):
     """Same workload as the brute-force long run, but with FAISS HNSW.
     Catches any FAISS-specific failure mode in the flush/compaction
     hooks (e.g. .idx file format mismatch, stem-parsing edge cases)."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 3
     )

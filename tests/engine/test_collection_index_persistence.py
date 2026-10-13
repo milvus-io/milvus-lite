@@ -16,7 +16,6 @@ import os
 import numpy as np
 import pytest
 
-from milvus_lite.constants import MEMTABLE_SIZE_LIMIT
 from milvus_lite.engine.collection import Collection
 from milvus_lite.schema.types import CollectionSchema, DataType, FieldSchema
 

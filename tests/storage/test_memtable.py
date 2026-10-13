@@ -402,6 +402,38 @@ def test_size_counts_active_pks_not_physical_rows(mt, wal_data_schema):
     assert mt.num_physical_rows() == 5  # five physical rows accumulated
 
 
+def test_memory_budget_retains_stale_batches(mt, wal_data_schema, wal_delta_schema):
+    batch = insert_batch(wal_data_schema, [(1, "_default", "X", [1.0, 1.0], "v1")])
+    mt.apply_insert(batch)
+    first_bytes = mt.estimated_memory_bytes
+    assert first_bytes > 0
+    newer = insert_batch(wal_data_schema, [(2, "_default", "X", [2.0, 2.0], "v2")])
+    mt.apply_insert(newer)
+    assert mt.estimated_memory_bytes > first_bytes
+    retained_bytes = mt.estimated_memory_bytes
+    mt.apply_insert(batch)  # Fully stale replay is not retained.
+    assert mt.estimated_memory_bytes == retained_bytes
+    mt.apply_delete(delete_batch(wal_delta_schema, ["X"], seq=3))
+    assert mt.estimated_memory_bytes > retained_bytes
+    deleted_bytes = mt.estimated_memory_bytes
+    mt.apply_delete(delete_batch(wal_delta_schema, ["X"], seq=4))
+    assert mt.estimated_memory_bytes == deleted_bytes  # One retained tombstone.
+    mt.apply_insert(newer)  # An older insert cannot remove the tombstone.
+    assert mt.estimated_memory_bytes == deleted_bytes
+    last = insert_batch(wal_data_schema, [(5, "_default", "X", [3.0, 3.0], "v3")])
+    mt.apply_insert(last)
+    assert mt.estimated_memory_bytes == retained_bytes + last.get_total_buffer_size()
+
+
+def test_memory_budget_counts_full_retained_slice_buffers(mt, wal_data_schema):
+    batch = insert_batch(wal_data_schema, [
+        (i, "_default", str(i), [1.0, 1.0], "x" * 1024) for i in range(10)
+    ])
+    mt.apply_insert(batch.slice(0, 1))
+    assert mt.size() == 1
+    assert mt.estimated_memory_bytes >= batch.nbytes
+
+
 def test_size_includes_tombstones(mt, wal_data_schema, wal_delta_schema):
     mt.apply_insert(insert_batch(wal_data_schema, [
         (1, "_default", "a", [0.1, 0.1], "x"),

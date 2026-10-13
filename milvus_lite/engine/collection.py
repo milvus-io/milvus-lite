@@ -4,7 +4,7 @@ Phase 4 scope:
     - insert(records, partition_name="_default")
     - get(pks, partition_names=None) — reads MemTable + Segments
     - search(query_vectors, top_k, metric_type, partition_names=None)
-    - Synchronous flush triggered when MemTable.size() >= MEMTABLE_SIZE_LIMIT
+    - Synchronous flush triggered by MemTable memory or uncheckpointed WAL bytes
     - Crash recovery on construction (replays WAL, rebuilds delta_index,
       loads all manifest segments)
     - WAL + MemTable + Manifest + DeltaIndex + Segment cache
@@ -42,8 +42,9 @@ from milvus_lite.constants import (
     DEFAULT_NUM_PARTITIONS,
     DEFAULT_PARTITION,
     FILTER_CACHE_SIZE,
-    MEMTABLE_SIZE_LIMIT,
+    MEMTABLE_MEMORY_LIMIT,
     PARTITION_KEY_BUCKET_PREFIX,
+    WAL_SIZE_LIMIT,
 )
 from milvus_lite.engine.compaction import CompactionManager
 from milvus_lite.engine.flush import execute_flush
@@ -193,7 +194,7 @@ class Collection:
 
     insert() validates fail-fast (no partial state on failure), allocates
     one _seq per row, writes to WAL then MemTable, and triggers a
-    synchronous flush if the MemTable hit the size limit.
+    synchronous flush if the MemTable or WAL reaches its byte budget.
     """
 
     def __init__(
@@ -238,6 +239,9 @@ class Collection:
         ) + 1
 
         wal_dir = os.path.join(data_dir, "wal")
+        # Recovery may leave several WAL pairs, including after repeated restarts.
+        # They remain part of the budget until a successful checkpoint deletes them.
+        self._recovered_wal_bytes = WAL.existing_size_bytes(wal_dir)
         self._wal = WAL(
             wal_dir=wal_dir,
             wal_data_schema=self._wal_data_schema,
@@ -333,7 +337,13 @@ class Collection:
                 if not self._manifest.has_partition(bucket):
                     self._manifest.add_partition(bucket)
 
-        self._schedule_bg_maintenance()
+        # Repair over-budget state recovered from older versions even if the
+        # application only reads after reopening. All flush dependencies and
+        # sequence allocators must be initialized before this check.
+        if self._should_flush():
+            self._trigger_flush()
+        else:
+            self._schedule_bg_maintenance()
 
     # ── public API ──────────────────────────────────────────────
 
@@ -346,7 +356,7 @@ class Collection:
 
         Each record is validated up-front (fail fast — no partial state
         on validation error). After WAL+MemTable apply, if the MemTable
-        has hit MEMTABLE_SIZE_LIMIT, a synchronous flush runs before
+        or WAL has hit its byte budget, a synchronous flush runs before
         returning.
 
         When ``is_partition_key`` is set on a schema field, records are
@@ -405,8 +415,8 @@ class Collection:
         op = InsertOp(partition=partition_name, batch=batch)
         self._apply(op)
 
-        # 8. trigger flush if we hit the size limit
-        if self._memtable.size() >= MEMTABLE_SIZE_LIMIT:
+        # 8. trigger flush if either byte budget is exhausted
+        if self._should_flush():
             self._trigger_flush()
 
         return [r[self._pk_name] for r in records]
@@ -439,7 +449,7 @@ class Collection:
             for (orig_idx, r) in bucket_entries:
                 ordered_pks.append((orig_idx, r[self._pk_name]))
 
-        if self._memtable.size() >= MEMTABLE_SIZE_LIMIT:
+        if self._should_flush():
             self._trigger_flush()
 
         # Return PKs in original input order
@@ -587,7 +597,7 @@ class Collection:
         op = DeleteOp(partition=target_partition, batch=batch)
         self._apply(op)
 
-        if self._memtable.size() >= MEMTABLE_SIZE_LIMIT:
+        if self._should_flush():
             self._trigger_flush()
 
         return len(pks)
@@ -1924,6 +1934,12 @@ class Collection:
             self._wal.write_delete(op.batch)
             self._memtable.apply_delete(op.batch)
 
+    def _should_flush(self) -> bool:
+        return (
+            self._memtable.estimated_memory_bytes >= MEMTABLE_MEMORY_LIMIT
+            or self._recovered_wal_bytes + self._wal.size_bytes >= WAL_SIZE_LIMIT
+        )
+
     def _trigger_flush(self) -> None:
         """Flush pipeline — synchronous up to data persistence, then
         compaction + index build are offloaded to the background worker.
@@ -1970,6 +1986,7 @@ class Collection:
                 delta_index=self._delta_index,
                 new_wal_number=new_wal_number,
             )
+            self._recovered_wal_bytes = 0
             self._refresh_segment_cache()
 
         # ── Steps 5-7: async compaction + index build

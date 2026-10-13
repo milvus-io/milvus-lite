@@ -251,11 +251,12 @@ def test_delete_then_insert_then_restart(tmp_path, schema):
 def test_delete_triggers_flush(tmp_path, schema, monkeypatch):
     """A delete that pushes the MemTable over the size limit must
     trigger a synchronous flush."""
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 5)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 250)
     col = Collection("c", str(tmp_path / "d"), schema)
     col.insert([_make_record(i) for i in range(4)])
-    # Memtable size = 4. The next delete bumps it past 5.
+    # Insert buffers fit in the budget; the added tombstones exceed it.
+    assert col._memtable.size() == 4
     col.delete(["ghost1", "ghost2"])
     # Should have flushed.
-    assert col.count() < 6
+    assert col._memtable.estimated_memory_bytes == 0
     col.close()

@@ -58,7 +58,7 @@ def test_sustained_readers_with_single_writer_flush_and_compaction(
     background work drains, the final Collection state is compared exactly
     against a reference dict updated after each successful write.
     """
-    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_SIZE_LIMIT", 9)
+    monkeypatch.setattr("milvus_lite.engine.collection.MEMTABLE_MEMORY_LIMIT", 450)
     monkeypatch.setattr(
         "milvus_lite.engine.compaction.COMPACTION_MIN_FILES_PER_BUCKET", 2,
     )
