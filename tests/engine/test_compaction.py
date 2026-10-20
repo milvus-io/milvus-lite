@@ -638,3 +638,37 @@ def test_concurrent_inserts_with_compaction(tmp_path):
     assert len(results) == total_expected
 
     db.close()
+
+
+@pytest.mark.parametrize("failure", ["file", "directory", "manifest"])
+def test_compaction_sync_failure_keeps_input_files(harness, monkeypatch, failure):
+    import errno
+    from milvus_lite.storage import durability, manifest as manifest_module
+
+    files = [
+        _write_data_file_with_records(
+            harness, [(seq, str(seq), [0.5, 0.25], "x")], seq, seq,
+        )
+        for seq in (1, 2)
+    ]
+    harness["manifest"].save()
+    partition_dir = os.path.join(harness["data_dir"], "partitions", DEFAULT_PARTITION)
+
+    def fail(*args):
+        raise OSError(errno.EIO, "injected sync failure")
+
+    with monkeypatch.context() as patch:
+        if failure == "file":
+            patch.setattr(durability.os, "fsync", fail)
+        elif failure == "directory":
+            patch.setattr(durability, "fsync_directory", fail)
+        else:
+            patch.setattr(manifest_module, "fsync_directory", fail)
+        with pytest.raises(OSError):
+            harness["mgr"]._compact_files(
+                DEFAULT_PARTITION, partition_dir, files,
+                harness["manifest"], harness["delta_index"],
+            )
+    assert all(os.path.exists(os.path.join(partition_dir, rel)) for rel in files)
+    if failure != "manifest":
+        assert Manifest.load(harness["data_dir"]).get_data_files(DEFAULT_PARTITION) == files

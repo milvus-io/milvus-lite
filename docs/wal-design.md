@@ -648,7 +648,20 @@ At T4:
 `sync_mode="close"` calls `os.fsync(sink.fileno())` once before `close_and_delete` to plug this window:
 - WAL is closed when flush is triggered, fsync before close persists the entire file
 - Frequency follows the MemTable memory / uncheckpointed WAL byte budgets (128 MiB memory / 256 MiB WAL by default), not the number of distinct keys.
-- Critical path: durability on the "WAL switch → Manifest update" commit path is now ensured
+- WAL fsync alone does not make the flush commit durable: the WAL is deleted after the Manifest commit.
+
+Flush and compaction therefore use the following persistence order:
+
+1. Finish each data/delta Parquet file, flush the Python buffer, and fsync the file.
+2. Fsync its directory, the partition directory, and the `partitions/` directory,
+   bottom-up, to persist file entries and newly created directories.
+3. Save the Manifest using file fsync, atomic replacement, and collection-directory fsync.
+4. Only after these barriers succeed, delete the frozen WAL (flush) or input files (compaction).
+
+File fsync and supported directory fsync failures propagate to the caller and prevent
+obsolete-file cleanup. Platforms that cannot sync directories retain best-effort
+namespace durability. This guarantees the flushed state on supported filesystems;
+`sync_mode="close"` does not guarantee unflushed writes survive power loss.
 
 **Cost of `sync_mode="batch"`**:
 
