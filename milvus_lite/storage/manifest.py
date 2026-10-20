@@ -40,6 +40,7 @@ from milvus_lite.exceptions import (
     PartitionAlreadyExistsError,
     PartitionNotFoundError,
 )
+from milvus_lite.storage.durability import fsync_directory
 from milvus_lite.storage.paths import normalize_rel_path
 
 if TYPE_CHECKING:
@@ -135,16 +136,9 @@ class Manifest:
         # 4. Version bump only after the commit point succeeds.
         self._version = new_version
 
-        # 5. fsync the directory so the replacement survives a crash
-        try:
-            dir_fd = os.open(self._data_dir, os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
-        except OSError:
-            # Directory fsync is not supported on every platform; best effort.
-            pass
+        # 5. Do not allow callers to delete recovery files after an I/O
+        # failure, even though the rename has already become visible.
+        fsync_directory(self._data_dir)
 
     @classmethod
     def load(cls, data_dir: str) -> "Manifest":

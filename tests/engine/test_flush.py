@@ -340,3 +340,86 @@ def test_flush_cleans_up_orphan_wals(harness, wal_data_schema):
     assert not os.path.exists(orphan_path)
     # And the just-flushed WAL is also gone.
     assert not os.path.exists(os.path.join(wal_dir, "wal_data_000001.arrow"))
+
+
+@pytest.mark.parametrize("failure", ["file", "directory", "manifest"])
+def test_sync_failure_preserves_wal(harness, wal_data_schema, monkeypatch, failure):
+    """Never retire the recovery source when a persistence barrier fails."""
+    import errno
+    from milvus_lite.storage import durability, manifest as manifest_module
+
+    batch = _insert_batch(wal_data_schema, [
+        (1, DEFAULT_PARTITION, "a", [0.5, 0.25], "x"),
+    ])
+    harness["wal"].write_insert(batch)
+    harness["memtable"].apply_insert(batch)
+    harness["manifest"].save()
+
+    def fail(*args):
+        raise OSError(errno.EIO, "injected sync failure")
+
+    with monkeypatch.context() as patch:
+        if failure == "file":
+            patch.setattr(durability.os, "fsync", fail)
+        elif failure == "directory":
+            patch.setattr(durability, "fsync_directory", fail)
+        else:
+            patch.setattr(manifest_module, "fsync_directory", fail)
+        with pytest.raises(OSError):
+            execute_flush(
+                frozen_memtable=harness["memtable"], frozen_wal=harness["wal"],
+                data_dir=harness["data_dir"], schema=harness["schema"],
+                manifest=harness["manifest"], delta_index=harness["delta_index"],
+                new_wal_number=2,
+            )
+
+    wal_dir = os.path.join(harness["data_dir"], "wal")
+    assert WAL.find_wal_files(wal_dir) == [1]
+    data, _ = WAL.recover(wal_dir, 1)
+    assert sum(batch.num_rows for batch in data) == 1
+    if failure != "manifest":
+        assert Manifest.load(harness["data_dir"]).get_data_files(DEFAULT_PARTITION) == []
+    harness["wal"].close_and_delete()
+
+
+def test_parquet_barriers_precede_manifest_and_wal_cleanup(
+    harness, wal_data_schema, wal_delta_schema, monkeypatch,
+):
+    from milvus_lite.storage import durability
+
+    insert = _insert_batch(wal_data_schema, [
+        (1, DEFAULT_PARTITION, "a", [0.5, 0.25], "x"),
+    ])
+    delete = _delete_batch(wal_delta_schema, ["b"], seq=2)
+    harness["wal"].write_insert(insert)
+    harness["wal"].write_delete(delete)
+    harness["memtable"].apply_insert(insert)
+    harness["memtable"].apply_delete(delete)
+    events = []
+    real_sync = durability.fsync_directory
+    real_save = harness["manifest"].save
+    real_cleanup = harness["wal"].close_and_delete
+
+    def sync(path):
+        real_sync(path)
+        events.append(os.path.basename(path))
+
+    def save():
+        assert events == ["data", DEFAULT_PARTITION, "partitions",
+                          "delta", DEFAULT_PARTITION, "partitions"]
+        real_save()
+        events.append("manifest")
+
+    def cleanup():
+        assert events[-1] == "manifest"
+        real_cleanup()
+        events.append("cleanup")
+
+    monkeypatch.setattr(durability, "fsync_directory", sync)
+    monkeypatch.setattr(harness["manifest"], "save", save)
+    monkeypatch.setattr(harness["wal"], "close_and_delete", cleanup)
+    execute_flush(
+        harness["memtable"], harness["wal"], harness["data_dir"],
+        harness["schema"], harness["manifest"], harness["delta_index"], 2,
+    )
+    assert events[-2:] == ["manifest", "cleanup"]

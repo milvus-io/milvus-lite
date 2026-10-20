@@ -19,6 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from milvus_lite.constants import DATA_FILE_TEMPLATE, SEQ_FORMAT_WIDTH
+from milvus_lite.storage.durability import write_parquet_durable
 from milvus_lite.storage.paths import persisted_rel_path
 
 
@@ -56,7 +57,7 @@ def write_data_file(
     rel_path = persisted_rel_path(rel_dir, filename)
     abs_path = os.path.join(partition_dir, rel_dir, filename)
 
-    pq.write_table(table, abs_path)
+    write_parquet_durable(table, abs_path)
     return rel_path
 
 
