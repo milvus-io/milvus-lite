@@ -93,6 +93,26 @@ def test_query_count_star_no_filter(milvus_client):
     milvus_client.drop_collection("cnt3")
 
 
+def test_query_count_star_no_filter_with_partition_names(milvus_client):
+    """count(*) with empty filter counts only the requested partitions."""
+    _setup(milvus_client, "cnt4")
+    milvus_client.create_partition("cnt4", "p1")
+    milvus_client.insert("cnt4", [
+        {"id": 100 + i, "vec": [1.0, 0, 0, 0], "tag": "p", "score": 0}
+        for i in range(3)
+    ], partition_name="p1")
+    _load(milvus_client, "cnt4")
+    result = milvus_client.query("cnt4", filter="",
+                                 output_fields=["count(*)"],
+                                 partition_names=["p1"])
+    assert result[0]["count(*)"] == 3
+    result = milvus_client.query("cnt4", filter="",
+                                 output_fields=["count(*)"],
+                                 partition_names=["_default", "p1"])
+    assert result[0]["count(*)"] == 13
+    milvus_client.drop_collection("cnt4")
+
+
 # ---------------------------------------------------------------------------
 # 3. get() with output_fields
 # ---------------------------------------------------------------------------

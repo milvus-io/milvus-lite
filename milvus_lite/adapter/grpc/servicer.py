@@ -442,6 +442,11 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                         timezone=timezone,
                     )
                     count = len(rows)
+                elif partition_names:
+                    count = sum(
+                        col.partition_num_entities(name)
+                        for name in dict.fromkeys(partition_names)
+                    )
                 else:
                     count = col.num_entities
                 # Return count as a single-row result with count field
