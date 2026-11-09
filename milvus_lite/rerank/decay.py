@@ -42,6 +42,9 @@ class DecayReranker:
                 f"decay: invalid function {function!r}, "
                 f"must be one of {sorted(self._VALID_FUNCTIONS)}"
             )
+        for name, value in (("origin", origin), ("scale", scale), ("offset", offset)):
+            if not math.isfinite(value):
+                raise ValueError(f"decay: {name} must be finite, got {value}")
         if scale <= 0:
             raise ValueError(f"decay: scale must be > 0, got {scale}")
         if offset < 0:

@@ -282,6 +282,21 @@ class TestDecayReranker:
         with pytest.raises(ValueError, match="offset must be >= 0"):
             DecayReranker("gauss", origin=0, scale=100, offset=-5)
 
+    @pytest.mark.parametrize(
+        ("parameter", "value"),
+        [
+            ("origin", float("nan")),
+            ("scale", float("nan")),
+            ("scale", float("inf")),
+            ("offset", float("nan")),
+        ],
+    )
+    def test_nonfinite_parameters(self, parameter, value):
+        kwargs = {"origin": 0.0, "scale": 100.0, "offset": 0.0}
+        kwargs[parameter] = value
+        with pytest.raises(ValueError, match=f"{parameter} must be finite"):
+            DecayReranker("gauss", **kwargs)
+
     def test_invalid_decay(self):
         with pytest.raises(ValueError, match="decay must be 0 < decay < 1"):
             DecayReranker("gauss", origin=0, scale=100, decay=1.0)
