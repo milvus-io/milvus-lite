@@ -5,7 +5,8 @@ Pulls the engine-relevant pieces out of pymilvus's SearchRequest:
     - query vectors    — packed inside placeholder_group bytes
     - top_k            — search_params["topk"], JSON-encoded
     - metric_type      — search_params["metric_type"], JSON-encoded string
-    - filter expr      — request.dsl
+    - filter expr      — request.dsl with {placeholders} rendered from
+                         request.expr_template_values
     - partition_names  — request.partition_names
     - output_fields    — request.output_fields
 
@@ -31,6 +32,7 @@ from typing import List, Optional, Tuple
 
 from pymilvus.grpc_gen import common_pb2
 
+from milvus_lite.adapter.grpc.translators.expr_template import render_expr_template
 from milvus_lite.exceptions import SchemaValidationError
 from milvus_lite.rerank.boost import decode_hybrid_function_score
 
@@ -62,14 +64,22 @@ def parse_search_request(request, default_metric_type: Optional[str] = None) -> 
 
     Raises:
         SchemaValidationError: missing required field, unsupported
-            placeholder type, or malformed search_params
+            placeholder type, malformed search_params, or an unresolved
+            filter template placeholder
     """
     query_vectors = _decode_placeholder_group(request.placeholder_group)
     top_k, metric_type, search_params = _decode_search_params(
         request.search_params, default_metric_type=default_metric_type,
     )
 
-    expr = request.dsl if request.dsl else None
+    expr = (
+        render_expr_template(
+            request.dsl,
+            getattr(request, "expr_template_values", None),
+        )
+        if request.dsl
+        else None
+    )
     partition_names = list(request.partition_names) or None
     output_fields = list(request.output_fields) or None
 
