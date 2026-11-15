@@ -34,6 +34,7 @@ from milvus_lite.adapter.grpc.errors import (
     success_status_kwargs,
     to_status_kwargs,
 )
+from milvus_lite.adapter.grpc.translators.expr_template import render_expr_template
 from milvus_lite.adapter.grpc.translators.index import (
     index_spec_to_kv_pairs,
     kv_pairs_to_index_params_dict,
@@ -361,8 +362,12 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
         try:
             col = self._get_collection(request, context)
             partition_name = request.partition_name or None
+            expr = render_expr_template(
+                request.expr,
+                getattr(request, "expr_template_values", None),
+            ) or None
 
-            pks = self._extract_pks_from_expr(request.expr, col)
+            pks = self._extract_pks_from_expr(expr, col)
             if pks is None:
                 # Fall back: query to find matching pks, then delete.
                 # Temporarily ensure loaded state for the query, then
@@ -371,7 +376,7 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 if original_state != "loaded":
                     col._load_state = "loaded"
                 try:
-                    hits = col.query(request.expr, output_fields=[col._pk_name])
+                    hits = col.query(expr, output_fields=[col._pk_name])
                 finally:
                     if original_state != "loaded":
                         col._load_state = original_state
@@ -408,6 +413,10 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
             col = self._get_collection(request, context)
             partition_names = list(request.partition_names) or None
             output_fields = list(request.output_fields) or None
+            expr = render_expr_template(
+                request.expr,
+                getattr(request, "expr_template_values", None),
+            ) or None
 
             # Extract limit and offset from query_params KV list.
             limit = None
@@ -434,7 +443,6 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
 
             # Handle count(*) aggregation
             if output_fields and "count(*)" in output_fields:
-                expr = request.expr if request.expr else None
                 if expr:
                     rows = col.query(
                         expr,
@@ -460,7 +468,6 @@ class MilvusServicer(milvus_pb2_grpc.MilvusServiceServicer):
                 output_fields, col.schema, api_kind="query"
             )
 
-            expr = request.expr if request.expr else None
             # Cursor pagination adds ``pk > last_pk`` between requests and
             # therefore requires every page to be in primary-key order.  It
             # must also avoid the get-by-PK fast path, which preserves input

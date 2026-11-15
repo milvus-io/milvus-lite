@@ -326,7 +326,7 @@ The command reads rows through `pymilvus` query iterators and writes BulkWriter 
 | Partitions | create, drop, list, partition-specific insert/search, partition key routing |
 | Search features | dense and sparse search, multiple dense-vector fields selected with `anns_field`, hybrid search, request-level boost/model/decay reranking, range search, group-by, iterators, offset, `round_decimal` |
 | Schema features | auto ID, nullable fields, default values, dynamic fields, BM25 functions, OpenAI text embedding functions |
-| Filtering | scalar, JSON path, dynamic field, array, text-match, and scan-based WKT geometry predicates |
+| Filtering | scalar, JSON path, dynamic field, array, text-match, scan-based WKT geometry predicates, and expression templates (`filter_params`) |
 | Text search | standard analyzer, optional Jieba analyzer, `text_match`, BM25 sparse inverted index |
 | Adapter | gRPC server implementing the supported local `pymilvus` workflow subset |
 

@@ -393,7 +393,9 @@ MilvusLite Phase 8's filter grammar is modeled after Milvus, so **the vast major
 
 ### 6.3 Implementation Approach
 
-**Current state**: After Phase 11, the MilvusLite parser natively supports `text_match`, `json_contains`, `array_contains`, and other functions. All expressions are passed through directly to the engine parser for processing, with no rewriting or interception needed at the adapter layer. Only `phrase_match` remains unsupported (the parser throws `FilterParseError` on unknown functions). A separate `translators/expr.py` file was not created — expressions are passed through directly.
+**Current state**: After Phase 11, the MilvusLite parser natively supports `text_match`, `json_contains`, `array_contains`, and other functions. Apart from template rendering, expressions are passed through directly to the engine parser; only `phrase_match` remains unsupported (the parser throws `FilterParseError` on unknown functions).
+
+Filter templates (`filter_params` in pymilvus, `expr_template_values` on the wire) are handled by `translators/expr_template.py`. It substitutes `{name}` placeholders with typed literals before pass-through: ints/floats/booleans unquoted, strings single-quoted and escaped, arrays rendered as `[v1, v2, ...]`. This is also the security boundary for untrusted values — they are never concatenated into the expression unquoted. Missing placeholders and binary/JSON array values are rejected with `SchemaValidationError`.
 
 ---
 

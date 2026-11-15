@@ -160,7 +160,7 @@ lite-v2/
 │   │       │   ├── records.py      #   FieldData (columnar) <-> list[dict] (row-wise) transposition
 │   │       │   ├── search.py       #   SearchRequest parsing
 │   │       │   ├── result.py       #   engine results -> SearchResults proto
-│   │       │   ├── expr.py         #   Milvus filter pass-through + unsupported function detection
+│   │       │   ├── expr_template.py #  filter_params / {name} placeholder rendering
 │   │       │   └── index.py        #   IndexParams <-> IndexSpec
 │   │       └── proto/              #   Generated stubs (committed to repo)
 │   │           ├── milvus_pb2.py
@@ -477,7 +477,7 @@ except ImportError:
 | `grpc/translators/records.py` | Column-row transposition | `fields_data_to_records(fields_data, num_rows) → List[dict]`, reverse `records_to_fields_data(records, schema, output_fields)` |
 | `grpc/translators/search.py` | Search request parsing | `parse_search_params(search_params_kv)`, `decode_search_query(request)` |
 | `grpc/translators/result.py` | Search result generation | engine `List[List[dict]]` -> milvus `SearchResults` proto |
-| `grpc/translators/expr.py` | Filter translation | Mostly pass-through + UNIMPLEMENTED function detection (json_contains, etc.) |
+| `grpc/translators/expr_template.py` | Filter template rendering | Replaces `{name}` placeholders from `expr_template_values` with typed, quoted literals before engine pass-through |
 | `grpc/translators/index.py` | Index parameter translation | `IndexParams (KeyValuePair list) ↔ IndexSpec` |
 | `grpc/proto/` | Generated stubs | Generated from milvus-io/milvus-proto; committed to repo |
 | `../cmdline.py` | Unified CLI entry point | `milvus-lite server --data-dir ./data --port 19530`; also includes `dump` |
